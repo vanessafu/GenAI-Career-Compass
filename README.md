@@ -1,1 +1,1 @@
-# GenAi-Career-Compass
+# Career Compass

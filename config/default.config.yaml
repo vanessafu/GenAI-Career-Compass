@@ -1,0 +1,66 @@
+"""
+Configuration - Default Settings
+
+Edit this file or set values via environment variables.
+"""
+
+# Application Core Settings
+APP:
+  API_HOST: "0.0.0.0"
+  API_PORT: 8000
+  LOG_LEVEL: "INFO"
+
+# Data Processing (CV Parser, JSON Processor)
+DATA_PROCESSING:
+  CV_MAX_SIZE_MB: 10
+  SUPPORTED_FORMATS: ["pdf", "docx", "txt"]
+  EXTRACTION_TIMEOUT: 30
+
+# Recommendation System (RAG, Matcher, Database Extractor)
+RECOMMENDATION:
+  MIN_MATCH_SCORE: 0.3
+  MAX_RESULTS: 10
+  SEARCH_TIMEOUT: 45
+  BATCH_SIZE: 50
+
+# LLM Configuration
+LLM:
+  PROVIDER: "openai"
+  MODEL: "gpt-3.5-turbo"
+  TEMPERATURE: 0.7
+  MAX_TOKENS: 2000
+  ENDPOINT: "https://api.openai.com/v1"
+
+# Embeddings
+EMBEDDINGS:
+  MODEL: "openai"
+  DIMENSION: 1536
+  BATCH_SIZE: 100
+
+# External Data Sources
+DATA_SOURCES:
+  ESCO:
+    ENDPOINT: "https://ec.europa.eu/esco/api"
+    VERSION: "1.0"
+    LANGUAGE: "en"
+  ONET:
+    ENDPOINT: "https://www.onetcenter.org/api"
+    VERSION: "25.0"
+
+# Vector Database (RAG)
+VECTOR_DB:
+  TYPE: "pinecone"
+  HOST: "localhost"
+  PORT: 6379
+  INDEX_NAME: "career_roles"
+
+# Caching
+CACHE:
+  ENABLED: true
+  TYPE: "redis"
+  TTL_SECONDS: 3600
+
+# Sessions
+SESSIONS:
+  STORAGE: "memory"
+  TTL_SECONDS: 86400
