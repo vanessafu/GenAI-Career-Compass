@@ -4,6 +4,7 @@ data/
 .env 
 .vscode/
 __pycache__/
+outputs/
 
 # Frontend
 frontend/node_modules/
