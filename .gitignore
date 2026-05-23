@@ -3,6 +3,7 @@ venv/
 data/ 
 .env 
 .vscode/
+.idea/
 __pycache__/
 outputs/
 

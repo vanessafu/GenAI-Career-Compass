@@ -37,3 +37,15 @@ Enter profile information manually without a CV:
 ```powershell
 python -m backend.app.cli manual-profile
 ```
+
+Generate identity and follow-up questions from confirmed JSON:
+
+```powershell
+python -m backend.app.cli identity-followups outputs/semjon_eschweiler_04_26_confirmed.json
+```
+
+Generate embedding input text from confirmed JSON:
+
+```powershell
+python -m backend.app.cli embedding-input outputs/semjon_eschweiler_04_26_confirmed.json
+```
