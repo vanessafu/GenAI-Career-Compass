@@ -1,1 +1,13 @@
 __pycache__/
+venv/
+.venv/
+data/
+.env
+.vscode/
+outputs/
+.DS_Store
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
