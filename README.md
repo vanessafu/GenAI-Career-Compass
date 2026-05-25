@@ -25,7 +25,7 @@ See [`docs/proposal.md`](docs/proposal.md) for the full project proposal.
 │       │   ├── cv_parsing/         # PDF -> structured CVData via OpenAI
 │       │   ├── cv_confirmation/    # Interactive confirmation + manual entry
 │       │   ├── role_matching/      # pgvector RAG over ESCO occupations
-│       │   └── prompt_engineering/ # (planned) editable prompt feature
+│       │   └── prompt_engineering/ # Career identity and embedding input generation
 │       └── scripts/                # (planned) data loader / preprocessing / embeddings
 ├── frontend/                   # React + Vite CV upload UI
 ├── docs/                       # Project proposal and additional docs
@@ -94,9 +94,12 @@ uv run career-compass parse-cv test_data/cvs/your_cv.pdf
 uv run career-compass confirm-cv test_data/cvs/your_cv.pdf
 uv run career-compass confirm-json outputs/your_cv_parsed.json
 uv run career-compass manual-profile
+uv run career-compass identity-followups outputs/your_confirmed.json
+uv run career-compass career-profile outputs/your_confirmed.json
+uv run career-compass embedding-input outputs/your_confirmed.json
+uv run career-compass embedding-chunks outputs/your_confirmed.json
 ```
 
-All CLI commands write their results into a local `outputs/` directory (gitignored).
 
 ## Running the frontend
 

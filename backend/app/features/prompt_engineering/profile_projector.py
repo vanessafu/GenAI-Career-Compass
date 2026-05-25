@@ -1,10 +1,3 @@
-import logging
-
-from backend.app.core.config import (
-    OPENAI_MODEL,
-    OPENAI_TEMPERATURE,
-    get_async_openai_client,
-)
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
 from backend.app.features.cv_parsing.schemas import CVData
 from backend.app.features.prompt_engineering.schemas import (
@@ -12,16 +5,13 @@ from backend.app.features.prompt_engineering.schemas import (
     DraftEducation,
     DraftExperience,
     DraftLanguageSkill,
+    DraftProject,
     DraftTechnicalSkill,
     PrivacyStrippedProfileDraft,
-    StarterIdentityGeneration,
-    StarterProfileResponse,
 )
 
-logger = logging.getLogger("CareerCompass.PromptEngineering.Service")
 
-
-def _is_section_available(confirmed_profile: ConfirmedCVData, section_id: str) -> bool:
+def is_section_available(confirmed_profile: ConfirmedCVData, section_id: str) -> bool:
     metadata = confirmed_profile.confirmation_metadata
     if section_id in metadata.skipped_sections:
         return False
@@ -30,7 +20,16 @@ def _is_section_available(confirmed_profile: ConfirmedCVData, section_id: str) -
     return True
 
 
-def _fallback_current_role(
+def is_section_available_or_untracked(
+    confirmed_profile: ConfirmedCVData,
+    section_id: str,
+) -> bool:
+    """Allow backward-compatible use of sections not tracked by older confirmations."""
+    metadata = confirmed_profile.confirmation_metadata
+    return section_id not in metadata.skipped_sections
+
+
+def fallback_current_role(
     cv_data: CVData,
     include_personal_info: bool,
     include_experience: bool,
@@ -96,28 +95,53 @@ def _privacy_safe_career_signals(cv_data: CVData) -> list[DraftCareerSignal]:
     return career_signals[:5]
 
 
+def _has_project_signal(title: str | None, description: str | None, technologies: list[str]) -> bool:
+    return bool(title or description or technologies)
+
+
+def _has_education_signal(degree_type: str | None, field_of_study: str | None) -> bool:
+    return bool(degree_type or field_of_study)
+
+
+def _has_experience_signal(
+    role: str | None,
+    industry: str | None,
+    duration_months: int | None,
+    core_responsibilities: list[str],
+    contextual_skills: list[str],
+) -> bool:
+    return bool(
+        role
+        or industry
+        or duration_months is not None
+        or core_responsibilities
+        or contextual_skills
+    )
+
+
 def build_privacy_stripped_profile_draft(
     confirmed_profile: ConfirmedCVData,
 ) -> PrivacyStrippedProfileDraft:
-    """Project confirmed CV JSON into only the fields needed for prompt engineering.
+    """Project confirmed CV JSON into only fields needed by prompt engineering.
 
     Personal identifiers, source text, organization names, institutions, contacts,
     links, and locations are intentionally excluded here.
     """
     cv_data = confirmed_profile.confirmed_cv_data
-    include_personal_info = _is_section_available(confirmed_profile, "personal_info")
-    include_profile_summary = _is_section_available(confirmed_profile, "profile_summary")
-    include_experience = _is_section_available(confirmed_profile, "experience")
-    include_education = _is_section_available(confirmed_profile, "education")
-    include_technical_skills = _is_section_available(confirmed_profile, "technical_skills")
-    include_soft_skills = _is_section_available(confirmed_profile, "soft_skills")
-    include_languages = _is_section_available(confirmed_profile, "languages")
-    include_unmapped_information = _is_section_available(
+    include_personal_info = is_section_available(confirmed_profile, "personal_info")
+    include_profile_summary = is_section_available(confirmed_profile, "profile_summary")
+    include_experience = is_section_available(confirmed_profile, "experience")
+    include_education = is_section_available(confirmed_profile, "education")
+    include_projects = is_section_available_or_untracked(confirmed_profile, "projects")
+    include_technical_skills = is_section_available(confirmed_profile, "technical_skills")
+    include_soft_skills = is_section_available(confirmed_profile, "soft_skills")
+    include_languages = is_section_available(confirmed_profile, "languages")
+    include_unmapped_information = is_section_available(
         confirmed_profile, "unmapped_information"
     )
-    include_interests = _is_section_available(confirmed_profile, "interests")
+    include_interests = is_section_available(confirmed_profile, "interests")
 
-    current_role = _fallback_current_role(
+    current_role = fallback_current_role(
         cv_data,
         include_personal_info=include_personal_info,
         include_experience=include_experience,
@@ -141,6 +165,13 @@ def build_privacy_stripped_profile_draft(
                 contextual_skills=experience.contextual_skills,
             )
             for experience in cv_data.experience
+            if _has_experience_signal(
+                role=experience.role,
+                industry=experience.industry,
+                duration_months=experience.duration_months,
+                core_responsibilities=experience.core_responsibilities,
+                contextual_skills=experience.contextual_skills,
+            )
         ]
         if include_experience
         else [],
@@ -150,8 +181,27 @@ def build_privacy_stripped_profile_draft(
                 field_of_study=education.field_of_study,
             )
             for education in cv_data.education
+            if _has_education_signal(
+                degree_type=education.degree_type,
+                field_of_study=education.field_of_study,
+            )
         ]
         if include_education
+        else [],
+        projects=[
+            DraftProject(
+                title=project.title,
+                description=project.description,
+                technologies=project.technologies,
+            )
+            for project in cv_data.projects
+            if _has_project_signal(
+                title=project.title,
+                description=project.description,
+                technologies=project.technologies,
+            )
+        ]
+        if include_projects
         else [],
         technical_skills=[
             DraftTechnicalSkill(
@@ -174,59 +224,3 @@ def build_privacy_stripped_profile_draft(
         ),
         interests=cv_data.interests if include_interests else [],
     )
-
-
-async def generate_starter_profile(
-    confirmed_profile: ConfirmedCVData,
-) -> StarterProfileResponse:
-    draft = build_privacy_stripped_profile_draft(confirmed_profile)
-    client = get_async_openai_client()
-
-    system_prompt = """
-You are an experienced tech recruiter specializing in IT and data careers.
-
-Input:
-Use only the structured, privacy-stripped resume JSON provided by the backend.
-
-Task:
-1. Generate a 2-3 sentence Career Identity Statement.
-2. Generate 1-2 follow-up questions:
-   - one capability-focused question
-   - one career-orientation-focused question
-
-Career Identity Statement:
-- Write in concise recruiter-style language suitable for ATS, LinkedIn, or recruiter notes.
-- Focus on current career identity, realistic seniority, demonstrated strengths, stakeholder or business exposure, and likely career direction.
-- Prioritize evidence-backed positioning over aspirational language.
-- Do not exaggerate technical depth, ownership, seniority, or impact.
-- Avoid generic buzzwords or personality traits.
-
-Follow-up Questions:
-- Ask only about unclear or missing career signals.
-- Capability questions should clarify technical depth, work complexity, or analytical focus.
-- Orientation questions should clarify preferred work style, problem domain, or career direction.
-- Avoid generic preference questions such as desired job title or preferred industry.
-- Each question should include 3-5 concise option labels.
-""".strip()
-
-    try:
-        logger.info("Generating starter identity from privacy-stripped profile draft...")
-        response = await client.beta.chat.completions.parse(
-            model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": draft.model_dump_json()},
-            ],
-            response_format=StarterIdentityGeneration,
-            temperature=OPENAI_TEMPERATURE,
-        )
-        generated = response.choices[0].message.parsed
-        logger.info("Starter identity generated successfully.")
-        return StarterProfileResponse(
-            privacy_stripped_profile_draft=draft,
-            starter_identity=generated.starter_identity,
-            suggested_questions=generated.suggested_questions,
-        )
-    except Exception as exc:
-        logger.error("Starter profile generation error: %s", exc)
-        raise RuntimeError("Error while generating the starter profile.") from exc

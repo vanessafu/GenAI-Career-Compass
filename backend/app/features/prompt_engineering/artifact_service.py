@@ -2,11 +2,13 @@ import json
 from pathlib import Path
 
 from backend.app.features.prompt_engineering.schemas import (
+    CareerProfileResponse,
     EmbeddingInputResponse,
     FollowupAnswer,
     FollowupAnswersHistory,
     IdentityFollowupsGeneration,
     IdentityFollowupsHistory,
+    SemanticEmbeddingInputResponse,
     StarterProfileResponse,
     StoredFollowupQuestion,
 )
@@ -16,14 +18,16 @@ CONFIRMED_SUFFIX = "_confirmed"
 IDENTITY_FOLLOWUPS_FILENAME = "identity_followups.json"
 FOLLOWUP_ANSWERS_FILENAME = "followup_answers.json"
 EMBEDDING_INPUT_FILENAME = "embedding_input.txt"
+CAREER_PROFILE_FILENAME = "career_profile.json"
+EMBEDDING_CHUNKS_FILENAME = "embedding_chunks.json"
 
 
 def profile_output_dir_from_confirmed_path(confirmed_json_path: Path) -> Path:
     """Return outputs/<profile>/ for a confirmed JSON file.
 
     Supports the current flat CLI output style, for example
-    outputs/semjon_eschweiler_04_26_confirmed.json, and the proposed nested
-    style, for example outputs/semjon_eschweiler_04_26/confirmed.json.
+    outputs/semjon_eschweiler_04_26_confirmed_old.json, and the proposed nested
+    style, for example outputs/semjon_eschweiler_04_26_old/confirmed.json.
     """
     if confirmed_json_path.stem == "confirmed":
         return confirmed_json_path.parent
@@ -45,6 +49,14 @@ def _identity_followups_path(confirmed_json_path: Path) -> Path:
 
 def _followup_answers_path(confirmed_json_path: Path) -> Path:
     return prompt_engineering_output_dir(confirmed_json_path) / FOLLOWUP_ANSWERS_FILENAME
+
+
+def _career_profile_path(confirmed_json_path: Path) -> Path:
+    return prompt_engineering_output_dir(confirmed_json_path) / CAREER_PROFILE_FILENAME
+
+
+def _embedding_chunks_path(confirmed_json_path: Path) -> Path:
+    return prompt_engineering_output_dir(confirmed_json_path) / EMBEDDING_CHUNKS_FILENAME
 
 
 def _load_identity_followups_history(output_path: Path) -> IdentityFollowupsHistory:
@@ -126,6 +138,34 @@ def save_embedding_input_text_artifact(
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / EMBEDDING_INPUT_FILENAME
     output_path.write_text(result.embedding_input_text, encoding="utf-8")
+    return output_path
+
+
+def save_career_profile_artifact(
+    confirmed_json_path: Path,
+    result: CareerProfileResponse,
+) -> Path:
+    output_dir = prompt_engineering_output_dir(confirmed_json_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = _career_profile_path(confirmed_json_path)
+    output_path.write_text(
+        json.dumps(result.model_dump(mode="json"), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return output_path
+
+
+def save_embedding_chunks_artifact(
+    confirmed_json_path: Path,
+    result: SemanticEmbeddingInputResponse,
+) -> Path:
+    output_dir = prompt_engineering_output_dir(confirmed_json_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = _embedding_chunks_path(confirmed_json_path)
+    output_path.write_text(
+        json.dumps(result.model_dump(mode="json"), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
     return output_path
 
 
