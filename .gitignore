@@ -3,6 +3,7 @@ __pycache__/
 data/
 .env
 .vscode/
+.idea/
 outputs/
 .DS_Store
 
