@@ -1,23 +1,60 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
 from backend.app.features.cv_parsing.schemas import CVData
 
 
-class RoleMatch(BaseModel):
-    uri: str
-    isco_group: Optional[str] = None
-    isco_label: Optional[str] = None
-    title: str
-    alt_labels: list[str] = Field(default_factory=list)
-    description: Optional[str] = None
-    essential_knowledge: list[str] = Field(default_factory=list)
-    essential_skills: list[str] = Field(default_factory=list)
-    optional_knowledge: list[str] = Field(default_factory=list)
-    optional_skills: list[str] = Field(default_factory=list)
-    similarity_score: float
+# ---------------------------------------------------------------------------
+# Job dataset schema
+# ---------------------------------------------------------------------------
 
+class JobRecord(BaseModel):
+    """Normalised job posting as stored in job_postings table."""
+    job_id: str
+    jobtitle: str
+    description: Optional[str] = None
+    essential_skills: list[str] = Field(default_factory=list)
+    raw_text: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Gap analysis
+# ---------------------------------------------------------------------------
+
+class SkillGap(BaseModel):
+    framework: str
+    required_skill: str
+    user_closest_skill: Optional[str] = None
+    transferability: float = 0.0
+    severity: Literal["matched", "low", "medium", "high"] = "high"
+
+
+class GapAnalysis(BaseModel):
+    matched_skills: list[str] = Field(default_factory=list)
+    skill_gaps: list[SkillGap] = Field(default_factory=list)
+    match_coverage: float = 0.0   # fraction of job skills covered by user
+
+
+# ---------------------------------------------------------------------------
+# Role match result
+# ---------------------------------------------------------------------------
+
+class RoleMatch(BaseModel):
+    job_id: str
+    jobtitle: str
+    description: Optional[str] = None
+    essential_skills: list[str] = Field(default_factory=list)
+    similarity_score: float        # dense cosine similarity
+    interest_score: float = 0.0
+    rerank_score: float = 0.0
+    final_score: float = 0.0
+    gap_analysis: Optional[GapAnalysis] = None
+
+
+# ---------------------------------------------------------------------------
+# Request / response
+# ---------------------------------------------------------------------------
 
 class RoleMatchRequest(BaseModel):
     cv_data: CVData
