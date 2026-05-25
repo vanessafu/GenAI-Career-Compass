@@ -21,6 +21,16 @@ class DraftTechnicalSkill(BaseModel):
     proficiency_indication: str | None = None
 
 
+class DraftLanguageSkill(BaseModel):
+    language: str
+    level: str | None = None
+
+
+class DraftCareerSignal(BaseModel):
+    label: str | None = None
+    value: str
+
+
 class PrivacyStrippedProfileDraft(BaseModel):
     current_role: str | None = None
     current_seniority_level: str | None = None
@@ -30,12 +40,14 @@ class PrivacyStrippedProfileDraft(BaseModel):
     education: list[DraftEducation] = Field(default_factory=list)
     technical_skills: list[DraftTechnicalSkill] = Field(default_factory=list)
     soft_skills: list[str] = Field(default_factory=list)
+    language_skills: list[DraftLanguageSkill] = Field(default_factory=list)
+    career_signals: list[DraftCareerSignal] = Field(default_factory=list)
     interests: list[str] = Field(default_factory=list)
 
 
 class SuggestedQuestion(BaseModel):
     question: str
-    options: list[str] = Field(min_length=2, max_length=4)
+    options: list[str] = Field(min_length=3, max_length=5)
 
 
 class StarterIdentityGeneration(BaseModel):
@@ -64,10 +76,8 @@ class EmbeddingInputResponse(BaseModel):
     embedding_metadata: EmbeddingMetadata
 
 
-class StoredFollowupQuestion(BaseModel):
+class StoredFollowupQuestion(SuggestedQuestion):
     id: str
-    question: str
-    options: list[str] = Field(min_length=2, max_length=4)
 
 
 class IdentityFollowupsGeneration(BaseModel):

@@ -8,8 +8,10 @@ from backend.app.core.config import (
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
 from backend.app.features.cv_parsing.schemas import CVData
 from backend.app.features.prompt_engineering.schemas import (
+    DraftCareerSignal,
     DraftEducation,
     DraftExperience,
+    DraftLanguageSkill,
     DraftTechnicalSkill,
     PrivacyStrippedProfileDraft,
     StarterIdentityGeneration,
@@ -44,6 +46,56 @@ def _fallback_current_role(
     return None
 
 
+def _privacy_safe_career_signals(cv_data: CVData) -> list[DraftCareerSignal]:
+    """Keep non-identifying CV signals that HR reviewers commonly use for IT screening."""
+    useful_terms = (
+        "award",
+        "certificate",
+        "certification",
+        "patent",
+        "project",
+        "publication",
+        "thesis",
+    )
+    excluded_terms = (
+        "address",
+        "birth",
+        "contact",
+        "date of birth",
+        "email",
+        "final grade",
+        "gender",
+        "grade",
+        "nationality",
+        "phone",
+        "website",
+    )
+    career_signals: list[DraftCareerSignal] = []
+
+    for item in cv_data.unmapped_information:
+        label = item.label or item.source_section or None
+        searchable_text = " ".join(
+            part.lower()
+            for part in (item.label, item.source_section, item.reason_not_mapped)
+            if part
+        )
+        value = item.value.strip()
+        value_lower = value.lower()
+
+        if not value:
+            continue
+        if any(term in searchable_text for term in excluded_terms):
+            continue
+        if "http://" in value_lower or "https://" in value_lower or "@" in value:
+            continue
+        if not any(term in searchable_text for term in useful_terms):
+            continue
+
+        career_signals.append(DraftCareerSignal(label=label, value=value))
+
+    return career_signals[:5]
+
+
 def build_privacy_stripped_profile_draft(
     confirmed_profile: ConfirmedCVData,
 ) -> PrivacyStrippedProfileDraft:
@@ -59,6 +111,10 @@ def build_privacy_stripped_profile_draft(
     include_education = _is_section_available(confirmed_profile, "education")
     include_technical_skills = _is_section_available(confirmed_profile, "technical_skills")
     include_soft_skills = _is_section_available(confirmed_profile, "soft_skills")
+    include_languages = _is_section_available(confirmed_profile, "languages")
+    include_unmapped_information = _is_section_available(
+        confirmed_profile, "unmapped_information"
+    )
     include_interests = _is_section_available(confirmed_profile, "interests")
 
     current_role = _fallback_current_role(
@@ -107,6 +163,15 @@ def build_privacy_stripped_profile_draft(
         if include_technical_skills
         else [],
         soft_skills=cv_data.skills_extracted.soft_skills if include_soft_skills else [],
+        language_skills=[
+            DraftLanguageSkill(language=language.language, level=language.level)
+            for language in cv_data.skills_extracted.languages
+        ]
+        if include_languages
+        else [],
+        career_signals=(
+            _privacy_safe_career_signals(cv_data) if include_unmapped_information else []
+        ),
         interests=cv_data.interests if include_interests else [],
     )
 
@@ -117,17 +182,32 @@ async def generate_starter_profile(
     draft = build_privacy_stripped_profile_draft(confirmed_profile)
     client = get_async_openai_client()
 
-    system_prompt = (
-        "You are a career path prompt-engineering assistant. "
-        "Use only the privacy-stripped profile draft provided by the backend. "
-        "Do not infer personal identifiers, employer names, locations, age, "
-        "gender, or contact details. "
-        "Generate a first-person starter identity that is polished but still editable by the user. "
-        "The identity should be 2 or 3 concise sentences and should describe current role, experience, "
-        "skills, working style, and the kind of career direction the profile suggests. "
-        "Also generate 1 or 2 high-level follow-up questions with short option labels. "
-        "Questions should help clarify broad career direction, not ask for sensitive personal data."
-    )
+    system_prompt = """
+You are an experienced tech recruiter specializing in IT and data careers.
+
+Input:
+Use only the structured, privacy-stripped resume JSON provided by the backend.
+
+Task:
+1. Generate a 2-3 sentence Career Identity Statement.
+2. Generate 1-2 follow-up questions:
+   - one capability-focused question
+   - one career-orientation-focused question
+
+Career Identity Statement:
+- Write in concise recruiter-style language suitable for ATS, LinkedIn, or recruiter notes.
+- Focus on current career identity, realistic seniority, demonstrated strengths, stakeholder or business exposure, and likely career direction.
+- Prioritize evidence-backed positioning over aspirational language.
+- Do not exaggerate technical depth, ownership, seniority, or impact.
+- Avoid generic buzzwords or personality traits.
+
+Follow-up Questions:
+- Ask only about unclear or missing career signals.
+- Capability questions should clarify technical depth, work complexity, or analytical focus.
+- Orientation questions should clarify preferred work style, problem domain, or career direction.
+- Avoid generic preference questions such as desired job title or preferred industry.
+- Each question should include 3-5 concise option labels.
+""".strip()
 
     try:
         logger.info("Generating starter identity from privacy-stripped profile draft...")
