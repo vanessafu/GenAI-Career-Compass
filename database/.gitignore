@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+.idea/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/embedding_cache/
+data/entgeltatlas_cache/
+supabase/.temp/
