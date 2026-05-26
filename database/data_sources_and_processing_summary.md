@@ -17,11 +17,13 @@ Certifications   -> role_certifications
 
 We then cleaned the skills and certifications deterministically. For example, we split comma-separated skill lists into individual rows, trimmed whitespace, removed duplicates, and normalized obvious aliases like:
 
+```
 JS -> JavaScript
 K8s -> Kubernetes
 React.js -> React
 Amazon Web Services -> AWS
 CI CD -> CI/CD
+```
 
 This means the Kaggle dataset gives us the practical role/skill/certification layer, but we do not treat it as an official source.
 
