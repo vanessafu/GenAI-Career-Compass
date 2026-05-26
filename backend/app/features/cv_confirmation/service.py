@@ -23,6 +23,13 @@ def build_confirmation_sections() -> list[ConfirmationSection]:
         ),
         ConfirmationSection(section_id="experience", title="Experience", path=["experience"]),
         ConfirmationSection(section_id="education", title="Education", path=["education"]),
+        ConfirmationSection(section_id="projects", title="Projects", path=["projects"]),
+        ConfirmationSection(
+            section_id="certifications",
+            title="Certifications",
+            path=["certifications"],
+        ),
+        ConfirmationSection(section_id="thesis", title="Thesis", path=["thesis"]),
         ConfirmationSection(
             section_id="technical_skills",
             title="Technical Skills",

@@ -37,3 +37,7 @@ Enter profile information manually without a CV:
 ```powershell
 python -m backend.app.cli manual-profile
 ```
+
+The manual and CV-based flows both collect or confirm current role, education,
+work experience, projects, certifications, thesis, skills, languages, interests,
+and unmapped information into the same confirmed JSON format.

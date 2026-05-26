@@ -37,7 +37,10 @@ async def parse_cv_to_pydantic(raw_text: str) -> CVData:
         "3. Do not infer an industry from company names if it is not stated in the text. "
         "4. Extract personal information such as name, email, phone, location, current role, and links "
         "only when explicitly present. "
-        "5. If the resume contains relevant information that does not fit any schema field, preserve it "
+        "5. Extract projects, certifications, and thesis or final dissertation work into their dedicated "
+        "schema sections when they are explicitly present. Do not merge them into work experience unless "
+        "the resume clearly presents them as employment. "
+        "6. If the resume contains relevant information that does not fit any schema field, preserve it "
         "in unmapped_information instead of discarding it."
     )
 

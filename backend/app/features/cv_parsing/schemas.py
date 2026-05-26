@@ -43,6 +43,35 @@ class Education(BaseModel):
     institution: Optional[str] = None
 
 
+class Project(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    organization: Optional[str] = None
+    role: Optional[str] = None
+    technologies: list[str] = Field(default_factory=list)
+    outcomes: list[str] = Field(default_factory=list)
+    links: list[str] = Field(default_factory=list)
+
+
+class Certification(BaseModel):
+    name: Optional[str] = None
+    issuing_organization: Optional[str] = None
+    issue_date: Optional[str] = None
+    expiration_date: Optional[str] = None
+    credential_id: Optional[str] = None
+    credential_url: Optional[str] = None
+
+
+class Thesis(BaseModel):
+    title: Optional[str] = None
+    degree_type: Optional[str] = None
+    institution: Optional[str] = None
+    supervisor: Optional[str] = None
+    description: Optional[str] = None
+    technologies: list[str] = Field(default_factory=list)
+    grade: Optional[str] = None
+
+
 class TechnicalSkill(BaseModel):
     name: str
     proficiency_indication: Optional[str] = None
@@ -73,6 +102,9 @@ class CVData(BaseModel):
     profile_summary: ProfileSummary = Field(default_factory=ProfileSummary)
     experience: list[Experience] = Field(default_factory=list)
     education: list[Education] = Field(default_factory=list)
+    projects: list[Project] = Field(default_factory=list)
+    certifications: list[Certification] = Field(default_factory=list)
+    thesis: list[Thesis] = Field(default_factory=list)
     skills_extracted: SkillsExtracted = Field(default_factory=SkillsExtracted)
     interests: list[str] = Field(default_factory=list)
     unmapped_information: list[UnmappedInformation] = Field(default_factory=list)
