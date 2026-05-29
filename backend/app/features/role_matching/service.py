@@ -2,9 +2,9 @@ import logging
 
 import psycopg
 from pgvector.psycopg import register_vector
-from openai import OpenAI
 
-from backend.app.core.config import DATABASE_URL, OPENAI_API_KEY, OPENAI_MODEL, OPENAI_TEMPERATURE, get_async_openai_client
+from backend.app.core.config import DATABASE_URL
+from backend.app.core import openai_client
 from backend.app.features.cv_parsing.schemas import CVData
 from backend.app.features.role_matching.schemas import RoleMatch, RoleMatchResponse
 
@@ -69,21 +69,15 @@ def build_cv_query_text(cv_data: CVData) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _embed_query(text: str) -> list[float]:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    response = client.embeddings.create(model=EMBEDDING_MODEL, input=[text])
-    return response.data[0].embedding
-
-
 def _split_csv(value: str | None) -> list[str]:
     if not value:
         return []
     return [lbl.strip() for lbl in value.split(",") if lbl.strip()]
 
 
-def retrieve_similar_roles(query_text: str, top_k: int = 5) -> list[RoleMatch]:
+async def retrieve_similar_roles(query_text: str, top_k: int = 5) -> list[RoleMatch]:
     """Embed the query and return the top-k most similar ESCO occupations."""
-    query_embedding = _embed_query(query_text)
+    query_embedding = await openai_client.embed(query_text, model=EMBEDDING_MODEL)
 
     with psycopg.connect(DATABASE_URL) as conn:
         register_vector(conn)
@@ -132,8 +126,6 @@ def retrieve_similar_roles(query_text: str, top_k: int = 5) -> list[RoleMatch]:
 
 
 async def generate_role_analysis(cv_data: CVData, matched_roles: list[RoleMatch]) -> str:
-    client = get_async_openai_client()
-
     roles_block = "\n".join(
         f"{i + 1}. {r.title} (match: {r.similarity_score:.0%})"
         + (f"\n   {r.description[:250]}" if r.description else "")
@@ -142,7 +134,7 @@ async def generate_role_analysis(cv_data: CVData, matched_roles: list[RoleMatch]
 
     current_role = cv_data.personal_info.current_role or "not specified"
     skills = [s.name for s in cv_data.skills_extracted.technical_skills[:10]]
-    # The following can be changed after implementing the prompt engeineering
+    # The following can be changed after implementing the prompt engineering feature
     user_prompt = (
         f"User's current role: {current_role}\n"
         f"Key technical skills: {', '.join(skills) or 'not specified'}\n\n"
@@ -152,8 +144,7 @@ async def generate_role_analysis(cv_data: CVData, matched_roles: list[RoleMatch]
         "transition would require the least additional skill development."
     )
 
-    response = await client.chat.completions.create(
-        model=OPENAI_MODEL,
+    return await openai_client.complete(
         messages=[
             {
                 "role": "system",
@@ -164,10 +155,8 @@ async def generate_role_analysis(cv_data: CVData, matched_roles: list[RoleMatch]
             },
             {"role": "user", "content": user_prompt},
         ],
-        temperature=OPENAI_TEMPERATURE,
         max_tokens=350,
     )
-    return response.choices[0].message.content
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +174,7 @@ async def match_roles_for_cv(cv_data: CVData, top_k: int = 5) -> RoleMatchRespon
     query_text = build_cv_query_text(cv_data)
     logger.info("CV query text:\n%s", query_text)
 
-    matched_roles = retrieve_similar_roles(query_text, top_k=top_k)
+    matched_roles = await retrieve_similar_roles(query_text, top_k=top_k)
     logger.info("Retrieved %d role matches.", len(matched_roles))
 
     analysis = await generate_role_analysis(cv_data, matched_roles)
