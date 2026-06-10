@@ -1,54 +1,54 @@
 # Career Compass
 
-An AI-powered career exploration tool that takes a user's CV and current background, then suggests realistic next-step roles, generates personalised career paths, and highlights the skill gaps between where they are and where they want to go.
+An AI-powered career exploration tool that takes a user's CV and current background, then suggests realistic next-step roles, generates personalized career paths, and highlights the skill gaps between where they are and where they want to go.
 
-See [`docs/proposal.md`](docs/proposal.md) for the full project proposal.
+See [docs/proposal.md](docs/proposal.md) for the full project proposal.
 
-## Tech stack
+## Tech Stack
 
-- **Backend:** FastAPI, Pydantic, OpenAI Python SDK, PyMuPDF (PDF text extraction)
-- **Vector search:** PostgreSQL + [`pgvector`](https://github.com/pgvector/pgvector) over the ESCO occupations database
+- **Backend:** FastAPI, Pydantic, OpenAI Python SDK, PyMuPDF
+- **Vector search:** PostgreSQL + [pgvector](https://github.com/pgvector/pgvector) over the ESCO occupations database
 - **Frontend:** React 19 + TypeScript + Vite
-- **CLI:** `argparse`-based CLI for running the parse / confirm / manual-profile flows locally
-- **Package manager:** [`uv`](https://docs.astral.sh/uv/)
+- **CLI:** `argparse`-based CLI for running parse, confirm, and manual-profile flows locally
+- **Package manager:** [uv](https://docs.astral.sh/uv/)
 
-## Repository layout
+## Repository Layout
 
-```
+```text
 .
-├── backend/
-│   └── app/
-│       ├── main.py             # FastAPI app entry point
-│       ├── cli.py              # Local CLI (extract-text, parse-cv, confirm-cv, ...)
-│       ├── core/config.py      # Env + OpenAI client wiring
-│       ├── features/
-│       │   ├── cv_parsing/         # PDF -> structured CVData via OpenAI
-│       │   ├── cv_confirmation/    # Interactive confirmation + manual entry
-│       │   ├── role_matching/      # pgvector RAG over ESCO occupations
-│       │   └── prompt_engineering/ # (planned) editable prompt feature
-│       └── scripts/                # (planned) data loader / preprocessing / embeddings
-├── frontend/                   # React + Vite CV upload UI
-├── docs/                       # Project proposal and additional docs
-├── data/                       # Local datasets (gitignored)
-├── test_data/                  # Local test CVs (not committed; add your own)
-├── pyproject.toml
-├── uv.lock
-└── .env.example
+|-- backend/
+|   `-- app/
+|       |-- main.py
+|       |-- cli.py
+|       |-- core/config.py
+|       |-- features/
+|       |   |-- cv_parsing/
+|       |   |-- cv_confirmation/
+|       |   |-- role_matching/
+|       |   `-- prompt_engineering/
+|       `-- scripts/
+|-- frontend/
+|-- docs/
+|-- data/
+|-- test_data/
+|-- pyproject.toml
+|-- uv.lock
+`-- .env.example
 ```
 
 ## Setup
 
-### 1. Python environment
+### 1. Python Environment
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you don't have it, then:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you do not have it, then:
 
 ```powershell
 uv sync
 ```
 
-This creates `.venv/`, resolves all dependencies from `uv.lock`, and installs the project itself as an editable package — no manual `venv` or `pip install` needed.
+This creates `.venv/`, resolves all dependencies from `uv.lock`, and installs the project itself as an editable package.
 
-### 2. Environment variables
+### 2. Environment Variables
 
 Copy `.env.example` to `.env` and fill in your values:
 
@@ -61,28 +61,28 @@ Required keys:
 | Variable | Purpose |
 |---|---|
 | `OPENAI_API_KEY` | API key used for CV parsing and role-matching analysis |
-| `OPENAI_MODEL` | Chat model to use (e.g. `gpt-4o-mini`) |
-| `OPENAI_TEMPERATURE` | Sampling temperature (default `0.0`) |
+| `OPENAI_MODEL` | Chat model to use, for example `gpt-4o-mini` |
+| `OPENAI_TEMPERATURE` | Sampling temperature, default `0.0` |
 | `DATABASE_URL` | Postgres connection string for the `esco_occupations` pgvector table |
 
-### 3. Database (only required for role matching)
+### 3. Database
 
-The role-matching feature expects a Postgres database with the `pgvector` extension enabled and an `esco_occupations` table populated with ESCO data and precomputed embeddings. Loader scripts will live under `backend/scripts/` (work in progress).
+The role-matching feature expects a Postgres database with the `pgvector` extension enabled and an `esco_occupations` table populated with ESCO data and precomputed embeddings. Loader scripts live under `backend/scripts/`.
 
-## Running the backend
+## Running The Backend
 
-### API server
+### API Server
 
 ```powershell
 uv run uvicorn backend.app.main:app --reload
 ```
 
-The server listens on `http://localhost:8000`. Interactive docs are available at `http://localhost:8000/docs` (the root redirects there).
+The server listens on `http://localhost:8000`. Interactive docs are available at `http://localhost:8000/docs`.
 
 Key endpoints:
 
-- `POST /api/v1/parse-cv` — upload a PDF, get back a structured `CVData` profile
-- `POST /api/v1/roles/match` — submit a confirmed profile, get back the top-k matching ESCO roles with reasoning
+- `POST /api/v1/parse-cv` uploads a PDF and returns a structured `CVData` profile
+- `POST /api/v1/roles/match` submits a confirmed profile and returns top-k matching ESCO roles with reasoning
 
 ### CLI
 
@@ -94,11 +94,15 @@ uv run career-compass parse-cv test_data/cvs/your_cv.pdf
 uv run career-compass confirm-cv test_data/cvs/your_cv.pdf
 uv run career-compass confirm-json outputs/your_cv_parsed.json
 uv run career-compass manual-profile
+uv run career-compass identity-followups outputs/your_confirmed.json
+uv run career-compass career-profile outputs/your_confirmed.json
+uv run career-compass embedding-input outputs/your_confirmed.json
+uv run career-compass embedding-chunks outputs/your_confirmed.json
 ```
 
-All CLI commands write their results into a local `outputs/` directory (gitignored).
+The manual and CV-based flows both collect or confirm current role, education, work experience, projects, certifications, thesis, skills, languages, interests, and unmapped information into the same confirmed JSON format.
 
-## Running the frontend
+## Running The Frontend
 
 ```powershell
 cd frontend
@@ -106,10 +110,10 @@ npm install
 npm run dev
 ```
 
-The dev server runs on `http://localhost:5173` and talks to the backend at `http://localhost:8000` (CORS is preconfigured for this origin).
+The dev server runs on `http://localhost:5173` and talks to the backend at `http://localhost:8000`.
 
-See [`frontend/README.md`](frontend/README.md) for more details.
+See [frontend/README.md](frontend/README.md) for more details.
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT. See [LICENSE](LICENSE).

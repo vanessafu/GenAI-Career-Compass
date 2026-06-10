@@ -13,17 +13,29 @@ from backend.app.features.cv_parsing.service import (
     parse_cv_to_pydantic,
 )
 from backend.app.features.prompt_engineering.artifact_service import (
+    save_career_profile_artifact,
     save_embedding_input_text_artifact,
+    save_embedding_chunks_artifact,
     save_identity_followups_artifact,
+)
+from backend.app.features.prompt_engineering.career_profile_extraction_service import (
+    build_career_profile_response,
 )
 from backend.app.features.prompt_engineering.embedding_preparation_service import (
     build_embedding_input,
 )
 from backend.app.features.prompt_engineering.schemas import (
+    CareerProfileResponse,
     EmbeddingInputResponse,
+    SemanticEmbeddingInputResponse,
     StarterProfileResponse,
 )
-from backend.app.features.prompt_engineering.service import generate_starter_profile
+from backend.app.features.prompt_engineering.semantic_embedding_service import (
+    build_embedding_chunks_from_confirmed,
+)
+from backend.app.features.prompt_engineering.identity_generation_service import (
+    generate_starter_profile,
+)
 
 
 def default_output_path(input_path: Path, suffix: str) -> Path:
@@ -97,6 +109,18 @@ def build_embedding_input_from_file(json_path: Path) -> EmbeddingInputResponse:
     return build_embedding_input(confirmed_profile)
 
 
+def build_career_profile_from_file(json_path: Path) -> CareerProfileResponse:
+    confirmed_profile = load_confirmed_profile(json_path)
+    return build_career_profile_response(confirmed_profile)
+
+
+def build_embedding_chunks_from_file(
+    json_path: Path,
+) -> SemanticEmbeddingInputResponse:
+    confirmed_profile = load_confirmed_profile(json_path)
+    return build_embedding_chunks_from_confirmed(confirmed_profile)
+
+
 def print_starter_profile(result: StarterProfileResponse) -> None:
     print("\nStarter identity:")
     print(result.starter_identity)
@@ -105,6 +129,35 @@ def print_starter_profile(result: StarterProfileResponse) -> None:
         print(f"{index}. {question.question}")
         for option in question.options:
             print(f"   - {option}")
+
+
+def print_career_profile(result: CareerProfileResponse) -> None:
+    profile = result.career_profile
+    print("\nNormalized roles:")
+    for role in profile.normalized_roles:
+        print(f"- {role}")
+    print("\nCareer domains:")
+    for domain in profile.career_domains:
+        print(f"- {domain}")
+    print("\nTechnical domains:")
+    for domain in profile.technical_domains:
+        print(f"- {domain}")
+    print("\nCareer direction candidates:")
+    for candidate in profile.career_direction_candidates:
+        print(f"- {candidate}")
+    if profile.seniority_estimate:
+        print(f"\nSeniority estimate: {profile.seniority_estimate}")
+
+
+def print_embedding_chunks(result: SemanticEmbeddingInputResponse) -> None:
+    print(f"\nEmbedding chunks: {len(result.chunks)}")
+    for chunk in result.chunks:
+        print(f"\n[{chunk.chunk_id}] {chunk.chunk_type}")
+        print(chunk.text)
+        if chunk.skills:
+            print(f"Skills: {', '.join(chunk.skills)}")
+        if chunk.domains:
+            print(f"Domains: {', '.join(chunk.domains)}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -159,6 +212,18 @@ def build_parser() -> argparse.ArgumentParser:
     )
     embedding_parser.add_argument("json_path", type=Path)
 
+    career_profile_parser = subparsers.add_parser(
+        "career-profile",
+        help="Build a normalized career profile from confirmed JSON.",
+    )
+    career_profile_parser.add_argument("json_path", type=Path)
+
+    embedding_chunks_parser = subparsers.add_parser(
+        "embedding-chunks",
+        help="Build semantic embedding chunks from confirmed JSON.",
+    )
+    embedding_chunks_parser.add_argument("json_path", type=Path)
+
     return parser
 
 
@@ -207,6 +272,20 @@ def main() -> None:
         result = build_embedding_input_from_file(args.json_path)
         output_path = save_embedding_input_text_artifact(args.json_path, result)
         print(f"Embedding input text written to {output_path}")
+        return
+
+    if args.command == "career-profile":
+        result = build_career_profile_from_file(args.json_path)
+        print_career_profile(result)
+        output_path = save_career_profile_artifact(args.json_path, result)
+        print(f"\nCareer profile written to {output_path}")
+        return
+
+    if args.command == "embedding-chunks":
+        result = build_embedding_chunks_from_file(args.json_path)
+        print_embedding_chunks(result)
+        output_path = save_embedding_chunks_artifact(args.json_path, result)
+        print(f"\nEmbedding chunks written to {output_path}")
         return
 
     parser.error(f"Unknown command: {args.command}")

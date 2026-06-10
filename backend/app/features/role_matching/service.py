@@ -27,6 +27,8 @@ from rank_bm25 import BM25Okapi
 from flashrank import Ranker, RerankRequest
 
 from backend.app.core.config import DATABASE_URL, get_async_openai_client, OPENAI_MODEL, OPENAI_TEMPERATURE
+from backend.app.core.config import DATABASE_URL
+from backend.app.core import openai_client
 from backend.app.features.cv_parsing.schemas import CVData
 from backend.app.features.role_matching.embedder import get_embedder
 from backend.app.features.role_matching.normalization_layer import (
@@ -421,8 +423,7 @@ async def _generate_analysis(
         "3. RECOMMENDATION (1 sentence): Which role to target first and why."
     )
 
-    response = await client.chat.completions.create(
-        model=OPENAI_MODEL,
+    return await openai_client.complete(
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -430,7 +431,6 @@ async def _generate_analysis(
         temperature=OPENAI_TEMPERATURE,
         max_tokens=450,
     )
-    return response.choices[0].message.content
 
 
 # ---------------------------------------------------------------------------

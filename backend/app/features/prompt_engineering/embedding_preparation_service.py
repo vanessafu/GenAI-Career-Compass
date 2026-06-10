@@ -1,12 +1,12 @@
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
 from backend.app.features.cv_parsing.schemas import CVData, UnmappedInformation
+from backend.app.features.prompt_engineering.profile_projector import (
+    fallback_current_role,
+    is_section_available,
+)
 from backend.app.features.prompt_engineering.schemas import (
     EmbeddingInputResponse,
     EmbeddingMetadata,
-)
-from backend.app.features.prompt_engineering.service import (
-    _fallback_current_role,
-    _is_section_available,
 )
 
 CAREER_RELATED_UNMAPPED_KEYWORDS = {
@@ -191,16 +191,16 @@ def _build_embedding_metadata(
 def build_embedding_input(confirmed_profile: ConfirmedCVData) -> EmbeddingInputResponse:
     """Build deterministic embedding input text from confirmed, non-sensitive fields."""
     cv_data = confirmed_profile.confirmed_cv_data
-    include_personal_info = _is_section_available(confirmed_profile, "personal_info")
-    include_profile_summary = _is_section_available(confirmed_profile, "profile_summary")
-    include_experience = _is_section_available(confirmed_profile, "experience")
-    include_education = _is_section_available(confirmed_profile, "education")
-    include_technical_skills = _is_section_available(confirmed_profile, "technical_skills")
-    include_soft_skills = _is_section_available(confirmed_profile, "soft_skills")
-    include_interests = _is_section_available(confirmed_profile, "interests")
-    include_unmapped = _is_section_available(confirmed_profile, "unmapped_information")
+    include_personal_info = is_section_available(confirmed_profile, "personal_info")
+    include_profile_summary = is_section_available(confirmed_profile, "profile_summary")
+    include_experience = is_section_available(confirmed_profile, "experience")
+    include_education = is_section_available(confirmed_profile, "education")
+    include_technical_skills = is_section_available(confirmed_profile, "technical_skills")
+    include_soft_skills = is_section_available(confirmed_profile, "soft_skills")
+    include_interests = is_section_available(confirmed_profile, "interests")
+    include_unmapped = is_section_available(confirmed_profile, "unmapped_information")
 
-    current_role = _fallback_current_role(
+    current_role = fallback_current_role(
         cv_data,
         include_personal_info=include_personal_info,
         include_experience=include_experience,
