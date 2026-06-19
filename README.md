@@ -94,7 +94,7 @@ uv run career-compass parse-cv test_data/cvs/your_cv.pdf
 uv run career-compass confirm-cv test_data/cvs/your_cv.pdf
 uv run career-compass confirm-json outputs/your_cv_parsed.json
 uv run career-compass manual-profile
-uv run career-compass identity-followups outputs/your_confirmed.json
+uv run career-compass prepare-for-embedding outputs/your_confirmed.json
 uv run career-compass career-profile outputs/your_confirmed.json
 uv run career-compass embedding-input outputs/your_confirmed.json
 uv run career-compass embedding-chunks outputs/your_confirmed.json

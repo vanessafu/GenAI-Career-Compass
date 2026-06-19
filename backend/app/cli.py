@@ -16,11 +16,11 @@ from backend.app.features.prompt_engineering.artifact_service import (
     save_career_profile_artifact,
     save_embedding_input_text_artifact,
     save_embedding_chunks_artifact,
-    save_identity_followups_artifact,
 )
 from backend.app.features.prompt_engineering.career_profile_extraction_service import (
     build_career_profile_response,
 )
+from backend.app.features.prompt_engineering.embedding_handoff_service import prepare_for_embedding
 from backend.app.features.prompt_engineering.embedding_preparation_service import (
     build_embedding_input,
 )
@@ -28,13 +28,9 @@ from backend.app.features.prompt_engineering.schemas import (
     CareerProfileResponse,
     EmbeddingInputResponse,
     SemanticEmbeddingInputResponse,
-    StarterProfileResponse,
 )
 from backend.app.features.prompt_engineering.semantic_embedding_service import (
     build_embedding_chunks_from_confirmed,
-)
-from backend.app.features.prompt_engineering.identity_generation_service import (
-    generate_starter_profile,
 )
 
 
@@ -99,9 +95,9 @@ def collect_manual_profile(output_path: Path, assume_yes: bool = False) -> Path:
     return write_json_output(output_path, result.model_dump(mode="json"))
 
 
-async def generate_starter_profile_from_file(json_path: Path) -> StarterProfileResponse:
+async def prepare_for_embedding_from_file(json_path: Path) -> ConfirmedCVData:
     confirmed_profile = load_confirmed_profile(json_path)
-    return await generate_starter_profile(confirmed_profile)
+    return await prepare_for_embedding(confirmed_profile)
 
 
 def build_embedding_input_from_file(json_path: Path) -> EmbeddingInputResponse:
@@ -121,14 +117,9 @@ def build_embedding_chunks_from_file(
     return build_embedding_chunks_from_confirmed(confirmed_profile)
 
 
-def print_starter_profile(result: StarterProfileResponse) -> None:
-    print("\nStarter identity:")
-    print(result.starter_identity)
-    print("\nFollow-up questions:")
-    for index, question in enumerate(result.suggested_questions, start=1):
-        print(f"{index}. {question.question}")
-        for option in question.options:
-            print(f"   - {option}")
+def print_career_identity(result: ConfirmedCVData) -> None:
+    print("\nCareer identity statement:")
+    print(result.career_identity_statement or "(none generated)")
 
 
 def print_career_profile(result: CareerProfileResponse) -> None:
@@ -200,11 +191,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     manual_parser.add_argument("--yes", action="store_true", help="Confirm all sections automatically.")
 
-    identity_parser = subparsers.add_parser(
-        "identity-followups",
-        help="Generate identity and follow-up questions from confirmed JSON.",
+    prepare_parser = subparsers.add_parser(
+        "prepare-for-embedding",
+        help="Privacy-strip a confirmed CV and attach a generated career identity.",
     )
-    identity_parser.add_argument("json_path", type=Path)
+    prepare_parser.add_argument("json_path", type=Path)
+    prepare_parser.add_argument("-o", "--output", type=Path)
 
     embedding_parser = subparsers.add_parser(
         "embedding-input",
@@ -261,11 +253,12 @@ def main() -> None:
         print(f"Confirmed manual profile written to {output_path}")
         return
 
-    if args.command == "identity-followups":
-        result = asyncio.run(generate_starter_profile_from_file(args.json_path))
-        print_starter_profile(result)
-        output_path = save_identity_followups_artifact(args.json_path, result)
-        print(f"\nIdentity and follow-up generation appended to {output_path}")
+    if args.command == "prepare-for-embedding":
+        result = asyncio.run(prepare_for_embedding_from_file(args.json_path))
+        print_career_identity(result)
+        output_path = args.output or default_output_path(args.json_path, "embedding_ready")
+        write_json_output(output_path, result.model_dump(mode="json"))
+        print(f"\nEmbedding-ready profile written to {output_path}")
         return
 
     if args.command == "embedding-input":

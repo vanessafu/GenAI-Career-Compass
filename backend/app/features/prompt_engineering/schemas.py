@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from pydantic import BaseModel, Field
 
 
@@ -84,62 +82,16 @@ class CareerProfileResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# 3. User-facing identity and follow-up models
+# 3. Career identity model
 # ---------------------------------------------------------------------------
-# These models represent content shown to the user or stored for iterative
-# refinement after the system has generated an initial career identity.
+# The prompt-engineering step produces a single career identity statement from
+# the privacy-stripped CV. No follow-up questions are generated.
 
 
-class SuggestedQuestion(BaseModel):
-    question: str
-    options: list[str] = Field(min_length=3, max_length=5)
+class CareerIdentityGeneration(BaseModel):
+    """Structured LLM output for the career identity step."""
 
-
-class StarterIdentityGeneration(BaseModel):
-    starter_identity: str
-    suggested_questions: list[SuggestedQuestion] = Field(min_length=1, max_length=2)
-
-
-class StarterProfileResponse(BaseModel):
-    privacy_stripped_profile_draft: PrivacyStrippedProfileDraft
-    starter_identity: str
-    suggested_questions: list[SuggestedQuestion]
-
-
-class CareerIdentityResponse(BaseModel):
-    career_profile: CareerProfile
     career_identity_statement: str
-    suggested_questions: list[SuggestedQuestion]
-
-
-class StoredFollowupQuestion(SuggestedQuestion):
-    id: str
-
-
-class IdentityFollowupsGeneration(BaseModel):
-    version: int
-    source_confirmed_profile: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    privacy_stripped_profile_draft: PrivacyStrippedProfileDraft
-    starter_identity: str
-    suggested_questions: list[StoredFollowupQuestion] = Field(min_length=1, max_length=2)
-
-
-class IdentityFollowupsHistory(BaseModel):
-    active_version: int
-    generations: list[IdentityFollowupsGeneration] = Field(default_factory=list)
-
-
-class FollowupAnswer(BaseModel):
-    question_id: str
-    question: str
-    selected_option: str
-    answered_at: datetime = Field(default_factory=datetime.utcnow)
-    generation_version: int | None = None
-
-
-class FollowupAnswersHistory(BaseModel):
-    answers: list[FollowupAnswer] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
