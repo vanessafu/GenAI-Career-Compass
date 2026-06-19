@@ -5,10 +5,8 @@ Model: lwolfrum2/careerbert-jg  (768-dim SentenceTransformer)
 Singleton — loaded once, reused across all requests.
 """
 from __future__ import annotations
-
 import logging
 from typing import Optional
-
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger("CareerCompass.Embedder")

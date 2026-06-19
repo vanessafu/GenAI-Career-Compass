@@ -1,9 +1,6 @@
 """
 Job dataset ETL pipeline.
 
-Source (default): azrai99/job-dataset  (HuggingFace)
-  URL: hf://datasets/azrai99/job-dataset/jobstreet_all_job_dataset.csv
-
 Target schema: jobtitle | description | essential_skills
 Steps:
   1. Load CSV (swap in any source with the same schema via --source)
@@ -13,9 +10,6 @@ Steps:
   5. Batch-embed with lwolfrum2/careerbert-jg
   6. Upsert into PostgreSQL job_postings table
 
-Run:
-    python -m backend.scripts.data_loader
-    python -m backend.scripts.data_loader --source path/to/jobs.csv --batch 128
 """
 from __future__ import annotations
 
@@ -39,11 +33,9 @@ from backend.app.features.role_matching.schemas import JobRecord
 
 logger = logging.getLogger("CareerCompass.DataLoader")
 
-HF_DEFAULT = "hf://datasets/azrai99/job-dataset/jobstreet_all_job_dataset.csv"
+DATASET_DEFAULT = "hf://datasets/azrai99/job-dataset/jobstreet_all_job_dataset.csv"
 
-# ---------------------------------------------------------------------------
 # DB schema
-# ---------------------------------------------------------------------------
 
 _DDL = """
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -63,32 +55,28 @@ CREATE INDEX IF NOT EXISTS job_postings_ivfflat_idx
 """
 
 
+# Column detection  (handles varied column naming across datasets)
+
+COL_TITLE = ["jobtitle", "job_title", "title", "position", "job_name", "role"]
+COL_DESC = ["description", "job_description", "details", "summary", "content"]
+COL_SKILLS = [
+    "essential_skills", "skills", "required_skills", "skill_requirements",
+    "key_skills", "qualifications",
+]
+
+
 def _init_db(conn: psycopg.Connection) -> None:
     conn.execute(_DDL)
     conn.commit()
 
 
-# ---------------------------------------------------------------------------
 # Loading
-# ---------------------------------------------------------------------------
 
-def load_dataframe(source: str = HF_DEFAULT) -> pd.DataFrame:
+def load_dataframe(source: str = DATASET_DEFAULT) -> pd.DataFrame:
     logger.info("Loading dataset from %s", source)
     df = pd.read_csv(source)
     logger.info("Loaded %d rows, columns: %s", len(df), list(df.columns))
     return df
-
-
-# ---------------------------------------------------------------------------
-# Column detection  (handles varied column naming across datasets)
-# ---------------------------------------------------------------------------
-
-_COL_TITLE = ["jobtitle", "job_title", "title", "position", "job_name", "role"]
-_COL_DESC = ["description", "job_description", "details", "summary", "content"]
-_COL_SKILLS = [
-    "essential_skills", "skills", "required_skills", "skill_requirements",
-    "key_skills", "qualifications",
-]
 
 
 def _find_col(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
@@ -98,10 +86,6 @@ def _find_col(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
             return lower_map[name]
     return None
 
-
-# ---------------------------------------------------------------------------
-# Skill extraction from various raw formats
-# ---------------------------------------------------------------------------
 
 def _extract_skills(value) -> list[str]:
     if pd.isna(value) or not str(value).strip():
@@ -118,9 +102,7 @@ def _extract_skills(value) -> list[str]:
     return [x.strip() for x in s.split(sep) if x.strip()]
 
 
-# ---------------------------------------------------------------------------
 # Embedding text builder  (mirrors CV format for semantic alignment)
-# ---------------------------------------------------------------------------
 
 def _build_job_text(jobtitle: str, description: Optional[str], skills: list[str]) -> str:
     """
@@ -137,16 +119,15 @@ def _build_job_text(jobtitle: str, description: Optional[str], skills: list[str]
     return "\n".join(parts)
 
 
-# ---------------------------------------------------------------------------
+
 # Row → JobRecord
-# ---------------------------------------------------------------------------
 
 def build_job_records(df: pd.DataFrame) -> list[JobRecord]:
     engine = get_normalization_engine()
 
-    title_col = _find_col(df, _COL_TITLE)
-    desc_col = _find_col(df, _COL_DESC)
-    skill_col = _find_col(df, _COL_SKILLS)
+    title_col = _find_col(df, COL_TITLE)
+    desc_col = _find_col(df, COL_DESC)
+    skill_col = _find_col(df, COL_SKILLS)
 
     if title_col is None:
         raise ValueError(
@@ -168,24 +149,22 @@ def build_job_records(df: pd.DataFrame) -> list[JobRecord]:
         raw_skills = _extract_skills(row.get(skill_col, "") if skill_col else "")
         essential_skills = engine.normalize_list(raw_skills)
 
-        raw_text = _build_job_text(jobtitle, description, essential_skills)
-        job_id = hashlib.md5(raw_text[:256].encode()).hexdigest()[:16]
+        embedding_text = _build_job_text(jobtitle, description, essential_skills)
+        job_id = hashlib.md5(embedding_text[:256].encode()).hexdigest()[:16]
 
         records.append(JobRecord(
             job_id=job_id,
             jobtitle=jobtitle,
             description=description,
             essential_skills=essential_skills,
-            raw_text=raw_text,
+            raw_text=embedding_text,
         ))
 
     logger.info("Built %d job records.", len(records))
     return records
 
 
-# ---------------------------------------------------------------------------
 # DB upsert
-# ---------------------------------------------------------------------------
 
 def upsert_batch(
     records: list[JobRecord],
@@ -215,11 +194,8 @@ def upsert_batch(
     return len(records)
 
 
-# ---------------------------------------------------------------------------
-# Full pipeline
-# ---------------------------------------------------------------------------
 
-def run_pipeline(source: str = HF_DEFAULT, batch_size: int = 256) -> None:
+def run_pipeline(source: str = DATASET_DEFAULT, batch_size: int = 256) -> None:
     """Load → normalise → embed → store."""
     df = load_dataframe(source)
     records = build_job_records(df)
@@ -250,9 +226,7 @@ def run_pipeline(source: str = HF_DEFAULT, batch_size: int = 256) -> None:
     logger.info("Pipeline complete. Total upserted: %d", inserted)
 
 
-# ---------------------------------------------------------------------------
 # CLI
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     logging.basicConfig(
@@ -260,7 +234,7 @@ if __name__ == "__main__":
         format="%(asctime)s %(name)s %(levelname)s  %(message)s",
     )
     parser = argparse.ArgumentParser(description="Load job dataset into PostgreSQL.")
-    parser.add_argument("--source", default=HF_DEFAULT, help="CSV path or HF URL")
+    parser.add_argument("--source", default=DATASET_DEFAULT, help="CSV path or HF URL")
     parser.add_argument("--batch", type=int, default=256, help="Embedding batch size")
     args = parser.parse_args()
     try:
