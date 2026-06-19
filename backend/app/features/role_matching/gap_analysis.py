@@ -2,10 +2,10 @@
 Gap analysis (decoupled). The service calls analyze_role_gap() / explain_role_gap().
 
 Dimensions:
-  1. Skills        -> ontology coverage (exact + implied + transferable)   [skill_ontology]
-  2. Certifications-> embedding similarity vs role_certifications.embedding
-  3. Seniority     -> user level/years vs the role's inferred level
-  4. Readiness     -> weighted aggregate of the above
+  1. Skills         -> ontology coverage (exact + implied + transferable) [skill_ontology]
+  2. Certifications -> exact normalized certification overlap
+  3. Seniority      -> user level/years vs the role's inferred level
+  4. Readiness      -> weighted aggregate of the above
 
 """
 from __future__ import annotations
@@ -16,13 +16,11 @@ import logging
 import re
 from typing import Literal, Optional
 
-import numpy as np
 from psycopg2.extras import RealDictCursor
 
 from backend.app.core.database import get_db_connection
 from backend.app.core.openai_client import parse_structured
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
-from backend.app.features.role_matching.embedder import get_embedder
 from backend.app.features.role_matching.schemas import (
     CertificationDimension,
     CertificationGap,
@@ -34,14 +32,12 @@ from backend.app.features.role_matching.schemas import (
     SkillDimension,
     SkillGap,
 )
-from backend.app.features.role_matching.service import extract_user_skills
+from backend.app.features.role_matching.service import as_cv_data, extract_user_skills
 from backend.app.features.role_matching.skill_ontology import get_ontology
 
 logger = logging.getLogger("CareerCompass.GapAnalysis")
 
 # --- tunables --------------------------------------------------------------
-CERT_HELD_SIM = 0.85       # cosine >= -> user effectively holds this cert
-CERT_RELATED_SIM = 0.62    # cosine >= -> user holds something related
 READINESS_W = {"skills": 0.60, "certifications": 0.25, "seniority": 0.15}
 MAX_GROUNDING_SKILLS = 8   # cap missing skills sent to the LLM (prompt budget)
 
@@ -58,15 +54,6 @@ _SENIORITY_ALIASES = {
 # ===========================================================================
 # small helpers
 # ===========================================================================
-def _unit(v: np.ndarray) -> np.ndarray:
-    n = float(np.linalg.norm(v))
-    return v / n if n else v
-
-
-def _cosine(a: np.ndarray, b: np.ndarray) -> float:
-    return float(np.dot(_unit(a), _unit(b)))
-
-
 def _status(coverage: float) -> DimensionStatus:
     if coverage >= 0.70:
         return "strong"
@@ -76,8 +63,7 @@ def _status(coverage: float) -> DimensionStatus:
 
 
 def _normalize_cert(name: str) -> str:
-    """Light, deterministic. Reuse YOUR role_certifications normalizer here for
-    exact-match consistency; embedding similarity covers the fuzzy cases."""
+    """Light deterministic normalizer for exact certification matches."""
     s = re.sub(r"[^a-z0-9 ]+", " ", (name or "").lower())
     return re.sub(r"\s+", " ", s).strip()
 
@@ -103,13 +89,14 @@ def _infer_role_seniority(title: str) -> Optional[str]:
 
 # Extract user-side facts from the confirmed profile
 def _user_certs(profile: ConfirmedCVData) -> list[str]:
-    return [c.name for c in (getattr(profile, "certifications", None) or []) if getattr(c, "name", None)]
+    cv_data = as_cv_data(profile)
+    return [c.name for c in cv_data.certifications if c.name]
 
 
 def _user_seniority(profile: ConfirmedCVData) -> tuple[Optional[str], Optional[int]]:
-    ps = getattr(profile, "profile_summary", None)
-    level = _canon_seniority(getattr(ps, "current_seniority_level", None)) if ps else None
-    years = getattr(ps, "years_of_experience", None) if ps else None
+    ps = as_cv_data(profile).profile_summary
+    level = _canon_seniority(ps.current_seniority_level)
+    years = ps.years_of_experience
     return level, years
 
 
@@ -128,8 +115,11 @@ def _fetch_role_certs(role_id: int) -> list[dict]:
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT certification_name, normalized_certification_name, embedding "
-                "FROM role_certifications WHERE role_id = %s",
+                "SELECT c.certification_name, c.normalized_certification_name "
+                "FROM certifications_mapping cm "
+                "JOIN certifications c ON c.certification_id = cm.certification_id "
+                "WHERE cm.role_id = %s "
+                "ORDER BY c.certification_name",
                 (role_id,),
             )
             return cur.fetchall()
@@ -144,14 +134,15 @@ def _retrieve_esco_grounding(role_id: int, missing_skills: list[str]) -> tuple[O
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT eo.esco_title FROM esco_mappings em "
+                "SELECT COALESCE(em.esco_title, eo.name) AS occupation_title "
+                "FROM esco_mappings em "
                 "JOIN esco_occupations eo ON eo.esco_uri = em.esco_uri "
                 "WHERE em.role_id = %s",
                 (role_id,),
             )
             row = cur.fetchone()
             if row:
-                occupation_title = row.get("esco_title")
+                occupation_title = row.get("occupation_title")
 
             for skill in missing_skills[:MAX_GROUNDING_SKILLS]:
                 cur.execute(
@@ -195,43 +186,29 @@ def _analyze_certs(role_certs: list[dict], user_certs: list[str]) -> Certificati
     if not role_certs:  # role requires no certs -> not a gap
         return CertificationDimension(coverage=1.0, status="strong")
 
-    user_norm = {_normalize_cert(c): c for c in user_certs}
-    user_vecs: list[tuple[str, np.ndarray]] = []
-    if user_certs:
-        embs = get_embedder().encode_documents(user_certs)  # same treatment as role certs
-        user_vecs = [(name, np.asarray(e, dtype=np.float32)) for name, e in zip(user_certs, embs)]
-
+    user_norm = {_normalize_cert(c) for c in user_certs}
     held: list[str] = []
-    related: list[CertificationGap] = []
     missing: list[CertificationGap] = []
 
     for rc in role_certs:
         name = rc["certification_name"]
-        norm = rc["normalized_certification_name"]
+        norm = _normalize_cert(rc.get("normalized_certification_name") or name)
         if norm in user_norm:  # exact normalized match
             held.append(name)
             continue
-        best_sim, best_name = 0.0, None
-        if user_vecs and rc.get("embedding") is not None:
-            rvec = np.asarray(rc["embedding"], dtype=np.float32)
-            for uname, uvec in user_vecs:
-                sim = _cosine(rvec, uvec)
-                if sim > best_sim:
-                    best_sim, best_name = sim, uname
-        if best_sim >= CERT_HELD_SIM:
-            held.append(name)
-        elif best_sim >= CERT_RELATED_SIM:
-            related.append(CertificationGap(required_certification=name, normalized_name=norm,
-                                            user_closest_certification=best_name,
-                                            similarity=round(best_sim, 4), status="related"))
-        else:
-            missing.append(CertificationGap(required_certification=name, normalized_name=norm,
-                                            user_closest_certification=best_name,
-                                            similarity=round(best_sim, 4), status="missing"))
+        missing.append(
+            CertificationGap(
+                required_certification=name,
+                normalized_name=norm,
+                user_closest_certification=None,
+                similarity=0.0,
+                status="missing",
+            )
+        )
 
     total = len(role_certs)
-    coverage = (len(held) + 0.4 * len(related)) / total
-    return CertificationDimension(held=held, related=related, missing=missing,
+    coverage = len(held) / total
+    return CertificationDimension(held=held, related=[], missing=missing,
                                   coverage=coverage, status=_status(coverage))
 
 

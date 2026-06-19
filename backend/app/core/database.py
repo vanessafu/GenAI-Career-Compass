@@ -15,13 +15,16 @@ logger = logging.getLogger("CareerCompass.Database")
 
 db_pool: Optional[SimpleConnectionPool] = None
 
-try:
-    db_pool = SimpleConnectionPool(
-        minconn=2, maxconn=15, dsn=DATABASE_URL, keepalives=1
-    )
-    logger.info("Initialized SimpleConnectionPool (Supabase pooler mode).")
-except Exception as exc:  # noqa: BLE001
-    logger.error("Failed to create database connection pool: %s", exc)
+if DATABASE_URL:
+    try:
+        db_pool = SimpleConnectionPool(
+            minconn=2, maxconn=15, dsn=DATABASE_URL, keepalives=1
+        )
+        logger.info("Initialized SimpleConnectionPool (Supabase pooler mode).")
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed to create database connection pool: %s", exc)
+else:
+    logger.warning("DATABASE_URL is not set; database connection pool is disabled.")
 
 
 @contextmanager

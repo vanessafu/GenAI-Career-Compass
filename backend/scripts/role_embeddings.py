@@ -1,18 +1,19 @@
 """
-Rebuild career_roles embeddings with bge-base-en-v1.5.
+Rebuild split career_roles embeddings with bge-base-en-v1.5.
 
-Pipeline:  read career_roles (+ role_skills) -> build a deterministic
-canonical_text -> encode_documents() -> batch UPDATE into pgvector.
+Pipeline:
+  career_roles + role_skills + certifications_mapping
+  -> deterministic capability/intent texts
+  -> encode_documents()
+  -> batch UPDATE capability_embedding / intent_embedding and their text fields.
 
 Run:
-    python backend/scripts/role_embeddings.py          # full rebuild
-    python backend/scripts/role_embeddings.py --dry-run  # print sample texts, no writes
-    python backend/scripts/role_embeddings.py --limit 20 # test on 20 roles
-    python backend/scripts/role_embeddings.py --only-certification # embed certifications for further gap analysis
+    python -m backend.scripts.role_embeddings
+    python -m backend.scripts.role_embeddings --dry-run
+    python -m backend.scripts.role_embeddings --limit 20
 
-NOTE: role descriptions are DOCUMENTS, so we use encode_documents() (no query
-prefix). After this runs, the 493 role vectors live in bge's space; do NOT mix
-them with any leftover careerbert vectors.
+Role texts are DOCUMENTS, so we use encode_documents() with no query prefix.
+User profile texts remain per-request QUERIES in the matching service.
 """
 from __future__ import annotations
 
@@ -21,76 +22,170 @@ import logging
 from typing import Optional
 
 import psycopg2
-from psycopg2.extras import execute_values
 from dotenv import load_dotenv
+from psycopg2.extras import execute_values
 
 from backend.app.core.database import db_pool, get_db_connection
-from backend.app.features.role_matching.embedder import get_embedder, EMBEDDING_DIM
+from backend.app.features.role_matching.embedder import EMBEDDING_DIM, get_embedder
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("CareerCompass.DataPreprocessing")
 
-# Soft cap on the description so the 512-token model doesn't truncate skills away
-# (title + skills are placed first; description is the lowest-signal, longest field).
 MAX_DESC_CHARS = 1200
-DB_UPDATE_PAGE = 100  # rows per execute_values batch
+MAX_INTENT_DESC_CHARS = 700
+DB_UPDATE_PAGE = 100
 
 
-#schema management
+def _clean_text(value: Optional[str]) -> str:
+    return " ".join((value or "").split())
+
+
+def _first_non_empty(*values: Optional[str]) -> str:
+    for value in values:
+        cleaned = _clean_text(value)
+        if cleaned:
+            return cleaned
+    return ""
+
+
+def _truncate(value: Optional[str], max_chars: int) -> str:
+    cleaned = _clean_text(value)
+    if len(cleaned) <= max_chars:
+        return cleaned
+    return cleaned[:max_chars].rsplit(" ", 1)[0] + " ..."
+
+
+def _vec_literal(vec: list[float]) -> str:
+    return "[" + ",".join(map(str, vec)) + "]"
+
+
+def build_capability_embedding_text(
+    *,
+    title: Optional[str],
+    description: Optional[str],
+    normalized_skills: Optional[str],
+    raw_skills: Optional[str],
+    certifications: Optional[str],
+    raw_certifications: Optional[str],
+) -> str:
+    """Role-side evidence comparable to a user's capability profile."""
+    parts = [f"Job title: {_clean_text(title)}"]
+
+    skills = _first_non_empty(normalized_skills, raw_skills)
+    if skills:
+        parts.append(f"Required skills: {skills}")
+
+    certs = _first_non_empty(certifications, raw_certifications)
+    if certs:
+        parts.append(f"Certifications: {certs}")
+
+    responsibilities = _truncate(description, MAX_DESC_CHARS)
+    if responsibilities:
+        parts.append(f"Responsibilities: {responsibilities}")
+
+    return "\n".join(parts).strip()
+
+
+def build_intent_embedding_text(
+    *,
+    title: Optional[str],
+    description: Optional[str],
+    domain_tags: Optional[str],
+) -> str:
+    """Role-side evidence comparable to a user's identity/interests profile."""
+    parts = [f"Career direction: {_clean_text(title)}"]
+
+    domains = _clean_text(domain_tags)
+    if domains:
+        parts.append(f"Domain tags: {domains}")
+
+    context = _truncate(description, MAX_INTENT_DESC_CHARS)
+    if context:
+        parts.append(f"Role context: {context}")
+
+    return "\n".join(parts).strip()
+
+
 def ensure_schema(conn: psycopg2.extensions.connection) -> None:
     with conn.cursor() as cur:
-        cur.execute(f"ALTER TABLE career_roles ADD COLUMN IF NOT EXISTS embedding vector({EMBEDDING_DIM});")
-        cur.execute("ALTER TABLE career_roles ADD COLUMN IF NOT EXISTS embedding_text text;")
+        cur.execute(
+            f"ALTER TABLE career_roles ADD COLUMN IF NOT EXISTS capability_embedding vector({EMBEDDING_DIM});"
+        )
+        cur.execute(
+            f"ALTER TABLE career_roles ADD COLUMN IF NOT EXISTS intent_embedding vector({EMBEDDING_DIM});"
+        )
+        cur.execute("ALTER TABLE career_roles ADD COLUMN IF NOT EXISTS capability_embedding_text text;")
+        cur.execute("ALTER TABLE career_roles ADD COLUMN IF NOT EXISTS intent_embedding_text text;")
+        cur.execute("ALTER TABLE career_roles DROP COLUMN IF EXISTS embedding;")
+        cur.execute("ALTER TABLE career_roles DROP COLUMN IF EXISTS embedding_text;")
+        cur.execute("ALTER TABLE certifications DROP COLUMN IF EXISTS embedding;")
     conn.commit()
-    _assert_vector_dim(conn)
+    _assert_vector_dims(conn)
 
 
-def ensure_cert_schema(conn: psycopg2.extensions.connection) -> None:
-    with conn.cursor() as cur:
-        cur.execute(f"ALTER TABLE role_certifications ADD COLUMN IF NOT EXISTS embedding vector({EMBEDDING_DIM});")
-    conn.commit()
-
-
-def _assert_vector_dim(conn: psycopg2.extensions.connection) -> None:
-    """Guard against an existing embedding column with the wrong dimension (e.g. 1536)."""
+def _assert_vector_dims(conn: psycopg2.extensions.connection) -> None:
     with conn.cursor() as cur:
         cur.execute(
             """
-            SELECT a.atttypmod
+            SELECT a.attname, a.atttypmod
             FROM pg_attribute a
             JOIN pg_class c ON c.oid = a.attrelid
             WHERE c.relname = 'career_roles'
-              AND a.attname = 'embedding'
+              AND a.attname IN ('capability_embedding', 'intent_embedding')
               AND NOT a.attisdropped;
             """
         )
-        row = cur.fetchone()
-    if not row:
-        raise RuntimeError("embedding column missing after ensure_schema().")
-    dim = row[0]  # pgvector stores the dimension in atttypmod; -1 means unspecified
-    if dim not in (EMBEDDING_DIM, -1):
-        raise RuntimeError(
-            f"career_roles.embedding is vector({dim}) but the model outputs {EMBEDDING_DIM}. "
-            f"Fix it first:  ALTER TABLE career_roles ALTER COLUMN embedding TYPE vector({EMBEDDING_DIM});"
-        )
+        dims = dict(cur.fetchall())
+
+    for column in ("capability_embedding", "intent_embedding"):
+        if column not in dims:
+            raise RuntimeError(f"career_roles.{column} missing after ensure_schema().")
+        dim = dims[column]
+        if dim not in (EMBEDDING_DIM, -1):
+            raise RuntimeError(
+                f"career_roles.{column} is vector({dim}) but the model outputs {EMBEDDING_DIM}. "
+                f"Fix it first: ALTER TABLE career_roles ALTER COLUMN {column} TYPE vector({EMBEDDING_DIM});"
+            )
 
 
-# load roles from the database, joining skills from role_skills. 
 def fetch_roles(conn: psycopg2.extensions.connection, limit: Optional[int] = None) -> list[tuple]:
-    """
-    array_agg(DISTINCT ...) dedups at the SQL level.
-    """
     sql = """
+        WITH normalized_role_skills AS (
+            SELECT
+                role_id,
+                string_agg(DISTINCT normalized_skill_name, ', ' ORDER BY normalized_skill_name) AS normalized_skills
+            FROM role_skills
+            WHERE normalized_skill_name IS NOT NULL
+              AND btrim(normalized_skill_name) <> ''
+            GROUP BY role_id
+        ),
+        mapped_certifications AS (
+            SELECT
+                cm.role_id,
+                string_agg(
+                    DISTINCT COALESCE(c.certification_name, c.normalized_certification_name),
+                    ', '
+                    ORDER BY COALESCE(c.certification_name, c.normalized_certification_name)
+                ) AS certifications
+            FROM certifications_mapping cm
+            JOIN certifications c ON c.certification_id = cm.certification_id
+            WHERE COALESCE(c.certification_name, c.normalized_certification_name) IS NOT NULL
+              AND btrim(COALESCE(c.certification_name, c.normalized_certification_name)) <> ''
+            GROUP BY cm.role_id
+        )
         SELECT
             c.role_id,
             c.job_title,
             c.job_description,
+            nrs.normalized_skills,
             c.raw_skills,
+            mc.certifications,
+            c.raw_certifications,
             c.domain_tags
-            c.certification_tags
         FROM career_roles c
-        GROUP BY c.role_id, c.job_title, c.job_description, c.raw_skills, c.domain_tags
+        LEFT JOIN normalized_role_skills nrs ON nrs.role_id = c.role_id
+        LEFT JOIN mapped_certifications mc ON mc.role_id = c.role_id
         ORDER BY c.role_id
     """
     params: tuple = ()
@@ -101,125 +196,107 @@ def fetch_roles(conn: psycopg2.extensions.connection, limit: Optional[int] = Non
         cur.execute(sql, params)
         return cur.fetchall()
 
-def build_canonical_text(
-    title: Optional[str],
-    description: Optional[str],
-    skills: Optional[str],
-    domain_tags: Optional[str],
-) -> str:
-    """Deterministic text fed to the embedder. Title + skills go first so they
-    survive the model's 512-token truncation; the long description goes last."""
-    parts = [f"Job title: {(title or '').strip()}"]
-    parts.append("Key skills: " +skills)
-    parts.append("Domain: " +domain_tags)
-    desc = (description or "").strip()
-    if len(desc) > MAX_DESC_CHARS:
-        desc = desc[:MAX_DESC_CHARS].rsplit(" ", 1)[0] + " …"
-    if desc:
-        parts.append("Description: " + desc)
-    return "\n".join(parts)
-
-# build certification embeddings
-def build_certification_embedding(
-    conn: psycopg2.extensions.connection,
-) -> list[tuple]:
-    """Returns list of (id, vec_literal) ready for batch UPDATE into role_certifications."""
-    sql = """
-        SELECT role_id, normalized_certification_name
-        FROM role_certifications
-    """
-    rows_out: list[tuple] = []
-    with conn.cursor() as cur:
-        cur.execute(sql)
-        rows = cur.fetchall()
-        embedder = get_embedder()
-        for cert_id, raw_cert in rows:
-            text = "Certification: " + (raw_cert or "").strip()
-            vec = embedder.encode_query(text)
-            rows_out.append((cert_id, _vec_literal(vec)))
-    return rows_out
-
-
-def store_cert_embeddings(conn: psycopg2.extensions.connection, rows: list[tuple]) -> None:
-    """Batch UPDATE role_certifications.embedding (no embedding_text stored)."""
-    if not rows:
-        return
-    sql = """
-        UPDATE role_certifications AS rc
-        SET embedding = v.embedding::vector
-        FROM (VALUES %s) AS v(id, embedding)
-        WHERE rc.role_id = v.id::bigint
-    """
-    with conn.cursor() as cur:
-        execute_values(cur, sql, rows, template="(%s, %s)", page_size=DB_UPDATE_PAGE)
-    conn.commit()
-
-
-# write embeddings back to the database in batches
-def _vec_literal(vec: list[float]) -> str:
-    return "[" + ",".join(map(str, vec)) + "]"
-
 
 def store_role_embeddings(conn: psycopg2.extensions.connection, rows: list[tuple]) -> None:
-    """Batch UPDATE existing rows by role_id (career_roles already holds every role)."""
     if not rows:
         return
     sql = """
         UPDATE career_roles AS c
-        SET embedding = v.embedding::vector,
-            embedding_text = v.embedding_text
-        FROM (VALUES %s) AS v(role_id, embedding, embedding_text)
+        SET capability_embedding = v.capability_embedding::vector,
+            intent_embedding = v.intent_embedding::vector,
+            capability_embedding_text = v.capability_embedding_text,
+            intent_embedding_text = v.intent_embedding_text
+        FROM (VALUES %s) AS v(
+            role_id,
+            capability_embedding,
+            intent_embedding,
+            capability_embedding_text,
+            intent_embedding_text
+        )
         WHERE c.role_id = v.role_id::bigint
     """
     with conn.cursor() as cur:
-        execute_values(cur, sql, rows, template="(%s, %s, %s)", page_size=DB_UPDATE_PAGE)
+        execute_values(cur, sql, rows, template="(%s, %s, %s, %s, %s)", page_size=DB_UPDATE_PAGE)
     conn.commit()
 
 
-# orchestration 
-def rebuild(limit: Optional[int] = None, dry_run: bool = False, only_certification: bool = False) -> None:
+def rebuild(limit: Optional[int] = None, dry_run: bool = False) -> None:
     with get_db_connection() as conn:
         if not dry_run:
             ensure_schema(conn)
-        
-        if only_certification:
-            logger.info("Building certification embeddings only...")
-            ensure_cert_schema(conn)
-            cert_rows = build_certification_embedding(conn)
-            store_cert_embeddings(conn, cert_rows)
-            logger.info("Stored %d certification embeddings into role_certifications.", len(cert_rows))
-            return
+
         roles = fetch_roles(conn, limit)
         logger.info("Fetched %d roles.", len(roles))
 
         ids: list[int] = []
-        texts: list[str] = []
-        for role_id, title, desc, raw_skills, domain_tags in roles:
+        capability_texts: list[str] = []
+        intent_texts: list[str] = []
+        for (
+            role_id,
+            title,
+            desc,
+            normalized_skills,
+            raw_skills,
+            certifications,
+            raw_certifications,
+            domain_tags,
+        ) in roles:
             ids.append(role_id)
-            texts.append(build_canonical_text(title, desc, raw_skills, domain_tags))
+            capability_texts.append(
+                build_capability_embedding_text(
+                    title=title,
+                    description=desc,
+                    normalized_skills=normalized_skills,
+                    raw_skills=raw_skills,
+                    certifications=certifications,
+                    raw_certifications=raw_certifications,
+                )
+            )
+            intent_texts.append(
+                build_intent_embedding_text(
+                    title=title,
+                    description=desc,
+                    domain_tags=domain_tags,
+                )
+            )
 
         if dry_run:
-            for i in range(min(3, len(texts))):
-                logger.info("role_id=%s\n%s\n----------", ids[i], texts[i])
-            logger.info("Dry run: %d roles would be embedded. No writes performed.", len(texts))
+            for i in range(min(3, len(ids))):
+                logger.info(
+                    "role_id=%s\n[Capability]\n%s\n\n[Intent]\n%s\n----------",
+                    ids[i],
+                    capability_texts[i],
+                    intent_texts[i],
+                )
+            logger.info("Dry run: %d roles would be embedded. No writes performed.", len(ids))
             return
 
-        logger.info("Encoding %d role documents (no query prefix) ...", len(texts))
-        vectors = get_embedder().encode_documents(texts)
+        logger.info("Encoding %d capability role documents (no query prefix) ...", len(capability_texts))
+        capability_vectors = get_embedder().encode_documents(capability_texts)
+        logger.info("Encoding %d intent role documents (no query prefix) ...", len(intent_texts))
+        intent_vectors = get_embedder().encode_documents(intent_texts)
 
-        rows = [(rid, _vec_literal(vec), text) for rid, vec, text in zip(ids, vectors, texts)]
+        rows = [
+            (rid, _vec_literal(cap_vec), _vec_literal(intent_vec), cap_text, intent_text)
+            for rid, cap_vec, intent_vec, cap_text, intent_text in zip(
+                ids,
+                capability_vectors,
+                intent_vectors,
+                capability_texts,
+                intent_texts,
+            )
+        ]
         store_role_embeddings(conn, rows)
-        logger.info("Done. Wrote embeddings + embedding_text for %d roles.", len(rows))
+        logger.info("Done. Wrote split embeddings + text fields for %d roles.", len(rows))
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Rebuild career_roles embeddings with bge-base-en-v1.5.")
-    parser.add_argument("--dry-run", action="store_true", help="Print sample canonical_text and exit; no embedding, no writes.")
-    parser.add_argument("--limit", type=int, default=None, help="Process only the first N roles (testing).")
-    parser.add_argument("--only-certification", action="store_true", help="Only embed certifications for further gap analysis.")
+    parser = argparse.ArgumentParser(description="Rebuild split career_roles embeddings with bge-base-en-v1.5.")
+    parser.add_argument("--dry-run", action="store_true", help="Print sample split embedding texts and exit; no writes.")
+    parser.add_argument("--limit", type=int, default=None, help="Process only the first N roles.")
     args = parser.parse_args()
     try:
-        rebuild(limit=args.limit, dry_run=args.dry_run, only_certification=args.only_certification)
+        rebuild(limit=args.limit, dry_run=args.dry_run)
     finally:
         if db_pool is not None:
             db_pool.closeall()

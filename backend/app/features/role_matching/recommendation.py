@@ -1,155 +1,162 @@
-"""
-Recommendation logic (pure functions, no I/O).
-
-Pipeline:  score -> bucket -> diversify (MMR) -> RoleMatch.
-
-Scoring (domain_tags already live inside the role embedding, so sim_interest
-captures domain alignment; there is no separate domain term):
-    match_score    = w_sim_cv * sim_cv + w_skill_coverage * skill_coverage
-    interest_score = sim_interest
-    growth_score   = sim_interest * reachability(coverage)   # peaks at a moderate gap
-    final_score    = (1 - alpha) * match_score + alpha * interest_score
-                     + beta_growth * growth_score
-
-Buckets:
-    ready_now    : coverage high, you already fit it          -> ranked by match_score
-    next_step    : interest high, gap moderate (reachable)    -> ranked by growth_score
-    aspirational : interest high, gap large                   -> ranked by interest_score
-"""
-from __future__ import annotations
-
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Union
 
-import numpy as np
-
-from backend.app.features.role_matching.schemas import (
+from .schemas import (
     BucketedRoles,
-    GapAnalysis,
+    DEFAULT_WEIGHTS,
     RecommendationBucket,
     RecommendationMode,
     RoleMatch,
-    ScoringWeights,
-    weights_for,
+    RoleMatchSignalBreakdown,
 )
 
-# --- thresholds---------------------------------------
-READY_COVERAGE = 0.70     # coverage >= this -> small gap -> ready_now
-MID_COVERAGE = 0.35       # MID..READY -> moderate gap -> next_step ; below -> aspirational
-MIN_RELEVANCE = 0.30      # floor on sim_cv before a role can count as "ready"
-MIN_INTEREST = 0.30       # floor on sim_interest before surfacing next_step/aspirational
-GROWTH_PEAK = 0.50        # coverage at which "reachable stretch" is maximal
-MMR_LAMBDA = 0.70         # MMR: relevance vs diversity (1.0 = pure relevance)
+
+READY_NOW_SKILL_OVERLAP = 0.65
+NEXT_STEP_SKILL_OVERLAP = 0.35
+STRETCH_MIN_SKILL_OVERLAP = 0.20
+STRONG_DOMAIN_OVERLAP = 0.50
+MIN_CAPABILITY_FOR_DOMAIN_STRETCH = 0.50
+STRONG_CERTIFICATION_OVERLAP = 0.50
 
 
 @dataclass
 class Candidate:
-    """One role + its raw signals + (filled later) its scores."""
-    role_id: int
+    role_id: Union[str, int]
     job_title: str
-    description: Optional[str]
-    essential_skills: list[str]
-    domain_tags: Optional[str]
-    embedding: np.ndarray           # unit-length role vector (for MMR)
-    sim_cv: float
-    sim_interest: float
-    skill_coverage: float
-    gap_analysis: GapAnalysis
-    match_score: float = 0.0
-    interest_score: float = 0.0
-    growth_score: float = 0.0
+    description: str = ""
+    salary: str = ""
+    required_skills: list[str] = field(default_factory=list)
+    domain_tags: list[str] = field(default_factory=list)
+    role_certifications: list[str] = field(default_factory=list)
+    capability_vector_similarity: float = 0.0
+    intent_vector_similarity: float = 0.0
+    normalized_skill_overlap: float = 0.0
+    interest_domain_overlap: float = 0.0
+    skill_overlap: float | None = None
+    domain_overlap: float | None = None
+    certification_overlap: float = 0.0
+    seniority_fit: float = 0.0
+    seniority_gap: str = "unknown"
+    matched_skills: list[str] = field(default_factory=list)
+    missing_skills: list[str] = field(default_factory=list)
+    matched_domains: list[str] = field(default_factory=list)
+    matched_certifications: list[str] = field(default_factory=list)
     final_score: float = 0.0
-    bucket: Optional[RecommendationBucket] = None
+    bucket: RecommendationBucket = RecommendationBucket.ASPIRATIONAL
+
+    def __post_init__(self) -> None:
+        self.description = self.description or ""
+        if self.skill_overlap is not None:
+            self.normalized_skill_overlap = self.skill_overlap
+        if self.domain_overlap is not None:
+            self.interest_domain_overlap = self.domain_overlap
 
 
-def _reachability(coverage: float, peak: float = GROWTH_PEAK) -> float:
-    """Triangular: 1.0 at `peak`, 0.0 at coverage 0 and at 2*peak. A role is a good
-    growth target when it stretches the user but stays within reach."""
-    return max(0.0, 1.0 - abs(coverage - peak) / peak)
+def _clamp01(value: float | None) -> float:
+    if value is None:
+        return 0.0
+    return max(0.0, min(1.0, float(value)))
 
 
-def score_candidates(cands: list[Candidate], w: ScoringWeights) -> None:
-    for c in cands:
-        c.match_score = w.w_sim_cv * c.sim_cv + w.w_skill_coverage * c.skill_coverage
-        c.interest_score = c.sim_interest
-        c.growth_score = c.sim_interest * _reachability(c.skill_coverage)
-        base = (1.0 - w.alpha) * c.match_score + w.alpha * c.interest_score
-        c.final_score = base + w.beta_growth * c.growth_score
+def _effective_domain_overlap(candidate: Candidate) -> float:
+    """Keep domain enthusiasm helpful without letting it dominate thin skills."""
+    skill_overlap = _clamp01(candidate.normalized_skill_overlap)
+    domain_overlap = _clamp01(candidate.interest_domain_overlap)
+    if skill_overlap >= NEXT_STEP_SKILL_OVERLAP:
+        return domain_overlap
+    if skill_overlap >= STRETCH_MIN_SKILL_OVERLAP:
+        return min(domain_overlap, 0.50)
+    return min(domain_overlap, 0.25)
 
 
-def assign_bucket(c: Candidate) -> Optional[RecommendationBucket]:
-    # Ready now: skills already fit AND the role is actually relevant to the CV
-    if c.skill_coverage >= READY_COVERAGE and c.sim_cv >= MIN_RELEVANCE:
-        return RecommendationBucket.ready_now
-    # Everything else must be something the user actually wants
-    if c.sim_interest < MIN_INTEREST:
-        return None  # not ready and not wanted -> drop
-    if c.skill_coverage >= MID_COVERAGE:
-        return RecommendationBucket.next_step
-    return RecommendationBucket.aspirational
-
-
-def _mmr(cands: list[Candidate], k: int, relevance_attr: str, lam: float = MMR_LAMBDA) -> list[Candidate]:
-    """Maximal Marginal Relevance: pick high-scoring roles that are not near-duplicates
-    of ones already picked (cosine over role embeddings). Spreads results across the
-    user's interest space instead of ten near-identical DevOps roles."""
-    pool = list(cands)
-    selected: list[Candidate] = []
-    while pool and len(selected) < k:
-        if not selected:
-            best = max(pool, key=lambda c: getattr(c, relevance_attr))
-        else:
-            def mmr_score(c: Candidate) -> float:
-                rel = getattr(c, relevance_attr)
-                redundancy = max(float(np.dot(c.embedding, s.embedding)) for s in selected)
-                return lam * rel - (1.0 - lam) * redundancy
-            best = max(pool, key=mmr_score)
-        selected.append(best)
-        pool.remove(best)
-    return selected
-
-
-def _to_match(c: Candidate) -> RoleMatch:
-    r = lambda x: round(float(x), 4)  # noqa: E731
-    return RoleMatch(
-        role_id=c.role_id,
-        job_title=c.job_title,
-        description=c.description,
-        essential_skills=c.essential_skills,
-        sim_cv=r(c.sim_cv),
-        sim_interest=r(c.sim_interest),
-        skill_coverage=r(c.skill_coverage),
-        match_score=r(c.match_score),
-        interest_score=r(c.interest_score),
-        growth_score=r(c.growth_score),
-        final_score=r(c.final_score),
-        bucket=c.bucket,
-        gap_analysis=c.gap_analysis,
+def score_candidate(candidate: Candidate) -> float:
+    weights = DEFAULT_WEIGHTS
+    return (
+        weights.capability_vector_similarity * _clamp01(candidate.capability_vector_similarity)
+        + weights.intent_vector_similarity * _clamp01(candidate.intent_vector_similarity)
+        + weights.normalized_skill_overlap * _clamp01(candidate.normalized_skill_overlap)
+        + weights.interest_domain_overlap * _effective_domain_overlap(candidate)
+        + weights.certification_overlap * _clamp01(candidate.certification_overlap)
+        + weights.seniority_fit * _clamp01(candidate.seniority_fit)
     )
 
 
-def recommend(cands: list[Candidate], mode: RecommendationMode, per_bucket: int = 5) -> BucketedRoles:
-    """Score, bucket, diversify. `per_bucket` caps each tier (the request's top_k)."""
-    score_candidates(cands, weights_for(mode))
+def assign_bucket(candidate: Candidate) -> RecommendationBucket:
+    skill_overlap = _clamp01(candidate.normalized_skill_overlap)
+    domain_overlap = _clamp01(candidate.interest_domain_overlap)
+    cert_overlap = _clamp01(candidate.certification_overlap)
+    capability_similarity = _clamp01(candidate.capability_vector_similarity)
+
+    if skill_overlap >= READY_NOW_SKILL_OVERLAP and candidate.seniority_gap != "stretch":
+        return RecommendationBucket.READY_NOW
+
+    if candidate.seniority_gap == "stretch" and skill_overlap < NEXT_STEP_SKILL_OVERLAP:
+        return RecommendationBucket.ASPIRATIONAL
+
+    if skill_overlap >= NEXT_STEP_SKILL_OVERLAP:
+        return RecommendationBucket.NEXT_STEP
+    if cert_overlap >= STRONG_CERTIFICATION_OVERLAP and skill_overlap >= STRETCH_MIN_SKILL_OVERLAP:
+        return RecommendationBucket.NEXT_STEP
+    if (
+        skill_overlap >= STRETCH_MIN_SKILL_OVERLAP
+        and domain_overlap >= STRONG_DOMAIN_OVERLAP
+        and capability_similarity >= MIN_CAPABILITY_FOR_DOMAIN_STRETCH
+    ):
+        return RecommendationBucket.NEXT_STEP
+
+    return RecommendationBucket.ASPIRATIONAL
+
+
+def _to_match(candidate: Candidate) -> RoleMatch:
+    return RoleMatch(
+        role_id=candidate.role_id,
+        job_title=candidate.job_title,
+        description=candidate.description or "",
+        final_score=round(candidate.final_score, 4),
+        salary=candidate.salary or "",
+        bucket=candidate.bucket,
+        matched_skills=candidate.matched_skills,
+        missing_skills=candidate.missing_skills,
+        matched_domains=candidate.matched_domains,
+        matched_certifications=candidate.matched_certifications,
+        signal_breakdown=RoleMatchSignalBreakdown(
+            capability_vector_similarity=round(_clamp01(candidate.capability_vector_similarity), 4),
+            intent_vector_similarity=round(_clamp01(candidate.intent_vector_similarity), 4),
+            normalized_skill_overlap=round(_clamp01(candidate.normalized_skill_overlap), 4),
+            interest_domain_overlap=round(_clamp01(candidate.interest_domain_overlap), 4),
+            certification_overlap=round(_clamp01(candidate.certification_overlap), 4),
+            seniority_fit=round(_clamp01(candidate.seniority_fit), 4),
+            seniority_gap=candidate.seniority_gap,
+        ),
+    )
+
+
+def recommend(
+    candidates: list[Candidate],
+    top_k: int | None = None,
+    mode: RecommendationMode = RecommendationMode.BALANCED,
+    per_bucket: int | None = None,
+) -> BucketedRoles:
+    if top_k is None:
+        top_k = per_bucket or 3
+
+    for candidate in candidates:
+        candidate.final_score = score_candidate(candidate)
+        candidate.bucket = assign_bucket(candidate)
 
     grouped: dict[RecommendationBucket, list[Candidate]] = {
-        RecommendationBucket.ready_now: [],
-        RecommendationBucket.next_step: [],
-        RecommendationBucket.aspirational: [],
+        RecommendationBucket.READY_NOW: [],
+        RecommendationBucket.NEXT_STEP: [],
+        RecommendationBucket.ASPIRATIONAL: [],
     }
-    for c in cands:
-        b = assign_bucket(c)
-        if b is not None:
-            c.bucket = b
-            grouped[b].append(c)
+    for candidate in candidates:
+        grouped[candidate.bucket].append(candidate)
 
-    # Each bucket is ranked by its own meaningful metric, then MMR-diversified.
-    ready = _mmr(grouped[RecommendationBucket.ready_now], per_bucket, "match_score")
-    nxt = _mmr(grouped[RecommendationBucket.next_step], per_bucket, "growth_score")
-    asp = _mmr(grouped[RecommendationBucket.aspirational], per_bucket, "interest_score")
+    for bucket_candidates in grouped.values():
+        bucket_candidates.sort(key=lambda item: item.final_score, reverse=True)
 
     return BucketedRoles(
-        ready_now=[_to_match(c) for c in ready],
-        next_step=[_to_match(c) for c in nxt],
-        aspirational=[_to_match(c) for c in asp],
+        ready_now=[_to_match(item) for item in grouped[RecommendationBucket.READY_NOW][:top_k]],
+        next_step=[_to_match(item) for item in grouped[RecommendationBucket.NEXT_STEP][:top_k]],
+        aspirational=[_to_match(item) for item in grouped[RecommendationBucket.ASPIRATIONAL][:top_k]],
     )

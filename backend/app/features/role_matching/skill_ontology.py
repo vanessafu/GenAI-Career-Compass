@@ -59,12 +59,22 @@ def severity_from(credit: float) -> str:
 
 class SkillOntology:
     def __init__(self, path: Path = ONTOLOGY_PATH) -> None:
-        raw = json.loads(Path(path).read_text(encoding="utf-8"))
-        nodes = raw.values() if isinstance(raw, dict) else raw  # tolerate list OR dict
-
         self._canonical_by_alias: dict[str, str] = {}   # lowercased alias -> canonical name
         self._implies: dict[str, list[str]] = {}        # canonical -> direct implied skills
         self._closure_cache: dict[str, frozenset[str]] = {}
+        self._exact_match_fallback = False
+
+        ontology_path = Path(path)
+        if not ontology_path.exists():
+            self._exact_match_fallback = True
+            logger.warning(
+                "Skill ontology file %s not found. Falling back to exact skill matching.",
+                ontology_path,
+            )
+            return
+
+        raw = json.loads(ontology_path.read_text(encoding="utf-8"))
+        nodes = raw.values() if isinstance(raw, dict) else raw  # tolerate list OR dict
 
         for node in nodes:
             name = node.get("name")
@@ -79,6 +89,9 @@ class SkillOntology:
 
         logger.info("Loaded ontology: %d skills, %d aliases.",
                     len(self._implies), len(self._canonical_by_alias))
+
+    def _fallback_key(self, skill: str) -> str:
+        return re.sub(r"\s+", " ", (skill or "").strip()).casefold()
 
     # ---- normalization ----
     def canonical(self, skill: str) -> Optional[str]:
@@ -127,6 +140,26 @@ class SkillOntology:
         Each gap: {required_skill, user_closest_skill, transferability, severity}.
         """
         user_skills = list(user_skills)
+        if self._exact_match_fallback:
+            required = parse_raw_skills(required_raw)
+            if not required:
+                return 0.0, [], []
+
+            user_keys = {self._fallback_key(skill) for skill in user_skills}
+            matched: list[str] = []
+            gaps: list[dict] = []
+            for req in required:
+                if self._fallback_key(req) in user_keys:
+                    matched.append(req)
+                else:
+                    gaps.append({
+                        "required_skill": req,
+                        "user_closest_skill": None,
+                        "transferability": 0.0,
+                        "severity": severity_from(0.0),
+                    })
+            return len(matched) / len(required), matched, gaps
+
         required = [self.canonical(r) or r for r in parse_raw_skills(required_raw)]
         required = list(dict.fromkeys(required))  # dedup, keep order
         if not required:

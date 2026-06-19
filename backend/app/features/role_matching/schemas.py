@@ -1,123 +1,169 @@
-"""
-Role-matching stage schemas. All Pydantic models live here.
-
-Two signals describe the user and they are embedded SEPARATELY:
-  - confirmed_profile -> v_cv       (current capabilities: skills, experience, seniority)
-  - identity          -> v_interest (direction: identity statement, interests, target dirs)
-
-Scoring:
-  match_score    = w_sim_cv * sim_cv + w_skill_coverage * skill_coverage
-  interest_score = sim_interest
-  final          = (1 - alpha) * match_score + alpha * interest_score
-                   + beta_growth * growth_score
-"""
-from __future__ import annotations
-
 from enum import Enum
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
-
-
-# ---------------------------------------------------------------------------
-# Enums & recommendation modes
-# ---------------------------------------------------------------------------
 
 class RecommendationMode(str, Enum):
-    focused = "focused"          # prioritise roles you already fit
-    balanced = "balanced"        # default mix
-    exploratory = "exploratory"  # prioritise interest + growth
+    BALANCED = "balanced"
+    GROWTH = "growth"
+    SAFE = "safe"
+    balanced = "balanced"
+    growth = "growth"
+    safe = "safe"
 
 
 class RecommendationBucket(str, Enum):
-    ready_now = "ready_now"        # high match, small gap
-    next_step = "next_step"        # high interest, moderate gap
-    aspirational = "aspirational"  # high interest, large gap
+    READY_NOW = "ready_now"
+    NEXT_STEP = "next_step"
+    ASPIRATIONAL = "aspirational"
+    ready_now = "ready_now"
+    next_step = "next_step"
+    aspirational = "aspirational"
+
+
+DimensionStatus = Literal["strong", "partial", "weak"]
 
 
 class ScoringWeights(BaseModel):
-    w_sim_cv: float = 0.65
-    w_skill_coverage: float = 0.35
-    alpha: float = 0.5
-    beta_growth: float = 0.2
+    capability_vector_similarity: float = 0.25
+    intent_vector_similarity: float = 0.15
+    normalized_skill_overlap: float = 0.30
+    interest_domain_overlap: float = 0.15
+    certification_overlap: float = 0.10
+    seniority_fit: float = 0.05
 
 
-MODE_WEIGHTS: dict[RecommendationMode, ScoringWeights] = {
-    RecommendationMode.focused:     ScoringWeights(alpha=0.25, beta_growth=0.10),
-    RecommendationMode.balanced:    ScoringWeights(alpha=0.50, beta_growth=0.20),
-    RecommendationMode.exploratory: ScoringWeights(alpha=0.75, beta_growth=0.35),
-}
+DEFAULT_WEIGHTS = ScoringWeights()
 
 
-def weights_for(mode: RecommendationMode) -> ScoringWeights:
-    return MODE_WEIGHTS[mode]
+def _has_text(value: Optional[str]) -> bool:
+    return bool(value and value.strip())
 
 
-# ---------------------------------------------------------------------------
-# User-facing input models
-# ---------------------------------------------------------------------------
+def _has_any_text(values: list[str]) -> bool:
+    return any(_has_text(value) for value in values)
 
-class UserIdentity(BaseModel):
-    """The interest / direction side of the user (feeds v_interest)."""
-    career_identity_statement: str
-    career_directions: list[str] = Field(default_factory=list)
+
+class CareerIdentity(BaseModel):
+    title: Optional[str] = None
+    summary: Optional[str] = None
+
+    @property
+    def has_signal(self) -> bool:
+        return _has_text(self.title) or _has_text(self.summary)
+
+
+class UserEducation(BaseModel):
+    degree: Optional[str] = None
+    institution: Optional[str] = None
+    start_year: Optional[str] = None
+    end_year: Optional[str] = None
+
+    @property
+    def has_signal(self) -> bool:
+        return _has_any_text(
+            [self.degree or "", self.institution or "", self.start_year or "", self.end_year or ""]
+        )
+
+
+class UserExperience(BaseModel):
+    role: Optional[str] = None
+    organization: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    summary: Optional[str] = None
+    skills: list[str] = Field(default_factory=list)
+
+    @property
+    def has_signal(self) -> bool:
+        return _has_any_text(
+            [
+                self.role or "",
+                self.organization or "",
+                self.start_date or "",
+                self.end_date or "",
+                self.summary or "",
+                *self.skills,
+            ]
+        )
+
+
+class UserCertification(BaseModel):
+    name: Optional[str] = None
+    issuer: Optional[str] = None
+    year: Optional[str] = None
+
+    @property
+    def has_signal(self) -> bool:
+        return _has_any_text([self.name or "", self.issuer or "", self.year or ""])
+
+
+class UserProject(BaseModel):
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    technologies: list[str] = Field(default_factory=list)
+    year: Optional[str] = None
+
+    @property
+    def has_signal(self) -> bool:
+        return _has_any_text([self.title or "", self.summary or "", self.year or "", *self.technologies])
+
+
+class UserCareerProfile(BaseModel):
+    career_identity: CareerIdentity = Field(default_factory=CareerIdentity)
+    education: list[UserEducation] = Field(default_factory=list)
+    experience: list[UserExperience] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
     interests: list[str] = Field(default_factory=list)
+    certifications: list[UserCertification] = Field(default_factory=list)
+    projects: list[UserProject] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def require_capability_and_intent(self) -> "UserCareerProfile":
+        has_capability = (
+            any(item.has_signal for item in self.experience)
+            or any(item.has_signal for item in self.education)
+            or _has_any_text(self.skills)
+            or any(item.has_signal for item in self.certifications)
+            or any(item.has_signal for item in self.projects)
+        )
+        has_intent = self.career_identity.has_signal or _has_any_text(self.interests)
+
+        if not has_capability and not has_intent:
+            raise ValueError("Profile must include at least one capability signal and one intent signal.")
+        if not has_capability:
+            raise ValueError(
+                "Profile must include at least one capability signal from experience, education, "
+                "skills, certifications, or projects."
+            )
+        if not has_intent:
+            raise ValueError("Profile must include at least one intent signal from career identity or interests.")
+        return self
 
 
-class JobRecord(BaseModel):
-    """A role row as stored in career_roles (internal representation)."""
-    role_id: int
-    job_title: str
-    job_description: Optional[str] = None
-    raw_skills: Optional[str] = None
-    domain_tags: Optional[str] = None
+class RoleMatchSignalBreakdown(BaseModel):
+    capability_vector_similarity: float = 0.0
+    intent_vector_similarity: float = 0.0
+    normalized_skill_overlap: float = 0.0
+    interest_domain_overlap: float = 0.0
+    certification_overlap: float = 0.0
+    seniority_fit: float = 0.0
+    seniority_gap: str = "unknown"
 
-
-# ---------------------------------------------------------------------------
-# Skill gap models (shared by role-match scoring and deep gap analysis)
-# ---------------------------------------------------------------------------
-
-Severity = Literal["matched", "low", "medium", "high"]
-
-
-class SkillGap(BaseModel):
-    required_skill: str
-    user_closest_skill: Optional[str] = None
-    transferability: float = 0.0
-    severity: Severity = "high"
-    source: str = "MIND"
-
-
-class GapAnalysis(BaseModel):
-    """Lightweight skill gap summary attached to each RoleMatch (for scoring)."""
-    matched_skills: list[str] = Field(default_factory=list)
-    skill_gaps: list[SkillGap] = Field(default_factory=list)
-    required_count: int = 0
-    coverage: float = 0.0
-
-
-# ---------------------------------------------------------------------------
-# Role match result models
-# ---------------------------------------------------------------------------
 
 class RoleMatch(BaseModel):
-    role_id: int
+    role_id: str | int
     job_title: str
-    description: Optional[str] = None
-    essential_skills: list[str] = Field(default_factory=list)
-
-    sim_cv: float = 0.0
-    sim_interest: float = 0.0
-    skill_coverage: float = 0.0
-    match_score: float = 0.0
-    interest_score: float = 0.0
-    growth_score: float = 0.0
-    final_score: float = 0.0
-    bucket: Optional[RecommendationBucket] = None
-
-    gap_analysis: Optional[GapAnalysis] = None
+    description: str = ""
+    final_score: float
+    salary: str = ""
+    bucket: RecommendationBucket
+    matched_skills: list[str] = Field(default_factory=list)
+    missing_skills: list[str] = Field(default_factory=list)
+    matched_domains: list[str] = Field(default_factory=list)
+    matched_certifications: list[str] = Field(default_factory=list)
+    signal_breakdown: RoleMatchSignalBreakdown
 
 
 class BucketedRoles(BaseModel):
@@ -126,81 +172,148 @@ class BucketedRoles(BaseModel):
     aspirational: list[RoleMatch] = Field(default_factory=list)
 
 
+class CareerResultV1(BaseModel):
+    bucket: str
+    title: str
+    matching_score: int = Field(ge=0, le=100)
+    salary: str = ""
+    description: str = ""
+
+    @classmethod
+    def from_role_match(cls, role: RoleMatch) -> "CareerResultV1":
+        score = max(0.0, min(1.0, role.final_score))
+        return cls(
+            bucket=role.bucket.value,
+            title=role.job_title,
+            matching_score=int(round(score * 100)),
+            salary=role.salary,
+            description=role.description,
+        )
+
+
+class CareerResultsV1(BaseModel):
+    results: list[CareerResultV1] = Field(default_factory=list)
+
+    @classmethod
+    def from_bucketed_roles(cls, buckets: BucketedRoles) -> "CareerResultsV1":
+        roles = [
+            *buckets.ready_now,
+            *buckets.next_step,
+            *buckets.aspirational,
+        ]
+        return cls(results=[CareerResultV1.from_role_match(role) for role in roles])
+
+
+class RoleMatchDebug(BaseModel):
+    capability_text: str
+    intent_text: str
+    normalized_user_skills: list[str] = Field(default_factory=list)
+    mapped_domains: list[str] = Field(default_factory=list)
+
+
 class RoleMatchRequest(BaseModel):
-    confirmed_profile: ConfirmedCVData
-    identity: UserIdentity
-    top_k: int = Field(default=2, ge=1, le=20)
-    mode: RecommendationMode = RecommendationMode.balanced
+    model_config = ConfigDict(extra="forbid")
+
+    profile: UserCareerProfile
+    top_k: int = Field(default=3, ge=1, le=20)
+    mode: RecommendationMode = RecommendationMode.BALANCED
+    include_debug: bool = False
 
 
 class RoleMatchResponse(BaseModel):
     mode: RecommendationMode
-    cv_query_text: str
-    interest_query_text: str
-    career_directions: list[str] = Field(default_factory=list)
     buckets: BucketedRoles
+    debug: Optional[RoleMatchDebug] = None
 
 
-# ---------------------------------------------------------------------------
-# Deep gap analysis models (full multi-dimensional report)
-# ---------------------------------------------------------------------------
+class SkillGap(BaseModel):
+    skill: str = ""
+    importance: str = ""
+    suggestion: str = ""
+    required_skill: str = ""
+    user_closest_skill: Optional[str] = None
+    transferability: float = 0.0
+    severity: str = "medium"
+    source: str = ""
 
-DimensionStatus = Literal["strong", "partial", "weak"]
+
+class GapAnalysis(BaseModel):
+    missing_essential: list[SkillGap] = Field(default_factory=list)
+    missing_optional: list[SkillGap] = Field(default_factory=list)
+    bridge_projects: list[str] = Field(default_factory=list)
+    learning_plan: list[str] = Field(default_factory=list)
+    estimated_months: int = 0
 
 
 class SkillDimension(BaseModel):
-    """Skill dimension of a GapReport (richer than GapAnalysis: includes status)."""
     matched_skills: list[str] = Field(default_factory=list)
+    missing_skills: list[str] = Field(default_factory=list)
+    optional_missing_skills: list[str] = Field(default_factory=list)
     skill_gaps: list[SkillGap] = Field(default_factory=list)
     coverage: float = 0.0
     status: DimensionStatus = "weak"
+    summary: str = ""
 
 
 class CertificationGap(BaseModel):
-    required_certification: str
-    normalized_name: str
+    name: str = ""
+    provider: Optional[str] = None
+    priority: str = "recommended"
+    reason: str = ""
+    required_certification: str = ""
+    normalized_name: str = ""
     user_closest_certification: Optional[str] = None
     similarity: float = 0.0
-    status: Literal["held", "related", "missing"] = "missing"
+    status: str = "missing"
 
 
 class CertificationDimension(BaseModel):
+    matched_certifications: list[str] = Field(default_factory=list)
+    missing_certifications: list[CertificationGap] = Field(default_factory=list)
     held: list[str] = Field(default_factory=list)
     related: list[CertificationGap] = Field(default_factory=list)
     missing: list[CertificationGap] = Field(default_factory=list)
     coverage: float = 0.0
     status: DimensionStatus = "weak"
+    summary: str = ""
 
 
 class SeniorityDimension(BaseModel):
+    user_seniority: str = "unknown"
+    role_seniority: str = "unknown"
+    fit: str = "unknown"
     user_level: Optional[str] = None
     role_level: Optional[str] = None
     user_years: Optional[int] = None
-    gap: Literal["under", "match", "over", "unknown"] = "unknown"
+    gap: str = "unknown"
     note: Optional[str] = None
+    summary: str = ""
 
 
 class GapActionItem(BaseModel):
     title: str
-    dimension: str
-    priority: Literal["high", "medium", "low"]
-    rationale: str
-    suggested_resources: list[str] = Field(default_factory=list)
+    description: str
+    effort: str = "medium"
+    priority: str = "medium"
 
 
 class GapNarrative(BaseModel):
-    summary: str
-    prioritized_actions: list[GapActionItem] = Field(default_factory=list)
-    estimated_effort: Optional[str] = None
+    readiness_summary: str = ""
+    why_this_role: str = ""
+    main_gaps: str = ""
+    next_steps: str = ""
 
 
 class GapReport(BaseModel):
-    role_id: int
+    role_id: str | int
     job_title: str
     job_description: Optional[str] = None
     overall_readiness: float = 0.0
-    skills: SkillDimension
-    certifications: CertificationDimension
-    seniority: SeniorityDimension
+    readiness_score: float = 0.0
+    bucket: RecommendationBucket = RecommendationBucket.ASPIRATIONAL
+    skills: SkillDimension = Field(default_factory=SkillDimension)
+    certifications: CertificationDimension = Field(default_factory=CertificationDimension)
+    seniority: SeniorityDimension = Field(default_factory=SeniorityDimension)
     grounding_used: list[str] = Field(default_factory=list)
+    action_plan: list[GapActionItem] = Field(default_factory=list)
     narrative: Optional[GapNarrative] = None

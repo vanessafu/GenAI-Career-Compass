@@ -10,8 +10,6 @@ Model bge-base-en-v1.5: input can be up to 512 tokens, used for longer CV text a
 from __future__ import annotations
 import logging
 from typing import Optional
-import torch
-from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger("CareerCompass.Embedder")
 
@@ -23,6 +21,8 @@ QUERY_INSTRUCTION = "Represent this sentence for searching relevant passages: "
  
 def _pick_device() -> str:
     """Prefer Apple Silicon GPU (Metal/MPS), then CUDA, then CPU."""
+    import torch
+
     if torch.backends.mps.is_available():
         return "mps"
     if torch.cuda.is_available():
@@ -33,6 +33,8 @@ class CareerEmbedder:
     """Thin wrapper that normalises embeddings to unit-length (cosine-ready)."""
 
     def __init__(self, model_name: str = MODEL_NAME, device: Optional[str] = None) -> None:
+        from sentence_transformers import SentenceTransformer
+
         self.device = device or _pick_device()
         logger.info("Loading embedding model %s on %s", model_name, self.device)
         self._model = SentenceTransformer(model_name, device=self.device)
