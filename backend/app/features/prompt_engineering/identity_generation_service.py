@@ -1,10 +1,6 @@
 import logging
 
-from backend.app.core.config import (
-    OPENAI_MODEL,
-    OPENAI_TEMPERATURE,
-    get_async_openai_client,
-)
+from backend.app.core import openai_client
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
 from backend.app.features.prompt_engineering.profile_projector import build_privacy_stripped_profile_draft
 from backend.app.features.prompt_engineering.schemas import (
@@ -19,7 +15,6 @@ async def generate_starter_profile(
     confirmed_profile: ConfirmedCVData,
 ) -> StarterProfileResponse:
     draft = build_privacy_stripped_profile_draft(confirmed_profile)
-    client = get_async_openai_client()
 
     system_prompt = """
 You are an experienced tech recruiter specializing in IT and data careers.
@@ -50,16 +45,13 @@ Follow-up Questions:
 
     try:
         logger.info("Generating starter identity from privacy-stripped profile draft...")
-        response = await client.beta.chat.completions.parse(
-            model=OPENAI_MODEL,
+        generated = await openai_client.parse_structured(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": draft.model_dump_json()},
             ],
             response_format=StarterIdentityGeneration,
-            temperature=OPENAI_TEMPERATURE,
         )
-        generated = response.choices[0].message.parsed
         logger.info("Starter identity generated successfully.")
         return StarterProfileResponse(
             privacy_stripped_profile_draft=draft,
