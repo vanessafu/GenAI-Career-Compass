@@ -3,6 +3,7 @@ import asyncio
 import json
 from pathlib import Path
 
+from backend.app.core.openai_client import openai_client_lifespan
 from backend.app.features.cv_confirmation.cli_flow import confirm_cv_interactively, confirm_json_file
 from backend.app.features.cv_confirmation.manual_flow import collect_manual_cv_data
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
@@ -60,6 +61,11 @@ def write_json_output(output_path: Path, payload: dict) -> Path:
 
 def load_confirmed_profile(json_path: Path) -> ConfirmedCVData:
     return ConfirmedCVData.model_validate_json(json_path.read_text(encoding="utf-8"))
+
+
+async def run_with_openai(coro):
+    async with openai_client_lifespan():
+        return await coro
 
 
 async def parse_cv_file(pdf_path: Path, output_path: Path | None = None) -> Path:
@@ -241,7 +247,7 @@ def main() -> None:
         return
 
     if args.command == "parse-cv":
-        output_path = asyncio.run(parse_cv_file(args.pdf_path, args.output))
+        output_path = asyncio.run(run_with_openai(parse_cv_file(args.pdf_path, args.output)))
         print(f"Parsed CV written to {output_path}")
         return
 
@@ -252,7 +258,7 @@ def main() -> None:
         return
 
     if args.command == "confirm-cv":
-        output_path = asyncio.run(confirm_cv_file(args.pdf_path, args.output, assume_yes=args.yes))
+        output_path = asyncio.run(run_with_openai(confirm_cv_file(args.pdf_path, args.output, assume_yes=args.yes)))
         print(f"Confirmed CV written to {output_path}")
         return
 
@@ -262,7 +268,7 @@ def main() -> None:
         return
 
     if args.command == "identity-followups":
-        result = asyncio.run(generate_starter_profile_from_file(args.json_path))
+        result = asyncio.run(run_with_openai(generate_starter_profile_from_file(args.json_path)))
         print_starter_profile(result)
         output_path = save_identity_followups_artifact(args.json_path, result)
         print(f"\nIdentity and follow-up generation appended to {output_path}")

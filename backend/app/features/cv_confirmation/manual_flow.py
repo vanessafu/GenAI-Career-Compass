@@ -1,10 +1,13 @@
 from backend.app.features.cv_parsing.schemas import (
+    Certification,
     CVData,
     Education,
     Experience,
     PersonalInfo,
+    Project,
     SkillsExtracted,
     TechnicalSkill,
+    Thesis,
 )
 
 
@@ -70,6 +73,71 @@ def collect_experience() -> list[Experience]:
     return experience
 
 
+def collect_projects() -> list[Project]:
+    projects: list[Project] = []
+    print("\nProjects")
+    while True:
+        title = ask_optional("Project title (blank to stop): ")
+        if title is None:
+            break
+
+        projects.append(
+            Project(
+                title=title,
+                description=ask_optional("Description: "),
+                organization=ask_optional("Organization/context: "),
+                role=ask_optional("Your role: "),
+                technologies=ask_comma_list("Technologies, comma-separated: "),
+                outcomes=ask_comma_list("Outcomes, comma-separated: "),
+                links=ask_comma_list("Links, comma-separated: "),
+            )
+        )
+    return projects
+
+
+def collect_certifications() -> list[Certification]:
+    certifications: list[Certification] = []
+    print("\nCertifications")
+    while True:
+        name = ask_optional("Certification name (blank to stop): ")
+        if name is None:
+            break
+
+        certifications.append(
+            Certification(
+                name=name,
+                issuing_organization=ask_optional("Issuing organization: "),
+                issue_date=ask_optional("Issue date: "),
+                expiration_date=ask_optional("Expiration date: "),
+                credential_id=ask_optional("Credential ID: "),
+                credential_url=ask_optional("Credential URL: "),
+            )
+        )
+    return certifications
+
+
+def collect_thesis() -> list[Thesis]:
+    theses: list[Thesis] = []
+    print("\nThesis")
+    while True:
+        title = ask_optional("Thesis title (blank to stop): ")
+        if title is None:
+            break
+
+        theses.append(
+            Thesis(
+                title=title,
+                degree_type=ask_optional("Degree type: "),
+                institution=ask_optional("Institution: "),
+                supervisor=ask_optional("Supervisor: "),
+                description=ask_optional("Description: "),
+                technologies=ask_comma_list("Technologies, comma-separated: "),
+                grade=ask_optional("Grade: "),
+            )
+        )
+    return theses
+
+
 def collect_skills() -> SkillsExtracted:
     print("\nSkills")
     technical_skills = [
@@ -89,6 +157,9 @@ def collect_manual_cv_data() -> CVData:
         personal_info=PersonalInfo(current_role=current_role),
         education=collect_education(),
         experience=collect_experience(),
+        projects=collect_projects(),
+        certifications=collect_certifications(),
+        thesis=collect_thesis(),
         skills_extracted=collect_skills(),
     )
     return cv_data
