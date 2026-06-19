@@ -100,7 +100,8 @@ REVIEW_FIELDNAMES = [
 class SchemaConfig:
     roles_table: str = "career_roles"
     role_skills_table: str = "role_skills"
-    role_certifications_table: str = "role_certifications"
+    certifications_table: str = "certifications"
+    certifications_mapping_table: str = "certifications_mapping"
     occupations_table: str = "esco_occupations"
     esco_skills_table: str = "esco_skills"
     occupation_skills_table: str = "esco_occupation_skills"
@@ -111,6 +112,7 @@ class SchemaConfig:
     raw_skills_column: str = "raw_skills"
     raw_certifications_column: str = "raw_certifications"
     domain_tags_column: str = "domain_tags"
+    certification_id_column: str = "certification_id"
     skill_name_column: str = "skill_name"
     normalized_skill_name_column: str = "normalized_skill_name"
     certification_name_column: str = "certification_name"
@@ -665,10 +667,17 @@ class SupabaseRestClient:
                 ],
             ),
             (
-                self.schema.role_certifications_table,
+                self.schema.certifications_table,
+                [
+                    self.schema.certification_id_column,
+                    self.schema.certification_name_column,
+                ],
+            ),
+            (
+                self.schema.certifications_mapping_table,
                 [
                     self.schema.role_id_column,
-                    self.schema.certification_name_column,
+                    self.schema.certification_id_column,
                 ],
             ),
             (
@@ -869,20 +878,24 @@ class SupabaseRestClient:
         self,
         role_ids: Sequence[str],
     ) -> dict[str, list[str]]:
-        grouped: dict[str, list[str]] = collections.defaultdict(list)
+        certification_ids_by_role_id: dict[str, list[str]] = (
+            collections.defaultdict(list)
+        )
+        certification_ids: set[str] = set()
         if not role_ids:
-            return grouped
+            return collections.defaultdict(list)
+
         for role_id_chunk in chunked(list(role_ids), LOOKUP_FILTER_BATCH_SIZE):
             rows = self._request(
                 "GET",
-                self.schema.role_certifications_table,
+                self.schema.certifications_mapping_table,
                 query=[
                     (
                         "select",
                         ",".join(
                             [
                                 self.schema.role_id_column,
-                                self.schema.certification_name_column,
+                                self.schema.certification_id_column,
                             ]
                         ),
                     ),
@@ -895,9 +908,52 @@ class SupabaseRestClient:
             )
             for row in rows or []:
                 role_id = str(row.get(self.schema.role_id_column))
+                certification_id = str(
+                    row.get(self.schema.certification_id_column) or ""
+                )
+                if role_id and certification_id:
+                    certification_ids_by_role_id[role_id].append(certification_id)
+                    certification_ids.add(certification_id)
+
+        certification_names_by_id: dict[str, str] = {}
+        for certification_id_chunk in chunked(
+            sorted(certification_ids),
+            LOOKUP_FILTER_BATCH_SIZE,
+        ):
+            certification_id_filter = ",".join(certification_id_chunk)
+            rows = self._request(
+                "GET",
+                self.schema.certifications_table,
+                query=[
+                    (
+                        "select",
+                        ",".join(
+                            [
+                                self.schema.certification_id_column,
+                                self.schema.certification_name_column,
+                            ]
+                        ),
+                    ),
+                    (
+                        self.schema.certification_id_column,
+                        f"in.({certification_id_filter})",
+                    ),
+                ],
+            )
+            for row in rows or []:
+                certification_id = str(
+                    row.get(self.schema.certification_id_column) or ""
+                )
                 certification_name = str(
                     row.get(self.schema.certification_name_column) or ""
                 ).strip()
+                if certification_id and certification_name:
+                    certification_names_by_id[certification_id] = certification_name
+
+        grouped: dict[str, list[str]] = collections.defaultdict(list)
+        for role_id, role_certification_ids in certification_ids_by_role_id.items():
+            for certification_id in role_certification_ids:
+                certification_name = certification_names_by_id.get(certification_id)
                 if certification_name:
                     grouped[role_id].append(certification_name)
         return grouped

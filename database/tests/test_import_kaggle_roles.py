@@ -20,10 +20,12 @@ class FakeClient:
         self.role_source_hashes = {}
         self.role_data = {}
         self.next_role_id = 100
+        self.next_certification_id = 1000
         self.deleted_skills = []
-        self.deleted_certifications = []
+        self.deleted_certification_mappings = []
         self.inserted_skills = []
-        self.inserted_certifications = []
+        self.upserted_certifications = []
+        self.inserted_certification_mappings = []
         self.inserted_roles = []
         self.updated_roles = []
         self.updated_role_titles = []
@@ -72,20 +74,39 @@ class FakeClient:
     def delete_role_skills_for_roles(self, role_ids):
         self.deleted_skills.extend(role_ids)
 
-    def delete_role_certifications_for_roles(self, role_ids):
-        self.deleted_certifications.extend(role_ids)
+    def delete_certification_mappings_for_roles(self, role_ids):
+        self.deleted_certification_mappings.extend(role_ids)
 
     def delete_role_skills(self, role_id):
         self.deleted_skills.append(role_id)
 
-    def delete_role_certifications(self, role_id):
-        self.deleted_certifications.append(role_id)
+    def delete_certification_mappings(self, role_id):
+        self.deleted_certification_mappings.append(role_id)
 
     def insert_role_skills(self, rows):
         self.inserted_skills.extend(rows)
 
-    def insert_role_certifications(self, rows):
-        self.inserted_certifications.extend(rows)
+    def upsert_certifications(self, certifications):
+        ids_by_normalized_name = {}
+        for certification in certifications:
+            certification_id = self.next_certification_id
+            self.next_certification_id += 1
+            ids_by_normalized_name[certification.normalized_certification_name] = (
+                certification_id
+            )
+            self.upserted_certifications.append(
+                {
+                    "certification_id": certification_id,
+                    "certification_name": certification.certification_name,
+                    "normalized_certification_name": (
+                        certification.normalized_certification_name
+                    ),
+                }
+            )
+        return ids_by_normalized_name
+
+    def insert_certification_mappings(self, rows):
+        self.inserted_certification_mappings.extend(rows)
 
 
 class ImportKaggleRolesTests(unittest.TestCase):
@@ -347,7 +368,7 @@ class ImportKaggleRolesTests(unittest.TestCase):
         self.assertEqual(stats.roles_reused_or_updated, 1)
         self.assertEqual(client.updated_roles, [(42, "Data Engineer")])
         self.assertEqual(client.deleted_skills, [42])
-        self.assertEqual(client.deleted_certifications, [42])
+        self.assertEqual(client.deleted_certification_mappings, [42])
         self.assertEqual(
             client.inserted_skills,
             [
@@ -364,12 +385,21 @@ class ImportKaggleRolesTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            client.inserted_certifications,
+            client.upserted_certifications,
+            [
+                {
+                    "certification_id": 1000,
+                    "certification_name": "AWS Certified Data Engineer",
+                    "normalized_certification_name": "aws certified data engineer",
+                }
+            ],
+        )
+        self.assertEqual(
+            client.inserted_certification_mappings,
             [
                 {
                     "role_id": 42,
-                    "certification_name": "AWS Certified Data Engineer",
-                    "normalized_certification_name": "aws certified data engineer",
+                    "certification_id": 1000,
                 }
             ],
         )
@@ -401,7 +431,7 @@ class ImportKaggleRolesTests(unittest.TestCase):
         self.assertEqual(stats.roles_reused_or_updated, 1)
         self.assertEqual(client.updated_roles, [(42, "DevOps Engineer")])
         self.assertEqual(client.deleted_skills, [42])
-        self.assertEqual(client.deleted_certifications, [42])
+        self.assertEqual(client.deleted_certification_mappings, [42])
 
     def test_import_roles_inserts_same_title_variant_with_different_source_row_hash(self):
         existing_role = import_kaggle_roles.ParsedRole(

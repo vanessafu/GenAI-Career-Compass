@@ -12,7 +12,7 @@ be run from frontend/client code.
 ## One-Time Database Population And Enrichment
 
 - `import_kaggle_roles.py`: imports the Kaggle role catalog into `career_roles`,
-  `role_skills`, and `role_certifications`.
+  `role_skills`, `certifications`, and `certifications_mapping`.
 - `tag_career_roles.py`: writes deterministic domain tags to
   `career_roles.domain_tags`.
 - `import_esco_occupations.py`: imports filtered ICT ESCO occupations into

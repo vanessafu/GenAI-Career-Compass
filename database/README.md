@@ -24,7 +24,8 @@ This project contains a local importer for the Kaggle IT job roles CSV and Supab
 
 - `career_roles`: `role_id`, `job_title`, `job_description`, `raw_skills`, `raw_certifications`, `source_row_hash`, `domain_tags`
 - `role_skills`: `role_id`, `skill_name`, `normalized_skill_name`
-- `role_certifications`: `role_id`, `certification_name`, `normalized_certification_name`
+- `certifications`: `certification_id`, `certification_name`, `normalized_certification_name`, `embedding`
+- `certifications_mapping`: `role_id`, `certification_id`
 - `esco_occupations`: `esco_uri`, `isco_code`, `name`, `definition`
 - `esco_mappings`: `role_id`, `esco_uri`, `esco_title`, `match_score`
 - `esco_skills`: `esco_skill_uri`, `skill_type`, `reuse_level`, `preferred_label`, `alt_labels`, `hidden_labels`, `description`, `scope_note`
@@ -45,6 +46,7 @@ Schema migrations are stored in `supabase/migrations/`:
 - `20260526113459_simplify_role_salaries_review_fields.sql`: removes low/high salary range and source fields from `role_salaries`, changes the key to `(role_id, region)`, and stores reviewed salary metadata.
 - `20260526114217_simplify_skill_aliases.sql`: removes source/audit/review metadata from `skill_aliases`.
 - `20260526115000_drop_role_salary_confidence_columns.sql`: removes the unused `match_confidence` and numeric `confidence` columns from `role_salaries`.
+- `20260619105941_split_role_certifications.sql`: moves certification names into `certifications` and maps roles through `certifications_mapping`.
 
 The script does not create tables and currently only imports roles, skills, and certifications.
 
@@ -86,7 +88,8 @@ Verify in the Supabase SQL editor:
 ```sql
 select count(*) as roles from career_roles;
 select count(*) as skills from role_skills;
-select count(*) as certifications from role_certifications;
+select count(*) as certifications from certifications;
+select count(*) as certification_mappings from certifications_mapping;
 
 select
   count(*) as roles,
@@ -106,7 +109,7 @@ If the script reports that a table or column cannot be found, confirm that all m
 
 Phase 3 assigns interest-domain tags to `career_roles.domain_tags` so the frontend can later build Interest Matches. It does not add recommendation scoring, ESCO mapping, salary data, embeddings, or any LLM/API-based tagging.
 
-The local tagger is stored at `scripts/tag_career_roles.py`. It reads `career_roles`, `role_skills`, and `role_certifications`, combines each role's title, description, raw skills, raw certifications, normalized skills, and normalized certifications into searchable text, scores tags with deterministic weighted keyword matching, writes review artifacts, and patches only `career_roles.domain_tags` by `role_id`.
+The local tagger is stored at `scripts/tag_career_roles.py`. It reads `career_roles`, `role_skills`, `certifications`, and `certifications_mapping`, combines each role's title, description, raw skills, raw certifications, normalized skills, and normalized certifications into searchable text, scores tags with deterministic weighted keyword matching, writes review artifacts, and patches only `career_roles.domain_tags` by `role_id`.
 
 Because `career_roles.domain_tags` is a `text` column, roles with multiple tags store them as comma-separated slugs, such as `devops,cloud,infrastructure`. The script assigns up to three tags per role. If no tag reaches the normal score threshold, the script assigns a deterministic fallback tag and marks the row as low confidence for review, so every role gets at least one tag.
 
@@ -423,7 +426,7 @@ $env:SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
 $env:OPENAI_API_KEY="your-openai-api-key"
 ```
 
-The mapper is stored at `scripts/map_roles_to_esco.py`. It builds role profile text from `career_roles`, `role_skills.normalized_skill_name`, and `role_certifications`; builds ESCO profile text from `esco_occupations`, `esco_occupation_skills`, and `esco_skills`; generates OpenAI `text-embedding-3-small` embeddings; caches embeddings locally under `data/embedding_cache`; scores semantic similarity plus exact skill overlap and a small domain hint; then writes one compact row per role to `esco_mappings`.
+The mapper is stored at `scripts/map_roles_to_esco.py`. It builds role profile text from `career_roles`, `role_skills.normalized_skill_name`, and role certifications resolved through `certifications_mapping`; builds ESCO profile text from `esco_occupations`, `esco_occupation_skills`, and `esco_skills`; generates OpenAI `text-embedding-3-small` embeddings; caches embeddings locally under `data/embedding_cache`; scores semantic similarity plus exact skill overlap and a small domain hint; then writes one compact row per role to `esco_mappings`.
 
 The database table stores only the durable catalog link: `role_id`, `esco_uri`, `esco_title`, and the final `match_score`. Diagnostic details such as semantic score, skill-overlap score, domain-hint score, top candidates, review status, manual override state, and notes stay in `data/esco_role_mapping_review.csv`.
 

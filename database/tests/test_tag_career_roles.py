@@ -303,6 +303,46 @@ class TagCareerRolesTests(unittest.TestCase):
         self.assertEqual(stats.roles_unchanged, 1)
         self.assertEqual(stats.roles_skipped_existing, 1)
 
+    def test_client_resolves_role_certifications_through_mapping_table(self):
+        class FakeClient(tag_career_roles.SupabaseRestClient):
+            def __init__(self):
+                self.schema = tag_career_roles.DEFAULT_SCHEMA
+
+            def _paged_get(self, table, select, extra_query=None):
+                if table == self.schema.certifications_mapping_table:
+                    return [
+                        {"role_id": 10, "certification_id": 100},
+                        {"role_id": 10, "certification_id": 101},
+                    ]
+                if table == self.schema.certifications_table:
+                    return [
+                        {
+                            "certification_id": 100,
+                            "certification_name": "CKA",
+                            "normalized_certification_name": "cka",
+                        },
+                        {
+                            "certification_id": 101,
+                            "certification_name": "AWS Certified Developer",
+                            "normalized_certification_name": "aws certified developer",
+                        },
+                    ]
+                raise AssertionError(f"Unexpected table: {table}")
+
+        certifications = FakeClient().list_role_certifications_by_role_id()
+
+        self.assertEqual(
+            certifications,
+            {
+                "10": [
+                    "CKA",
+                    "cka",
+                    "AWS Certified Developer",
+                    "aws certified developer",
+                ],
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

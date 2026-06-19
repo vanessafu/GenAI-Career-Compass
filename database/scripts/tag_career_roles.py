@@ -56,8 +56,10 @@ AUTO_ADD_SINGLE_ROLE_TAGS = frozenset(
 class SchemaConfig:
     roles_table: str = "career_roles"
     role_skills_table: str = "role_skills"
-    role_certifications_table: str = "role_certifications"
+    certifications_table: str = "certifications"
+    certifications_mapping_table: str = "certifications_mapping"
     role_id_column: str = "role_id"
+    certification_id_column: str = "certification_id"
     job_title_column: str = "job_title"
     job_description_column: str = "job_description"
     raw_skills_column: str = "raw_skills"
@@ -1431,15 +1433,31 @@ class SupabaseRestClient:
         )
         self._request(
             "GET",
-            self.schema.role_certifications_table,
+            self.schema.certifications_table,
+            query=[
+                (
+                    "select",
+                    ",".join(
+                        [
+                            self.schema.certification_id_column,
+                            self.schema.certification_name_column,
+                            self.schema.normalized_certification_name_column,
+                        ]
+                    ),
+                ),
+                ("limit", "1"),
+            ],
+        )
+        self._request(
+            "GET",
+            self.schema.certifications_mapping_table,
             query=[
                 (
                     "select",
                     ",".join(
                         [
                             self.schema.role_id_column,
-                            self.schema.certification_name_column,
-                            self.schema.normalized_certification_name_column,
+                            self.schema.certification_id_column,
                         ]
                     ),
                 ),
@@ -1497,25 +1515,45 @@ class SupabaseRestClient:
         return skills_by_role_id
 
     def list_role_certifications_by_role_id(self) -> dict[str, list[str]]:
-        rows = self._paged_get(
-            self.schema.role_certifications_table,
+        mapping_rows = self._paged_get(
+            self.schema.certifications_mapping_table,
             select=",".join(
                 [
                     self.schema.role_id_column,
-                    self.schema.certification_name_column,
-                    self.schema.normalized_certification_name_column,
+                    self.schema.certification_id_column,
                 ]
             ),
             extra_query=[("order", f"{self.schema.role_id_column}.asc")],
         )
+        certification_rows = self._paged_get(
+            self.schema.certifications_table,
+            select=",".join(
+                [
+                    self.schema.certification_id_column,
+                    self.schema.certification_name_column,
+                    self.schema.normalized_certification_name_column,
+                ]
+            ),
+            extra_query=[("order", f"{self.schema.certification_id_column}.asc")],
+        )
+        certifications_by_id = {
+            str(row.get(self.schema.certification_id_column)): row
+            for row in certification_rows
+            if row.get(self.schema.certification_id_column) is not None
+        }
         certifications_by_role_id: dict[str, list[str]] = {}
-        for row in rows:
+        for row in mapping_rows:
             role_id = row.get(self.schema.role_id_column)
             if role_id is None:
                 continue
+            certification = certifications_by_id.get(
+                str(row.get(self.schema.certification_id_column) or "")
+            )
+            if certification is None:
+                continue
             certification_names = [
-                row.get(self.schema.certification_name_column),
-                row.get(self.schema.normalized_certification_name_column),
+                certification.get(self.schema.certification_name_column),
+                certification.get(self.schema.normalized_certification_name_column),
             ]
             for certification_name in certification_names:
                 if certification_name:

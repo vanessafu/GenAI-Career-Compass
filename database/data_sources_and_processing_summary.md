@@ -12,7 +12,8 @@ We imported the Kaggle data into our own tables:
 Job Title        -> career_roles.job_title
 Job Description  -> career_roles.job_description
 Skills           -> role_skills
-Certifications   -> role_certifications
+Certifications   -> certifications
+Role/cert links  -> certifications_mapping
 ```
 
 We then cleaned the skills and certifications deterministically. For example, we split comma-separated skill lists into individual rows, trimmed whitespace, removed duplicates, and normalized obvious aliases like:

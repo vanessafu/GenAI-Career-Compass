@@ -271,6 +271,52 @@ class MapRolesToEscoTests(unittest.TestCase):
         self.assertNotIn("abc123MASKEDxyz", message)
         self.assertIn("[redacted]", message)
 
+    def test_client_resolves_certifications_through_mapping_table(self):
+        test_case = self
+
+        class FakeClient(map_roles_to_esco.SupabaseRestClient):
+            def __init__(self):
+                self.schema = map_roles_to_esco.DEFAULT_SCHEMA
+
+            def _request(
+                self,
+                method,
+                table,
+                query=None,
+                payload=None,
+                prefer=None,
+                extra_headers=None,
+            ):
+                test_case.assertEqual(method, "GET")
+                if table == self.schema.certifications_mapping_table:
+                    return [
+                        {"role_id": 10, "certification_id": 100},
+                        {"role_id": 10, "certification_id": 101},
+                        {"role_id": 11, "certification_id": 100},
+                    ]
+                if table == self.schema.certifications_table:
+                    return [
+                        {
+                            "certification_id": 100,
+                            "certification_name": "CKA",
+                        },
+                        {
+                            "certification_id": 101,
+                            "certification_name": "AWS Certified Developer",
+                        },
+                    ]
+                raise AssertionError(f"Unexpected table: {table}")
+
+        certifications = FakeClient().list_certifications_by_role_id(["10", "11"])
+
+        self.assertEqual(
+            certifications,
+            {
+                "10": ["CKA", "AWS Certified Developer"],
+                "11": ["CKA"],
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

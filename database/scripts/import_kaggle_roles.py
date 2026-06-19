@@ -18,7 +18,8 @@ After importing, verify in the Supabase SQL editor:
 
     select count(*) from career_roles;
     select count(*) from role_skills;
-    select count(*) from role_certifications;
+    select count(*) from certifications;
+    select count(*) from certifications_mapping;
 """
 
 from __future__ import annotations
@@ -133,8 +134,10 @@ LOWERCASE_TITLE_WORDS = {
 class SchemaConfig:
     roles_table: str = "career_roles"
     role_skills_table: str = "role_skills"
-    role_certifications_table: str = "role_certifications"
+    certifications_table: str = "certifications"
+    certifications_mapping_table: str = "certifications_mapping"
     role_id_column: str = "role_id"
+    certification_id_column: str = "certification_id"
     job_title_column: str = "job_title"
     job_description_column: str = "job_description"
     raw_skills_column: str = "raw_skills"
@@ -144,6 +147,7 @@ class SchemaConfig:
     normalized_skill_name_column: str = "normalized_skill_name"
     certification_name_column: str = "certification_name"
     normalized_certification_name_column: str = "normalized_certification_name"
+    embedding_column: str = "embedding"
 
 
 DEFAULT_SCHEMA = SchemaConfig()
@@ -415,6 +419,18 @@ def split_certifications(value: str) -> list[ParsedCertification]:
     return items
 
 
+def unique_certifications_by_normalized_name(
+    roles: Sequence[ParsedRole],
+) -> list[ParsedCertification]:
+    certifications_by_normalized_name: dict[str, ParsedCertification] = {}
+    for role in roles:
+        for certification in role.certifications:
+            normalized_name = certification.normalized_certification_name
+            if normalized_name not in certifications_by_normalized_name:
+                certifications_by_normalized_name[normalized_name] = certification
+    return list(certifications_by_normalized_name.values())
+
+
 def chunked(items: Sequence[Any], size: int = BATCH_SIZE) -> Iterable[Sequence[Any]]:
     for start in range(0, len(items), size):
         yield items[start : start + size]
@@ -541,11 +557,19 @@ class SupabaseRestClient:
                 ],
             ),
             (
-                self.schema.role_certifications_table,
+                self.schema.certifications_table,
                 [
-                    self.schema.role_id_column,
+                    self.schema.certification_id_column,
                     self.schema.certification_name_column,
                     self.schema.normalized_certification_name_column,
+                    self.schema.embedding_column,
+                ],
+            ),
+            (
+                self.schema.certifications_mapping_table,
+                [
+                    self.schema.role_id_column,
+                    self.schema.certification_id_column,
                 ],
             ),
         ]
@@ -668,17 +692,20 @@ class SupabaseRestClient:
                 prefer="return=minimal",
             )
 
-    def delete_role_certifications(self, role_id: Any) -> None:
-        self.delete_role_certifications_for_roles([role_id])
+    def delete_certification_mappings(self, role_id: Any) -> None:
+        self.delete_certification_mappings_for_roles([role_id])
 
-    def delete_role_certifications_for_roles(self, role_ids: Sequence[Any]) -> None:
+    def delete_certification_mappings_for_roles(
+        self,
+        role_ids: Sequence[Any],
+    ) -> None:
         for role_id_chunk in chunked(list(role_ids)):
             if not role_id_chunk:
                 continue
             role_id_filter = ",".join(str(role_id) for role_id in role_id_chunk)
             self._request(
                 "DELETE",
-                self.schema.role_certifications_table,
+                self.schema.certifications_mapping_table,
                 query=[
                     (self.schema.role_id_column, f"in.({role_id_filter})"),
                 ],
@@ -695,10 +722,10 @@ class SupabaseRestClient:
             prefer="return=minimal",
         )
 
-    def delete_role_certifications_one_at_a_time(self, role_id: Any) -> None:
+    def delete_certification_mappings_one_at_a_time(self, role_id: Any) -> None:
         self._request(
             "DELETE",
-            self.schema.role_certifications_table,
+            self.schema.certifications_mapping_table,
             query=[
                 (self.schema.role_id_column, f"eq.{role_id}"),
             ],
@@ -716,13 +743,67 @@ class SupabaseRestClient:
                 prefer="return=minimal",
             )
 
-    def insert_role_certifications(self, rows: Sequence[dict[str, Any]]) -> None:
+    def upsert_certifications(
+        self,
+        certifications: Sequence[ParsedCertification],
+    ) -> dict[str, Any]:
+        if not certifications:
+            return {}
+
+        ids_by_normalized_name: dict[str, Any] = {}
+        for certification_chunk in chunked(list(certifications)):
+            rows = [
+                {
+                    self.schema.certification_name_column: (
+                        certification.certification_name
+                    ),
+                    self.schema.normalized_certification_name_column: (
+                        certification.normalized_certification_name
+                    ),
+                }
+                for certification in certification_chunk
+            ]
+            response_rows = self._request(
+                "POST",
+                self.schema.certifications_table,
+                query=[
+                    (
+                        "on_conflict",
+                        self.schema.normalized_certification_name_column,
+                    ),
+                ],
+                payload=rows,
+                prefer="resolution=merge-duplicates,return=representation",
+            )
+            for row in response_rows or []:
+                normalized_name = str(
+                    row.get(self.schema.normalized_certification_name_column)
+                    or ""
+                )
+                certification_id = row.get(self.schema.certification_id_column)
+                if normalized_name and certification_id is not None:
+                    ids_by_normalized_name[normalized_name] = certification_id
+
+        missing_names = {
+            certification.normalized_certification_name
+            for certification in certifications
+            if certification.normalized_certification_name
+            not in ids_by_normalized_name
+        }
+        if missing_names:
+            raise SupabaseError(
+                "Supabase upserted certifications but did not return IDs for: "
+                + ", ".join(sorted(missing_names))
+            )
+        return ids_by_normalized_name
+
+    def insert_certification_mappings(self, rows: Sequence[dict[str, Any]]) -> None:
         if not rows:
             return
         for row_chunk in chunked(list(rows)):
             self._request(
                 "POST",
-                self.schema.role_certifications_table,
+                self.schema.certifications_mapping_table,
                 payload=list(row_chunk),
                 prefer="return=minimal",
             )
@@ -873,7 +954,7 @@ def import_roles(roles: Sequence[ParsedRole], client: Any) -> ImportStats:
 
     role_ids = list(role_ids_by_hash.values())
     client.delete_role_skills_for_roles(role_ids)
-    client.delete_role_certifications_for_roles(role_ids)
+    client.delete_certification_mappings_for_roles(role_ids)
 
     skill_rows = [
         {
@@ -884,22 +965,24 @@ def import_roles(roles: Sequence[ParsedRole], client: Any) -> ImportStats:
         for role in roles
         for skill in role.skills
     ]
-    certification_rows = [
+    certification_ids_by_normalized_name = client.upsert_certifications(
+        unique_certifications_by_normalized_name(roles)
+    )
+    certification_mapping_rows = [
         {
             schema.role_id_column: role_ids_by_hash[role.source_row_hash],
-            schema.certification_name_column: certification.certification_name,
-            schema.normalized_certification_name_column: (
+            schema.certification_id_column: certification_ids_by_normalized_name[
                 certification.normalized_certification_name
-            ),
+            ],
         }
         for role in roles
         for certification in role.certifications
     ]
 
     client.insert_role_skills(skill_rows)
-    client.insert_role_certifications(certification_rows)
+    client.insert_certification_mappings(certification_mapping_rows)
     stats.skills_inserted += len(skill_rows)
-    stats.certifications_inserted += len(certification_rows)
+    stats.certifications_inserted += len(certification_mapping_rows)
 
     return stats
 
