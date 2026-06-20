@@ -142,38 +142,31 @@ export type ConfirmationMetadata = {
 export type ConfirmedCVData = {
   confirmed_cv_data: CVData;
   confirmation_metadata: ConfirmationMetadata;
+  career_identity_statement?: string | null;
+  career_identity_summary?: CareerIdentitySummary | null;
 };
 
 /* ──────────────────────────  Identity generation  ──────────────────────── */
 
-export type SuggestedQuestion = {
-  question: string;
-  options: string[];
+export type CareerIdentitySummary = {
+  label: string;
+  summary: string;
 };
 
-export type StarterProfileResponse = {
-  privacy_stripped_profile_draft: unknown;
-  starter_identity: string;
-  suggested_questions: SuggestedQuestion[];
+export type EmbeddingProfile = {
+  career_identity_summary: CareerIdentitySummary;
+  education: Record<string, unknown>[];
+  experience: Record<string, unknown>[];
+  skills: string[];
+  interests: string[];
+  certifications: Record<string, unknown>[];
+  projects: Record<string, unknown>[];
 };
 
-export type EmbeddingContextRequest = {
-  confirmed_profile: ConfirmedCVData;
-  starter_profile?: StarterProfileResponse | null;
-};
-
-export type EmbeddingInputResponse = {
-  embedding_input_text: string;
-  embedding_metadata: {
-    career_identity_statement?: string | null;
-  };
-};
-
-export type EmbeddingPipelineResponse = {
-  starter_profile: StarterProfileResponse;
-  career_profile: unknown;
-  embedding_input: EmbeddingInputResponse;
-  embedding_chunks: unknown;
+export type ProfilePipelineResponse = {
+  cv_data: CVData;
+  privacy_stripped_cv_data: CVData;
+  embedding_profile: EmbeddingProfile;
 };
 
 /* ──────────────────────────  Role matching  ────────────────────────────── */
@@ -204,6 +197,8 @@ export type ManualEducationInput = {
   degree_type: string;
   institution?: string | null;
   field_of_study?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
 };
 
 export type ManualExperienceInput = {
@@ -248,12 +243,12 @@ async function parseError(response: Response): Promise<never> {
   throw new ApiError(detail, response.status);
 }
 
-/** Upload a PDF CV and parse it into structured CVData. */
-export async function parseCv(file: File): Promise<CVData> {
+/** Upload a PDF CV and run parsing + prompt engineering in one backend pipeline. */
+export async function parseCv(file: File): Promise<ProfilePipelineResponse> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API_BASE_URL}/api/v1/parse-cv`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/profile-pipeline/parse-cv`, {
     method: "POST",
     body: formData,
   });
@@ -261,38 +256,12 @@ export async function parseCv(file: File): Promise<CVData> {
   return response.json();
 }
 
-/** Build structured CVData from a manually entered profile. */
-export async function submitManualCv(input: ManualCVInput): Promise<CVData> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/manual-cv`, {
+/** Build structured CVData from manual input and run prompt engineering. */
+export async function submitManualCv(input: ManualCVInput): Promise<ProfilePipelineResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/profile-pipeline/manual-cv`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
-  });
-  if (!response.ok) await parseError(response);
-  return response.json();
-}
-
-/** Generate the starter career identity + follow-up questions from a confirmed CV. */
-export async function generateStarterProfile(
-  confirmed: ConfirmedCVData,
-): Promise<StarterProfileResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/prompt-engineering/starter-profile`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(confirmed),
-  });
-  if (!response.ok) await parseError(response);
-  return response.json();
-}
-
-/** Run identity → career profile → embedding preparation as one backend chain. */
-export async function runEmbeddingPipeline(
-  request: EmbeddingContextRequest,
-): Promise<EmbeddingPipelineResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/prompt-engineering/embedding-pipeline`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
   });
   if (!response.ok) await parseError(response);
   return response.json();
@@ -302,7 +271,6 @@ export async function runEmbeddingPipeline(
 export async function matchRoles(
   cvData: CVData,
   topK = 6,
-  embeddingInputText?: string | null,
 ): Promise<RoleMatchResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/roles/match`, {
     method: "POST",
@@ -310,7 +278,6 @@ export async function matchRoles(
     body: JSON.stringify({
       cv_data: cvData,
       top_k: topK,
-      embedding_input_text: embeddingInputText ?? undefined,
     }),
   });
   if (!response.ok) await parseError(response);

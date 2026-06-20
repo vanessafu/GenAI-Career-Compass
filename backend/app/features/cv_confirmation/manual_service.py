@@ -80,6 +80,8 @@ def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
             degree_type=_clean(item.degree_type),
             institution=_clean(item.institution),
             field_of_study=_clean(item.field_of_study),
+            start_date=_clean(item.start_date),
+            end_date=_clean(item.end_date),
         )
         for item in request.education[:MAX_LIST_ITEMS]
         if _clean(item.degree_type)

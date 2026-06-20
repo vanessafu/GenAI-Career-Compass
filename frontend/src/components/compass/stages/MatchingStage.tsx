@@ -42,7 +42,7 @@ export function MatchingStage() {
 
   if (error) {
     return (
-      <div className="relative flex w-full flex-col items-center justify-center px-6 pb-10 pt-[max(6rem,calc(env(safe-area-inset-top)+5rem))] sm:px-10 lg:h-full lg:px-16 lg:pt-24">
+      <div className="relative flex w-full flex-col items-center justify-center px-6 pb-10 pt-[max(6rem,calc(env(safe-area-inset-top)+5rem))] sm:px-10 lg:px-16 lg:pt-24">
         <div className="liquid-glass mx-auto flex w-full max-w-xl flex-col items-start gap-3 rounded-3xl p-6">
           <h2 className="font-display text-[22px] tracking-tight">Matching is unavailable</h2>
           <p className="text-[14px] leading-relaxed text-foreground/65">{error}</p>
@@ -59,7 +59,7 @@ export function MatchingStage() {
   }
 
   return (
-    <div className="relative flex w-full flex-col items-stretch px-6 pb-10 pt-[max(6rem,calc(env(safe-area-inset-top)+5rem))] sm:px-10 lg:h-full lg:justify-center lg:px-16 lg:pt-24">
+    <div className="relative flex w-full flex-col items-stretch px-6 pb-10 pt-[max(6rem,calc(env(safe-area-inset-top)+5rem))] sm:px-10 lg:px-16 lg:pt-24">
       <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-7">
         <motion.div
           initial={{ opacity: 0, y: 10 }}

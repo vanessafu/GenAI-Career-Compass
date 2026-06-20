@@ -42,48 +42,36 @@ export type RecapEdits = {
 
 /* ───────────────────────────  Manual entry  ────────────────────────────── */
 
-/** Split a comma/newline separated string into a trimmed, non-empty list. */
-function splitList(value: string): string[] {
-  return value
-    .split(/[,\n]/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 /** Build the backend manual-entry DTO from the tiered entry form. */
 export function manualFormToInput(form: ManualProfileForm): ManualCVInput {
-  const years = parseInt(form.yearsOfExperience, 10);
-
-  const education = form.degree.trim()
-    ? [{ degree_type: form.degree.trim(), institution: form.school.trim() || null }]
-    : [];
-
-  const experience = form.latestJobRole.trim()
-    ? [
-        {
-          role: form.latestJobRole.trim(),
-          organization: form.latestJobCompany.trim() || null,
-          start_date: form.latestJobFrom.trim() || null,
-          end_date: form.latestJobTo.trim() || null,
-        },
-      ]
-    : [];
-
   const languages = form.languageName.trim()
     ? [{ language: form.languageName.trim(), level: form.languageLevel.trim() || null }]
     : [];
 
   return {
     current_role: form.currentRole.trim() || null,
-    seniority_level: form.seniority.trim() || null,
-    years_of_experience: Number.isFinite(years) ? years : null,
     summary: form.summary.trim() || null,
-    education,
-    experience,
+    education: form.education
+      .filter((item) => item.degree.trim())
+      .map((item) => ({
+        degree_type: item.degree.trim(),
+        institution: item.institution.trim() || null,
+        field_of_study: item.fieldOfStudy.trim() || null,
+        start_date: item.startDate.trim() || null,
+        end_date: item.endDate.trim() || null,
+      })),
+    experience: form.experience
+      .filter((item) => item.role.trim())
+      .map((item) => ({
+        role: item.role.trim(),
+        organization: item.organization.trim() || null,
+        start_date: item.startDate.trim() || null,
+        end_date: item.endDate.trim() || null,
+      })),
     technical_skills: form.skills.map((s) => s.trim()).filter(Boolean),
     soft_skills: form.softSkills.map((s) => s.trim()).filter(Boolean),
     languages,
-    interests: splitList(form.interests),
+    interests: form.interests.map((s) => s.trim()).filter(Boolean),
   };
 }
 

@@ -7,6 +7,8 @@ class ManualEducationInput(BaseModel):
     degree_type: str
     institution: str | None = None
     field_of_study: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
 
 
 class ManualExperienceInput(BaseModel):

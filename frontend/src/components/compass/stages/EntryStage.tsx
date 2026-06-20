@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 import { Upload, FileText, X, Plus, ArrowRight, Sparkles, ChevronDown } from "lucide-react";
 import { LoadingPanel } from "../ui/LoadingPanel";
 
-const PARSE_STEPS = ["Reading your profile", "Extracting skills", "Mapping roles"];
-const MANUAL_STEPS = ["Structuring your profile", "Mapping skills", "Mapping roles"];
+const PARSE_STEPS = ["Reading your profile", "Privacy-stripping data", "Generating identity"];
+const MANUAL_STEPS = ["Structuring your profile", "Privacy-stripping data", "Generating identity"];
 
 const SENIORITY_OPTIONS = ["Student", "Junior", "Mid", "Senior", "Lead"];
 
@@ -65,20 +65,40 @@ export function EntryStage() {
 
   // Tier 1 — quick start
   const [role, setRole] = useState("");
+  const [education, setEducation] = useState<
+    { degree: string; institution: string; fieldOfStudy: string; startDate: string; endDate: string }[]
+  >([]);
+  const [experience, setExperience] = useState<
+    { role: string; organization: string; startDate: string; endDate: string }[]
+  >([]);
+  const [educationDraft, setEducationDraft] = useState({
+    degree: "",
+    institution: "",
+    fieldOfStudy: "",
+    startDate: "",
+    endDate: "",
+  });
+  const [experienceDraft, setExperienceDraft] = useState({
+    role: "",
+    organization: "",
+    startDate: "",
+    endDate: "",
+  });
   const [seniority, setSeniority] = useState("");
   const [yearsOfExperience, setYearsOfExperience] = useState("");
   const [degree, setDegree] = useState("");
   const [school, setSchool] = useState("");
-  const [skills, setSkills] = useState<string[]>([]);
-  const [skillDraft, setSkillDraft] = useState("");
-  const [interests, setInterests] = useState("");
-
-  // Tier 2 — add more context (collapsed by default)
-  const [showMore, setShowMore] = useState(false);
   const [latestJobRole, setLatestJobRole] = useState("");
   const [latestJobCompany, setLatestJobCompany] = useState("");
   const [latestJobFrom, setLatestJobFrom] = useState("");
   const [latestJobTo, setLatestJobTo] = useState("");
+  const [skills, setSkills] = useState<string[]>([]);
+  const [skillDraft, setSkillDraft] = useState("");
+  const [interests, setInterests] = useState<string[]>([]);
+  const [interestDraft, setInterestDraft] = useState("");
+
+  // Tier 2 — add more context (collapsed by default)
+  const [showMore, setShowMore] = useState(false);
   const [summary, setSummary] = useState("");
   const [softSkills, setSoftSkills] = useState<string[]>([]);
   const [softSkillDraft, setSoftSkillDraft] = useState("");
@@ -109,6 +129,36 @@ export function EntryStage() {
     if (!val || softSkills.includes(val)) return;
     setSoftSkills([...softSkills, val]);
     setSoftSkillDraft("");
+  };
+
+  const addInterest = (s: string) => {
+    const val = s.trim();
+    if (!val || interests.some((item) => item.toLowerCase() === val.toLowerCase())) return;
+    setInterests([...interests, val]);
+    setInterestDraft("");
+  };
+
+  const addEducation = () => {
+    if (!educationDraft.degree.trim()) return;
+    setEducation([...education, {
+      degree: educationDraft.degree.trim(),
+      institution: educationDraft.institution.trim(),
+      fieldOfStudy: educationDraft.fieldOfStudy.trim(),
+      startDate: educationDraft.startDate.trim(),
+      endDate: educationDraft.endDate.trim(),
+    }]);
+    setEducationDraft({ degree: "", institution: "", fieldOfStudy: "", startDate: "", endDate: "" });
+  };
+
+  const addExperience = () => {
+    if (!experienceDraft.role.trim()) return;
+    setExperience([...experience, {
+      role: experienceDraft.role.trim(),
+      organization: experienceDraft.organization.trim(),
+      startDate: experienceDraft.startDate.trim(),
+      endDate: experienceDraft.endDate.trim(),
+    }]);
+    setExperienceDraft({ role: "", organization: "", startDate: "", endDate: "" });
   };
 
   const analyzeCv = async () => {
@@ -151,16 +201,10 @@ export function EntryStage() {
 
     const ok = await submitManualProfile({
       currentRole: role,
-      seniority,
-      yearsOfExperience,
-      degree,
-      school,
+      education,
+      experience,
       skills,
       interests,
-      latestJobRole,
-      latestJobCompany,
-      latestJobFrom,
-      latestJobTo,
       summary,
       softSkills,
       languageName,
@@ -176,7 +220,7 @@ export function EntryStage() {
   };
 
   return (
-    <div className="relative flex w-full flex-col items-stretch px-6 pb-10 pt-[max(6rem,calc(env(safe-area-inset-top)+5rem))] sm:px-10 lg:h-full lg:justify-center lg:px-16 lg:pt-24">
+    <div className="relative flex w-full flex-col items-stretch px-6 pb-10 pt-[max(6rem,calc(env(safe-area-inset-top)+5rem))] sm:px-10 lg:px-16 lg:pt-24">
       <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-7">
         {/* Headline — transform-only animation, glides centered when loading appears. */}
         <motion.div
@@ -342,7 +386,7 @@ export function EntryStage() {
               {/* ── Manual entry ── */}
               <motion.div
                 transition={{ type: "spring", stiffness: 260, damping: 22 }}
-                className="liquid-glass flex flex-col gap-3.5 rounded-3xl p-6 lg:max-h-[78vh] lg:overflow-y-auto"
+                className="liquid-glass flex flex-col gap-3.5 rounded-3xl p-6"
               >
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-[22px] tracking-tight">Fill it in manually</h3>
@@ -351,7 +395,7 @@ export function EntryStage() {
                   </span>
                 </div>
 
-                <div className="grid gap-2.5 sm:grid-cols-2">
+                <div className="grid gap-2.5">
                   <AutocompleteInput
                     label="Current role"
                     value={role}
@@ -359,7 +403,7 @@ export function EntryStage() {
                     presets={ROLE_PRESETS}
                     placeholder="e.g. Senior Backend Developer"
                   />
-                  <label className="block">
+                  <label className="hidden">
                     <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
                       Seniority
                     </span>
@@ -378,7 +422,7 @@ export function EntryStage() {
                   </label>
                 </div>
 
-                <div className="grid gap-2.5 sm:grid-cols-2">
+                <div className="hidden">
                   <AutocompleteInput
                     label="Degree"
                     value={degree}
@@ -399,7 +443,7 @@ export function EntryStage() {
                   </label>
                 </div>
 
-                <label className="block sm:w-1/2 sm:pr-1.5">
+                <label className="hidden">
                   <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
                     Years of experience
                   </span>
@@ -413,6 +457,107 @@ export function EntryStage() {
                     className="manual-input"
                   />
                 </label>
+
+                <RepeatableSection
+                  title="Education"
+                  items={education.map((item) => ({
+                    title: item.degree,
+                    subtitle: [item.fieldOfStudy, item.institution].filter(Boolean).join(" · "),
+                    meta: [item.startDate, item.endDate].filter(Boolean).join("-"),
+                  }))}
+                  onRemove={(idx) => setEducation(education.filter((_, i) => i !== idx))}
+                >
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    <AutocompleteInput
+                      label="Degree"
+                      value={educationDraft.degree}
+                      onChange={(value) => setEducationDraft({ ...educationDraft, degree: value })}
+                      presets={EDU_PRESETS}
+                      placeholder="e.g. MSc Robotics"
+                    />
+                    <input
+                      value={educationDraft.institution}
+                      onChange={(e) =>
+                        setEducationDraft({ ...educationDraft, institution: e.target.value })
+                      }
+                      placeholder="Institution"
+                      className="manual-input self-end"
+                    />
+                    <input
+                      value={educationDraft.fieldOfStudy}
+                      onChange={(e) =>
+                        setEducationDraft({ ...educationDraft, fieldOfStudy: e.target.value })
+                      }
+                      placeholder="Field of study"
+                      className="manual-input"
+                    />
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <input
+                        value={educationDraft.startDate}
+                        onChange={(e) =>
+                          setEducationDraft({ ...educationDraft, startDate: e.target.value })
+                        }
+                        placeholder="From"
+                        className="manual-input"
+                      />
+                      <input
+                        value={educationDraft.endDate}
+                        onChange={(e) =>
+                          setEducationDraft({ ...educationDraft, endDate: e.target.value })
+                        }
+                        placeholder="To"
+                        className="manual-input"
+                      />
+                    </div>
+                  </div>
+                  <AddRowButton onClick={addEducation} label="Add education" />
+                </RepeatableSection>
+
+                <RepeatableSection
+                  title="Experience"
+                  items={experience.map((item) => ({
+                    title: item.role,
+                    subtitle: item.organization,
+                    meta: [item.startDate, item.endDate || "Present"].filter(Boolean).join("-"),
+                  }))}
+                  onRemove={(idx) => setExperience(experience.filter((_, i) => i !== idx))}
+                >
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                    <input
+                      value={experienceDraft.role}
+                      onChange={(e) =>
+                        setExperienceDraft({ ...experienceDraft, role: e.target.value })
+                      }
+                      placeholder="Role"
+                      className="manual-input"
+                    />
+                    <input
+                      value={experienceDraft.organization}
+                      onChange={(e) =>
+                        setExperienceDraft({ ...experienceDraft, organization: e.target.value })
+                      }
+                      placeholder="Organization"
+                      className="manual-input"
+                    />
+                    <input
+                      value={experienceDraft.startDate}
+                      onChange={(e) =>
+                        setExperienceDraft({ ...experienceDraft, startDate: e.target.value })
+                      }
+                      placeholder="From"
+                      className="manual-input"
+                    />
+                    <input
+                      value={experienceDraft.endDate}
+                      onChange={(e) =>
+                        setExperienceDraft({ ...experienceDraft, endDate: e.target.value })
+                      }
+                      placeholder="To"
+                      className="manual-input"
+                    />
+                  </div>
+                  <AddRowButton onClick={addExperience} label="Add experience" />
+                </RepeatableSection>
 
                 <div>
                   <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
@@ -436,13 +581,17 @@ export function EntryStage() {
                   <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
                     What are you drawn to?
                   </p>
-                  <textarea
-                    value={interests}
-                    onChange={(e) => setInterests(e.target.value)}
-                    rows={2}
-                    maxLength={200}
-                    placeholder="e.g. AI, open source, automation…"
-                    className="manual-input resize-none"
+                  <TagField
+                    tags={interests}
+                    onRemove={(t) => setInterests(interests.filter((x) => x !== t))}
+                    typeahead={
+                      <PlainTagInput
+                        draft={interestDraft}
+                        setDraft={setInterestDraft}
+                        onAdd={addInterest}
+                        placeholder="Add interest"
+                      />
+                    }
                   />
                 </div>
 
@@ -470,7 +619,7 @@ export function EntryStage() {
                       className="overflow-hidden"
                     >
                       <div className="flex flex-col gap-3.5 pt-0.5">
-                        <div>
+                        <div className="hidden">
                           <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
                             Most recent job
                           </p>
@@ -608,6 +757,67 @@ export function EntryStage() {
 }
 
 /* ─────────────────────────  Autocomplete inputs  ───────────────────────── */
+
+function RepeatableSection({
+  title,
+  items,
+  onRemove,
+  children,
+}: {
+  title: string;
+  items: { title: string; subtitle?: string; meta?: string }[];
+  onRemove: (idx: number) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-foreground/10 bg-white/45 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+          {title}
+        </p>
+        <span className="text-[11px] tabular-nums text-foreground/45">{items.length}</span>
+      </div>
+      {items.length > 0 && (
+        <div className="mb-2 flex flex-col gap-1.5">
+          {items.map((item, idx) => (
+            <div
+              key={`${item.title}-${idx}`}
+              className="flex items-center gap-2 rounded-xl bg-white/70 px-2.5 py-2 text-[12.5px]"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{item.title}</p>
+                {item.subtitle && <p className="truncate text-foreground/55">{item.subtitle}</p>}
+              </div>
+              {item.meta && <span className="shrink-0 text-foreground/50">{item.meta}</span>}
+              <button
+                type="button"
+                onClick={() => onRemove(idx)}
+                className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-foreground/45 transition hover:bg-foreground/5 hover:text-foreground"
+                aria-label={`Remove ${title.toLowerCase()} entry`}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex flex-col gap-2.5">{children}</div>
+    </div>
+  );
+}
+
+function AddRowButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[color:var(--brand)]/10 px-3 py-1.5 text-[12.5px] font-medium text-[color:var(--brand)] transition hover:bg-[color:var(--brand)]/15"
+    >
+      <Plus size={12} />
+      {label}
+    </button>
+  );
+}
 
 function AutocompleteInput({
   label,

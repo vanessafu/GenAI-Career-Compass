@@ -16,21 +16,30 @@ export type ProjectItem = { name: string; detail: string; year: string };
 /** Career identity shown on the recap screen. */
 export type Identity = { archetype: string; lead: string };
 
+export type ManualEducationFormItem = {
+  degree: string;
+  institution: string;
+  fieldOfStudy: string;
+  startDate: string;
+  endDate: string;
+};
+
+export type ManualExperienceFormItem = {
+  role: string;
+  organization: string;
+  startDate: string;
+  endDate: string;
+};
+
 /** Manual-entry form captured on the entry screen (tier 1 + collapsible tier 2). */
 export type ManualProfileForm = {
   // Tier 1 — quick start
   currentRole: string;
-  seniority: string;
-  yearsOfExperience: string;
-  degree: string;
-  school: string;
+  education: ManualEducationFormItem[];
+  experience: ManualExperienceFormItem[];
   skills: string[];
-  interests: string;
+  interests: string[];
   // Tier 2 — add more context
-  latestJobRole: string;
-  latestJobCompany: string;
-  latestJobFrom: string;
-  latestJobTo: string;
   summary: string;
   softSkills: string[];
   languageName: string;
@@ -39,16 +48,10 @@ export type ManualProfileForm = {
 
 export const emptyManualProfileForm: ManualProfileForm = {
   currentRole: "",
-  seniority: "",
-  yearsOfExperience: "",
-  degree: "",
-  school: "",
+  education: [],
+  experience: [],
   skills: [],
-  interests: "",
-  latestJobRole: "",
-  latestJobCompany: "",
-  latestJobFrom: "",
-  latestJobTo: "",
+  interests: [],
   summary: "",
   softSkills: [],
   languageName: "",

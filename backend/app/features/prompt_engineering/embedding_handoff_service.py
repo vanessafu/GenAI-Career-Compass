@@ -1,8 +1,8 @@
 """Prepares a confirmed profile for the embedding step.
 
-Takes the confirmed CV, privacy-strips it (same CVData schema), generates a career
-identity statement, and returns a ConfirmedCVData carrying both. Every intermediate
-step is persisted to disk.
+Takes the confirmed CV, privacy-strips it (same CVData schema), generates a
+career identity summary, and returns a ConfirmedCVData carrying it. Every
+intermediate step is persisted to disk.
 """
 
 import logging
@@ -21,7 +21,7 @@ async def prepare_for_embedding(confirmed_profile: ConfirmedCVData) -> Confirmed
     """Privacy-strip the CV, generate the career identity, and persist each step.
 
     Returns the ConfirmedCVData that the embedding step consumes: the
-    privacy-stripped CV plus the generated ``career_identity_statement``.
+    privacy-stripped CV plus the generated identity summary.
     """
     profile_stem = derive_profile_stem(confirmed_profile.confirmed_cv_data)
 
@@ -31,14 +31,16 @@ async def prepare_for_embedding(confirmed_profile: ConfirmedCVData) -> Confirmed
     identity = await generate_career_identity(stripped_cv)
     save_pipeline_artifact(
         "03_identity_statement",
-        {"career_identity_statement": identity},
+        {"career_identity_summary": identity.model_dump(mode="json")},
         profile_stem=profile_stem,
     )
+    identity_statement = f"{identity.label}: {identity.summary}"
 
     result = ConfirmedCVData(
         confirmed_cv_data=stripped_cv,
         confirmation_metadata=confirmed_profile.confirmation_metadata,
-        career_identity_statement=identity,
+        career_identity_statement=identity_statement,
+        career_identity_summary=identity,
     )
     save_pipeline_artifact("04_confirmed_with_identity", result, profile_stem=profile_stem)
 

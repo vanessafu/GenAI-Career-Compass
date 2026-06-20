@@ -21,7 +21,7 @@ export function DirectionsStage() {
   const canProceed = selected.length > 0;
 
   return (
-    <div className="relative flex w-full flex-col px-6 pb-8 pt-[max(6rem,calc(env(safe-area-inset-top)+5rem))] sm:px-10 lg:h-full lg:overflow-hidden lg:px-16 lg:pt-24">
+    <div className="relative flex w-full flex-col px-6 pb-8 pt-[max(6rem,calc(env(safe-area-inset-top)+5rem))] sm:px-10 lg:px-16 lg:pt-24">
       <div className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col gap-4 lg:min-h-0">
         <motion.div
           initial={{ opacity: 0, y: -6 }}

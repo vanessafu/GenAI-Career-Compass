@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -84,14 +86,29 @@ class CareerProfileResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # 3. Career identity model
 # ---------------------------------------------------------------------------
-# The prompt-engineering step produces a single career identity statement from
-# the privacy-stripped CV. No follow-up questions are generated.
+# The prompt-engineering step produces a compact identity summary from the
+# privacy-stripped CV. No follow-up questions are generated.
 
 
-class CareerIdentityGeneration(BaseModel):
+class CareerIdentitySummary(BaseModel):
     """Structured LLM output for the career identity step."""
 
-    career_identity_statement: str
+    label: str
+    summary: str
+
+
+class CareerIdentityGeneration(CareerIdentitySummary):
+    """Backward-compatible name for structured identity generation."""
+
+
+class EmbeddingProfile(BaseModel):
+    career_identity_summary: CareerIdentitySummary
+    education: list[dict[str, Any]] = Field(default_factory=list)
+    experience: list[dict[str, Any]] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    interests: list[str] = Field(default_factory=list)
+    certifications: list[dict[str, Any]] = Field(default_factory=list)
+    projects: list[dict[str, Any]] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

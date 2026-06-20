@@ -13,7 +13,7 @@ export function CareerCompassApp() {
 
   return (
     <div
-      className="relative w-full overflow-x-hidden lg:h-screen lg:overflow-hidden"
+      className="relative w-full overflow-x-hidden"
       style={{
         minHeight: "100dvh",
         paddingTop: "env(safe-area-inset-top)",
@@ -29,7 +29,7 @@ export function CareerCompassApp() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="relative w-full lg:absolute lg:inset-0 lg:overflow-hidden"
+          className="relative w-full"
         >
           {stage === "entry" && <EntryStage />}
           {stage === "recap" && <RecapStage />}

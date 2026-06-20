@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useStageStore } from "@/state/useStageStore";
 import {
   ArrowRight,
@@ -40,7 +40,6 @@ export function RecapStage() {
   const setStage = useStageStore((s) => s.setStage);
   const identity = useStageStore((s) => s.identity);
   const identityLoading = useStageStore((s) => s.identityLoading);
-  const generateIdentity = useStageStore((s) => s.generateIdentity);
   const skills = useStageStore((s) => s.skills);
   const interests = useStageStore((s) => s.interests);
   const addSkill = useStageStore((s) => s.addSkill);
@@ -64,10 +63,6 @@ export function RecapStage() {
   const [newSkill, setNewSkill] = useState("");
   const [newInterest, setNewInterest] = useState("");
 
-  useEffect(() => {
-    generateIdentity();
-  }, [generateIdentity]);
-
   const archetype = identity?.archetype ?? (identityLoading ? "…" : "professional");
   const lead =
     identity?.lead ??
@@ -76,7 +71,7 @@ export function RecapStage() {
       : "We mapped your profile to realistic next roles.");
 
   return (
-    <div className="relative w-full px-6 pb-6 pt-[max(5rem,calc(env(safe-area-inset-top)+4rem))] sm:px-10 lg:h-full lg:overflow-hidden lg:px-14 lg:pt-20">
+    <div className="relative w-full px-6 pb-6 pt-[max(5rem,calc(env(safe-area-inset-top)+4rem))] sm:px-10 lg:px-14 lg:pt-20">
       <div className="mx-auto flex h-full w-full max-w-[1320px] flex-col gap-3">
         {/* Eyebrow — no name, no role line. */}
         <div className="flex items-center gap-2">
