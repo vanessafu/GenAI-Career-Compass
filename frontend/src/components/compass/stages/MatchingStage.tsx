@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { Compass } from "lucide-react";
 import { useStageStore } from "@/state/useStageStore";
+import { MATCHING_PROGRESS, getLoadingProgressState } from "@/lib/loadingProgress";
 import { LoadingPanel } from "../ui/LoadingPanel";
 
 const STEPS = [
@@ -14,19 +15,33 @@ export function MatchingStage() {
   const setStage = useStageStore((s) => s.setStage);
   const runMatching = useStageStore((s) => s.runMatching);
   const [step, setStep] = useState(0);
+  const [progress, setProgress] = useState(8);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const stepTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     let active = true;
     const timers = stepTimersRef.current;
-    timers.push(setTimeout(() => setStep(1), 900));
-    timers.push(setTimeout(() => setStep(2), 1800));
+    const startedAt = Date.now();
+    const tickProgress = () => {
+      const state = getLoadingProgressState(MATCHING_PROGRESS, Date.now() - startedAt);
+      setStep(state.step);
+      setProgress(state.progress);
+    };
+
+    tickProgress();
+    progressTimerRef.current = setInterval(tickProgress, 250);
 
     runMatching().then((ok) => {
       if (!active) return;
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+      }
       if (ok) {
+        setProgress(100);
         setDone(true);
         timers.push(setTimeout(() => setStage("directions"), 600));
       } else {
@@ -36,6 +51,10 @@ export function MatchingStage() {
 
     return () => {
       active = false;
+      if (progressTimerRef.current) {
+        clearInterval(progressTimerRef.current);
+        progressTimerRef.current = null;
+      }
       timers.forEach(clearTimeout);
     };
   }, [runMatching, setStage]);
@@ -90,6 +109,7 @@ export function MatchingStage() {
           step={step}
           steps={STEPS}
           done={done}
+          progress={progress}
         />
       </div>
     </div>

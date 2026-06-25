@@ -11,12 +11,19 @@ from .schemas import (
 )
 
 
-READY_NOW_SKILL_OVERLAP = 0.65
+READY_NOW_SKILL_OVERLAP = 0.60
 NEXT_STEP_SKILL_OVERLAP = 0.35
 STRETCH_MIN_SKILL_OVERLAP = 0.20
 STRONG_DOMAIN_OVERLAP = 0.50
+MIN_CAPABILITY_FOR_READY_NOW = 0.68
 MIN_CAPABILITY_FOR_DOMAIN_STRETCH = 0.50
 STRONG_CERTIFICATION_OVERLAP = 0.50
+
+_BUCKET_ORDER = (
+    RecommendationBucket.READY_NOW,
+    RecommendationBucket.NEXT_STEP,
+    RecommendationBucket.ASPIRATIONAL,
+)
 
 
 @dataclass
@@ -87,7 +94,11 @@ def assign_bucket(candidate: Candidate) -> RecommendationBucket:
     cert_overlap = _clamp01(candidate.certification_overlap)
     capability_similarity = _clamp01(candidate.capability_vector_similarity)
 
-    if skill_overlap >= READY_NOW_SKILL_OVERLAP and candidate.seniority_gap != "stretch":
+    if (
+        skill_overlap >= READY_NOW_SKILL_OVERLAP
+        and capability_similarity >= MIN_CAPABILITY_FOR_READY_NOW
+        and candidate.seniority_gap != "stretch"
+    ):
         return RecommendationBucket.READY_NOW
 
     if candidate.seniority_gap == "stretch" and skill_overlap < NEXT_STEP_SKILL_OVERLAP:
@@ -131,14 +142,48 @@ def _to_match(candidate: Candidate) -> RoleMatch:
     )
 
 
+def _balanced_bucket_selection(
+    grouped: dict[RecommendationBucket, list[Candidate]],
+    total: int,
+) -> dict[RecommendationBucket, list[Candidate]]:
+    selected: dict[RecommendationBucket, list[Candidate]] = {
+        RecommendationBucket.READY_NOW: [],
+        RecommendationBucket.NEXT_STEP: [],
+        RecommendationBucket.ASPIRATIONAL: [],
+    }
+    if total <= 0:
+        return selected
+
+    indexes = {bucket: 0 for bucket in _BUCKET_ORDER}
+    remaining = total
+
+    while remaining > 0:
+        active_buckets = [
+            bucket
+            for bucket in _BUCKET_ORDER
+            if indexes[bucket] < len(grouped[bucket])
+        ]
+        if not active_buckets:
+            break
+
+        for bucket in active_buckets:
+            if remaining <= 0:
+                break
+            selected[bucket].append(grouped[bucket][indexes[bucket]])
+            indexes[bucket] += 1
+            remaining -= 1
+
+    return selected
+
+
 def recommend(
     candidates: list[Candidate],
     top_k: int | None = None,
     mode: RecommendationMode = RecommendationMode.BALANCED,
     per_bucket: int | None = None,
 ) -> BucketedRoles:
-    if top_k is None:
-        top_k = per_bucket or 3
+    if top_k is None and per_bucket is None:
+        top_k = 6
 
     for candidate in candidates:
         candidate.final_score = score_candidate(candidate)
@@ -155,8 +200,26 @@ def recommend(
     for bucket_candidates in grouped.values():
         bucket_candidates.sort(key=lambda item: item.final_score, reverse=True)
 
+    if per_bucket is not None:
+        return BucketedRoles(
+            ready_now=[
+                _to_match(item)
+                for item in grouped[RecommendationBucket.READY_NOW][:per_bucket]
+            ],
+            next_step=[
+                _to_match(item)
+                for item in grouped[RecommendationBucket.NEXT_STEP][:per_bucket]
+            ],
+            aspirational=[
+                _to_match(item)
+                for item in grouped[RecommendationBucket.ASPIRATIONAL][:per_bucket]
+            ],
+        )
+
+    selected = _balanced_bucket_selection(grouped, total=top_k or 0)
+
     return BucketedRoles(
-        ready_now=[_to_match(item) for item in grouped[RecommendationBucket.READY_NOW][:top_k]],
-        next_step=[_to_match(item) for item in grouped[RecommendationBucket.NEXT_STEP][:top_k]],
-        aspirational=[_to_match(item) for item in grouped[RecommendationBucket.ASPIRATIONAL][:top_k]],
+        ready_now=[_to_match(item) for item in selected[RecommendationBucket.READY_NOW]],
+        next_step=[_to_match(item) for item in selected[RecommendationBucket.NEXT_STEP]],
+        aspirational=[_to_match(item) for item in selected[RecommendationBucket.ASPIRATIONAL]],
     )

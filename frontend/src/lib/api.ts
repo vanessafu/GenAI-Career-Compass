@@ -235,6 +235,10 @@ type CareerResultV1 = {
   matching_score: number;
   salary: string;
   description: string;
+  matched_skills: string[];
+  missing_skills: string[];
+  matched_domains: string[];
+  matched_certifications: string[];
 };
 
 type CareerResultsV1 = {
@@ -311,10 +315,10 @@ function resultToRoleMatch(result: CareerResultV1, index: number): RoleMatch {
     title: result.title,
     alt_labels: result.salary ? [result.salary] : [],
     description: result.description || null,
-    essential_knowledge: [],
-    essential_skills: [],
-    optional_knowledge: [],
-    optional_skills: [],
+    essential_knowledge: result.matched_domains,
+    essential_skills: result.matched_skills,
+    optional_knowledge: result.matched_certifications,
+    optional_skills: result.missing_skills,
     similarity_score: Math.max(0, Math.min(1, result.matching_score / 100)),
   };
 }

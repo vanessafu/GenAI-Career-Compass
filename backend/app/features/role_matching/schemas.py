@@ -178,6 +178,10 @@ class CareerResultV1(BaseModel):
     matching_score: int = Field(ge=0, le=100)
     salary: str = ""
     description: str = ""
+    matched_skills: list[str] = Field(default_factory=list)
+    missing_skills: list[str] = Field(default_factory=list)
+    matched_domains: list[str] = Field(default_factory=list)
+    matched_certifications: list[str] = Field(default_factory=list)
 
     @classmethod
     def from_role_match(cls, role: RoleMatch) -> "CareerResultV1":
@@ -188,6 +192,10 @@ class CareerResultV1(BaseModel):
             matching_score=int(round(score * 100)),
             salary=role.salary,
             description=role.description,
+            matched_skills=role.matched_skills,
+            missing_skills=role.missing_skills,
+            matched_domains=role.matched_domains,
+            matched_certifications=role.matched_certifications,
         )
 
 
@@ -215,7 +223,7 @@ class RoleMatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     profile: UserCareerProfile
-    top_k: int = Field(default=3, ge=1, le=20)
+    top_k: int = Field(default=6, ge=1, le=20)
     mode: RecommendationMode = RecommendationMode.BALANCED
     include_debug: bool = False
 

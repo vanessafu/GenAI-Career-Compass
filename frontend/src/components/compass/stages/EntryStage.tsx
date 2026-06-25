@@ -2,10 +2,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { useStageStore } from "@/state/useStageStore";
 import { cn } from "@/lib/utils";
+import {
+  CV_UPLOAD_PROGRESS,
+  MANUAL_PROFILE_PROGRESS,
+  getLoadingProgressState,
+  type LoadingProgressConfig,
+} from "@/lib/loadingProgress";
 import { Upload, FileText, X, Plus, ArrowRight, Sparkles, ChevronDown } from "lucide-react";
 import { LoadingPanel } from "../ui/LoadingPanel";
 
-const PARSE_STEPS = ["Reading your profile", "Privacy-stripping data", "Generating identity"];
+const PARSE_STEPS = ["Reading your CV", "Privacy-stripping data", "Generating identity"];
 const MANUAL_STEPS = ["Structuring your profile", "Privacy-stripping data", "Generating identity"];
 
 const SENIORITY_OPTIONS = ["Student", "Junior", "Mid", "Senior", "Lead"];
@@ -114,14 +120,50 @@ export function EntryStage() {
   const [parsing, setParsing] = useState(false);
   const [steps, setSteps] = useState<string[]>(PARSE_STEPS);
   const [step, setStep] = useState(0);
+  const [progress, setProgress] = useState(8);
   const [done, setDone] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const timers = timersRef.current;
-    return () => timers.forEach(clearTimeout);
+    return () => {
+      timers.forEach(clearTimeout);
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    };
   }, []);
+
+  const clearLoadingTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+  };
+
+  const startProgress = (config: LoadingProgressConfig) => {
+    clearLoadingTimers();
+    const startedAt = Date.now();
+    const tick = () => {
+      const state = getLoadingProgressState(config, Date.now() - startedAt);
+      setStep(state.step);
+      setProgress(state.progress);
+    };
+
+    tick();
+    progressTimerRef.current = setInterval(tick, 250);
+  };
+
+  const finishProgress = () => {
+    if (progressTimerRef.current) {
+      clearInterval(progressTimerRef.current);
+      progressTimerRef.current = null;
+    }
+    setProgress(100);
+    setDone(true);
+  };
 
   const addSkill = (s: string) => {
     const val = s.trim();
@@ -188,16 +230,15 @@ export function EntryStage() {
     setFormError(null);
     setSteps(PARSE_STEPS);
     setParsing(true);
-    setStep(0);
     setDone(false);
-    timersRef.current.push(setTimeout(() => setStep(1), 700));
-    timersRef.current.push(setTimeout(() => setStep(2), 1400));
+    startProgress(CV_UPLOAD_PROGRESS);
 
     const ok = await uploadCv(file);
     if (ok) {
-      setDone(true);
+      finishProgress();
       timersRef.current.push(setTimeout(() => setStage("recap"), 600));
     } else {
+      clearLoadingTimers();
       setParsing(false);
       setFormError(useStageStore.getState().error);
     }
@@ -212,10 +253,8 @@ export function EntryStage() {
     setFormError(null);
     setSteps(MANUAL_STEPS);
     setParsing(true);
-    setStep(0);
     setDone(false);
-    timersRef.current.push(setTimeout(() => setStep(1), 500));
-    timersRef.current.push(setTimeout(() => setStep(2), 1000));
+    startProgress(MANUAL_PROFILE_PROGRESS);
 
     const ok = await submitManualProfile({
       currentRole: role,
@@ -229,9 +268,10 @@ export function EntryStage() {
       languageLevel,
     });
     if (ok) {
-      setDone(true);
+      finishProgress();
       timersRef.current.push(setTimeout(() => setStage("recap"), 600));
     } else {
+      clearLoadingTimers();
       setParsing(false);
       setFormError(useStageStore.getState().error);
     }
@@ -299,6 +339,7 @@ export function EntryStage() {
               step={step}
               steps={steps}
               done={done}
+              progress={progress}
             />
           ) : (
             <motion.div

@@ -14,6 +14,7 @@ export function LoadingPanel({
   step,
   steps,
   done,
+  progress,
 }: {
   icon: LucideIcon;
   title: string;
@@ -21,8 +22,9 @@ export function LoadingPanel({
   step: number;
   steps: string[];
   done: boolean;
+  progress?: number;
 }) {
-  const pct = done ? 100 : Math.min(95, ((step + 1) / steps.length) * 95);
+  const pct = done ? 100 : (progress ?? Math.min(95, ((step + 1) / steps.length) * 95));
   return (
     <motion.div
       layoutId="loading-panel"
@@ -56,7 +58,7 @@ export function LoadingPanel({
           <motion.div
             initial={{ width: "5%" }}
             animate={{ width: `${pct}%` }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: progress === undefined ? 0.6 : 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="h-full rounded-full"
             style={{ background: "var(--gradient-warm)" }}
           />

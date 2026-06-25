@@ -50,6 +50,24 @@ def _skill_keywords(cv_data: CVData) -> list[str]:
     return skills
 
 
+def build_fallback_career_identity(cv_data: CVData) -> CareerIdentitySummary:
+    role = (
+        cv_data.personal_info.current_role
+        or next((experience.role for experience in cv_data.experience if experience.role), None)
+        or "Career Explorer"
+    )
+    summary = cv_data.profile_summary.summary
+    if not summary:
+        skills = _skill_keywords(cv_data)[:4]
+        interests = [item for item in cv_data.interests if item.strip()][:3]
+        signals = [*skills, *interests]
+        if signals:
+            summary = "Profile combines career signals across " + ", ".join(signals) + "."
+        else:
+            summary = "Profile contains enough career signal to begin role matching."
+    return CareerIdentitySummary(label=role, summary=summary)
+
+
 def build_embedding_profile(
     privacy_stripped_cv_data: CVData,
     career_identity_summary: CareerIdentitySummary,
@@ -106,7 +124,15 @@ async def run_profile_pipeline(cv_data: CVData, *, artifact_name: str | None = N
         profile_stem=profile_stem,
     )
 
-    career_identity_summary = await generate_career_identity(privacy_stripped_cv_data)
+    try:
+        career_identity_summary = await generate_career_identity(privacy_stripped_cv_data)
+    except RuntimeError as exc:
+        career_identity_summary = build_fallback_career_identity(privacy_stripped_cv_data)
+        save_pipeline_artifact(
+            "03_identity_summary_error",
+            {"error": str(exc), "fallback_used": True},
+            profile_stem=profile_stem,
+        )
     save_pipeline_artifact(
         "03_identity_summary",
         {"career_identity_summary": career_identity_summary.model_dump(mode="json")},

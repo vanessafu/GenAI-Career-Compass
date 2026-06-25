@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test:loading-progress": "node scripts/check-loading-progress.mjs",
+    "test:scroll": "node scripts/check-scroll-regression.mjs",
     "preview": "vite preview",
     "format": "prettier --write ."
   },

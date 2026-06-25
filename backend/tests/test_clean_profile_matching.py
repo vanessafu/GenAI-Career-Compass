@@ -141,6 +141,10 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
                 "matching_score": 95,
                 "salary": "EUR 95k",
                 "description": "Designs scalable data pipelines and warehouse systems.",
+                "matched_skills": [],
+                "missing_skills": [],
+                "matched_domains": [],
+                "matched_certifications": [],
             },
         )
 
@@ -158,6 +162,9 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
                     bucket=RecommendationBucket.ready_now,
                     salary="EUR 95k",
                     matched_skills=["python"],
+                    missing_skills=["spark"],
+                    matched_domains=["data_engineering"],
+                    matched_certifications=["AWS Certified Developer - Associate"],
                     signal_breakdown=role_schemas.RoleMatchSignalBreakdown(),
                 )
             ]
@@ -175,6 +182,10 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
                         "matching_score": 95,
                         "salary": "EUR 95k",
                         "description": "Designs scalable data pipelines.",
+                        "matched_skills": ["python"],
+                        "missing_skills": ["spark"],
+                        "matched_domains": ["data_engineering"],
+                        "matched_certifications": ["AWS Certified Developer - Associate"],
                     }
                 ]
             },
@@ -232,6 +243,23 @@ class SupabaseBackedNormalizationTests(unittest.TestCase):
             normalized,
         )
 
+    def test_default_skill_aliases_cover_ci_testing_cloud_and_scripting_inputs(self) -> None:
+        normalized = normalize_user_skills(
+            [
+                "continuous integration (CI)",
+                "automated testing",
+                "Azure cloud",
+                "Linux services",
+                "shell scripts",
+            ],
+            {},
+        )
+
+        self.assertEqual(
+            ["ci cd", "test automation", "azure", "linux", "scripting"],
+            normalized,
+        )
+
     def test_certifications_use_token_cleanup(self) -> None:
         self.assertEqual(
             normalize_certification_name("AWS Certified Developer - Associate"),
@@ -258,6 +286,23 @@ class SupabaseBackedNormalizationTests(unittest.TestCase):
         self.assertEqual(
             map_profile_domains(sample_profile()),
             ["architecture", "backend", "cloud", "ai_ml", "automation_scripting", "data_engineering"],
+        )
+
+    def test_tooling_profile_maps_to_devops_and_qa_domains(self) -> None:
+        profile = UserCareerProfile(
+            career_identity=CareerIdentity(
+                title="Java Tooling Engineer",
+                summary=(
+                    "Builds CI pipelines with Jenkins and Azure, Ansible setup "
+                    "automation, and test automation using Selenium and JUnit."
+                ),
+            ),
+            skills=["Java"],
+        )
+
+        self.assertEqual(
+            map_profile_domains(profile),
+            ["cloud", "software_engineering", "automation_scripting", "devops", "qa_testing"],
         )
 
     def test_role_skill_overlap_uses_supabase_role_skills_not_mind_ontology(self) -> None:
@@ -339,6 +384,112 @@ class RankingBehaviorTests(unittest.TestCase):
             buckets.ready_now[0].signal_breakdown.normalized_skill_overlap,
             buckets.aspirational[0].signal_breakdown.normalized_skill_overlap,
         )
+
+    def test_recommend_top_k_is_total_and_balanced_across_sections(self) -> None:
+        candidates: list[Candidate] = []
+        for i in range(6):
+            candidates.append(
+                Candidate(
+                    role_id=f"ready-{i}",
+                    job_title=f"Ready {i}",
+                    capability_vector_similarity=0.7,
+                    intent_vector_similarity=0.7,
+                    skill_overlap=0.7,
+                    seniority_fit=1.0,
+                    seniority_gap="match",
+                )
+            )
+            candidates.append(
+                Candidate(
+                    role_id=f"next-{i}",
+                    job_title=f"Next {i}",
+                    capability_vector_similarity=0.7,
+                    intent_vector_similarity=0.7,
+                    skill_overlap=0.4,
+                    seniority_fit=0.7,
+                    seniority_gap="unknown",
+                )
+            )
+            candidates.append(
+                Candidate(
+                    role_id=f"asp-{i}",
+                    job_title=f"Aspirational {i}",
+                    capability_vector_similarity=0.7,
+                    intent_vector_similarity=0.7,
+                    skill_overlap=0.1,
+                    seniority_fit=0.7,
+                    seniority_gap="unknown",
+                )
+            )
+
+        buckets = recommend(candidates, mode=RecommendationMode.balanced, top_k=6)
+
+        self.assertEqual(2, len(buckets.ready_now))
+        self.assertEqual(2, len(buckets.next_step))
+        self.assertEqual(2, len(buckets.aspirational))
+
+    def test_recommend_redistributes_total_slots_when_a_section_is_empty(self) -> None:
+        candidates: list[Candidate] = []
+        for i in range(6):
+            candidates.append(
+                Candidate(
+                    role_id=f"next-{i}",
+                    job_title=f"Next {i}",
+                    capability_vector_similarity=0.7,
+                    intent_vector_similarity=0.7,
+                    skill_overlap=0.4,
+                    seniority_fit=0.7,
+                    seniority_gap="unknown",
+                )
+            )
+            candidates.append(
+                Candidate(
+                    role_id=f"asp-{i}",
+                    job_title=f"Aspirational {i}",
+                    capability_vector_similarity=0.7,
+                    intent_vector_similarity=0.7,
+                    skill_overlap=0.1,
+                    seniority_fit=0.7,
+                    seniority_gap="unknown",
+                )
+            )
+
+        buckets = recommend(candidates, mode=RecommendationMode.balanced, top_k=6)
+
+        self.assertEqual(0, len(buckets.ready_now))
+        self.assertEqual(3, len(buckets.next_step))
+        self.assertEqual(3, len(buckets.aspirational))
+
+    def test_ready_now_requires_skill_and_capability_alignment(self) -> None:
+        aligned_broad_role = Candidate(
+            role_id="aligned",
+            job_title="Software Engineer",
+            capability_vector_similarity=0.70,
+            intent_vector_similarity=0.65,
+            skill_overlap=0.60,
+            domain_overlap=1.0,
+            seniority_fit=0.7,
+            seniority_gap="unknown",
+        )
+        narrow_tool_role = Candidate(
+            role_id="tool",
+            job_title="Specific Tool Engineer",
+            capability_vector_similarity=0.55,
+            intent_vector_similarity=0.65,
+            skill_overlap=0.70,
+            domain_overlap=1.0,
+            seniority_fit=0.7,
+            seniority_gap="unknown",
+        )
+
+        buckets = recommend(
+            [aligned_broad_role, narrow_tool_role],
+            mode=RecommendationMode.balanced,
+            top_k=2,
+        )
+
+        self.assertEqual(["aligned"], [role.role_id for role in buckets.ready_now])
+        self.assertEqual(["tool"], [role.role_id for role in buckets.next_step])
 
     def test_exact_certification_match_improves_score(self) -> None:
         without_cert = Candidate(
