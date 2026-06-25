@@ -1,4 +1,4 @@
-from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -84,62 +84,31 @@ class CareerProfileResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# 3. User-facing identity and follow-up models
+# 3. Career identity model
 # ---------------------------------------------------------------------------
-# These models represent content shown to the user or stored for iterative
-# refinement after the system has generated an initial career identity.
+# The prompt-engineering step produces a compact identity summary from the
+# privacy-stripped CV. No follow-up questions are generated.
 
 
-class SuggestedQuestion(BaseModel):
-    question: str
-    options: list[str] = Field(min_length=3, max_length=5)
+class CareerIdentitySummary(BaseModel):
+    """Structured LLM output for the career identity step."""
+
+    label: str
+    summary: str
 
 
-class StarterIdentityGeneration(BaseModel):
-    starter_identity: str
-    suggested_questions: list[SuggestedQuestion] = Field(min_length=1, max_length=2)
+class CareerIdentityGeneration(CareerIdentitySummary):
+    """Backward-compatible name for structured identity generation."""
 
 
-class StarterProfileResponse(BaseModel):
-    privacy_stripped_profile_draft: PrivacyStrippedProfileDraft
-    starter_identity: str
-    suggested_questions: list[SuggestedQuestion]
-
-
-class CareerIdentityResponse(BaseModel):
-    career_profile: CareerProfile
-    career_identity_statement: str
-    suggested_questions: list[SuggestedQuestion]
-
-
-class StoredFollowupQuestion(SuggestedQuestion):
-    id: str
-
-
-class IdentityFollowupsGeneration(BaseModel):
-    version: int
-    source_confirmed_profile: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    privacy_stripped_profile_draft: PrivacyStrippedProfileDraft
-    starter_identity: str
-    suggested_questions: list[StoredFollowupQuestion] = Field(min_length=1, max_length=2)
-
-
-class IdentityFollowupsHistory(BaseModel):
-    active_version: int
-    generations: list[IdentityFollowupsGeneration] = Field(default_factory=list)
-
-
-class FollowupAnswer(BaseModel):
-    question_id: str
-    question: str
-    selected_option: str
-    answered_at: datetime = Field(default_factory=datetime.utcnow)
-    generation_version: int | None = None
-
-
-class FollowupAnswersHistory(BaseModel):
-    answers: list[FollowupAnswer] = Field(default_factory=list)
+class EmbeddingProfile(BaseModel):
+    career_identity_summary: CareerIdentitySummary
+    education: list[dict[str, Any]] = Field(default_factory=list)
+    experience: list[dict[str, Any]] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    interests: list[str] = Field(default_factory=list)
+    certifications: list[dict[str, Any]] = Field(default_factory=list)
+    projects: list[dict[str, Any]] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

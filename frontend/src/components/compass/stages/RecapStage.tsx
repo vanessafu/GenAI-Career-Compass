@@ -1,0 +1,591 @@
+import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
+import { useStageStore } from "@/state/useStageStore";
+import {
+  ArrowRight,
+  Sparkles,
+  Plus,
+  X,
+  Code2,
+  Database,
+  Cloud,
+  Wrench,
+  Layers,
+  Brain,
+  Cpu,
+  GitBranch,
+  Boxes,
+  Briefcase,
+  GraduationCap,
+  Award,
+  FolderGit2,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const SKILL_ICONS: Record<string, LucideIcon> = {
+  default: Wrench,
+  Python: Code2,
+  Java: Cpu,
+  PostgreSQL: Database,
+  "RESTful APIs": GitBranch,
+  Docker: Boxes,
+  "AWS EC2": Cloud,
+  Git: GitBranch,
+  "Microservices Architecture": Layers,
+  "Machine Learning": Brain,
+};
+
+export function RecapStage() {
+  const setStage = useStageStore((s) => s.setStage);
+  const identity = useStageStore((s) => s.identity);
+  const identityLoading = useStageStore((s) => s.identityLoading);
+  const skills = useStageStore((s) => s.skills);
+  const interests = useStageStore((s) => s.interests);
+  const addSkill = useStageStore((s) => s.addSkill);
+  const removeSkill = useStageStore((s) => s.removeSkill);
+  const addInterest = useStageStore((s) => s.addInterest);
+  const removeInterest = useStageStore((s) => s.removeInterest);
+
+  const experiences = useStageStore((s) => s.experiences);
+  const addExperience = useStageStore((s) => s.addExperience);
+  const removeExperience = useStageStore((s) => s.removeExperience);
+  const educations = useStageStore((s) => s.educations);
+  const addEducation = useStageStore((s) => s.addEducation);
+  const removeEducation = useStageStore((s) => s.removeEducation);
+  const certifications = useStageStore((s) => s.certifications);
+  const addCertification = useStageStore((s) => s.addCertification);
+  const removeCertification = useStageStore((s) => s.removeCertification);
+  const projects = useStageStore((s) => s.projects);
+  const addProject = useStageStore((s) => s.addProject);
+  const removeProject = useStageStore((s) => s.removeProject);
+
+  const [newSkill, setNewSkill] = useState("");
+  const [newInterest, setNewInterest] = useState("");
+
+  const archetype = identity?.archetype ?? (identityLoading ? "…" : "professional");
+  const lead =
+    identity?.lead ??
+    (identityLoading
+      ? "Generating your career identity…"
+      : "We mapped your profile to realistic next roles.");
+
+  return (
+    <div className="relative w-full px-6 pb-6 pt-[max(5rem,calc(env(safe-area-inset-top)+4rem))] sm:px-10 lg:px-14 lg:pt-20">
+      <div className="mx-auto flex h-full w-full max-w-[1320px] flex-col gap-3">
+        {/* Eyebrow — no name, no role line. */}
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-foreground/65">
+            <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--brand)]" />
+            Analysis complete
+          </span>
+        </div>
+
+        {/* Identity card — archetype + restored short lead text. */}
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          className="liquid-glass relative flex items-start gap-3 overflow-hidden rounded-2xl px-4 py-3"
+        >
+          <div
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white"
+            style={{ background: "var(--gradient-warm)" }}
+          >
+            <Sparkles size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[color:var(--brand)]">
+              Career identity
+            </p>
+            <p className="font-display text-[20px] leading-tight tracking-tight">
+              You are a{" "}
+              <span
+                className="italic"
+                style={{
+                  background: "var(--gradient-warm)",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  color: "transparent",
+                }}
+              >
+                {archetype}
+              </span>
+            </p>
+            <p className="mt-1 text-[13.5px] leading-snug text-foreground/65">{lead}</p>
+          </div>
+        </motion.div>
+
+        {/* Two-row grid that fills the screen. */}
+        <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,3fr)_minmax(0,4fr)] gap-3">
+          {/* Row 1 — Education (left) + Experience (right). */}
+          <div className="grid min-h-0 gap-3 lg:grid-cols-2">
+            <SectionCard icon={GraduationCap} title="Education" count={educations.length}>
+              <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
+                <AnimatePresence initial={false}>
+                  {educations.map((e, i) => (
+                    <RowItem
+                      key={`${e.school}-${i}`}
+                      idx={i}
+                      title={e.degree}
+                      subtitle={e.school}
+                      meta={`${e.start}–${e.end}`}
+                      onRemove={() => removeEducation(i)}
+                    />
+                  ))}
+                </AnimatePresence>
+                <AddEducationRow onAdd={(e) => addEducation(e)} />
+              </div>
+            </SectionCard>
+
+            <SectionCard icon={Briefcase} title="Experience" count={experiences.length}>
+              <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
+                <AnimatePresence initial={false}>
+                  {experiences.map((e, i) => (
+                    <RowItem
+                      key={`${e.company}-${i}`}
+                      idx={i}
+                      title={e.role}
+                      subtitle={e.company}
+                      meta={`${e.start}–${e.end}`}
+                      onRemove={() => removeExperience(i)}
+                    />
+                  ))}
+                </AnimatePresence>
+                <AddExperienceRow onAdd={(e) => addExperience(e)} />
+              </div>
+            </SectionCard>
+          </div>
+
+          {/* Row 2 — Skills, Interests, Certifications, Projects (all open). */}
+          <div className="grid min-h-0 gap-3 lg:grid-cols-4">
+            <SectionCard title="Strongest skills" count={skills.length}>
+              <div className="flex flex-1 flex-wrap content-start gap-1.5 overflow-y-auto">
+                <AnimatePresence initial={false}>
+                  {skills.map((s, i) => {
+                    const Icon = SKILL_ICONS[s.name] ?? SKILL_ICONS.default;
+                    return (
+                      <motion.div
+                        key={s.name}
+                        layout
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.85 }}
+                        transition={{
+                          delay: i * 0.02,
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 24,
+                        }}
+                        whileHover={{ y: -2 }}
+                        className="group inline-flex items-center gap-1.5 rounded-full border border-[color:var(--brand)]/15 bg-white/80 px-3 py-1.5 text-[13.5px] text-foreground/85"
+                      >
+                        <span
+                          className="grid h-6 w-6 place-items-center rounded-full text-white"
+                          style={{ background: "var(--gradient-warm)" }}
+                        >
+                          <Icon size={11} />
+                        </span>
+
+                        {s.name}
+                        <button
+                          onClick={() => removeSkill(s.name)}
+                          className="opacity-0 transition group-hover:opacity-100"
+                        >
+                          <X size={10} className="text-foreground/55 hover:text-foreground" />
+                        </button>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+                <AddPill
+                  value={newSkill}
+                  setValue={setNewSkill}
+                  onSubmit={() => {
+                    addSkill(newSkill);
+                    setNewSkill("");
+                  }}
+                />
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Interests" count={interests.length}>
+              <div className="flex flex-1 flex-wrap content-start gap-1.5 overflow-y-auto">
+                <AnimatePresence initial={false}>
+                  {interests.map((it, i) => (
+                    <motion.div
+                      key={it}
+                      layout
+                      initial={{ opacity: 0, scale: 0.85 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.85 }}
+                      transition={{ delay: i * 0.02, type: "spring", stiffness: 400, damping: 24 }}
+                      whileHover={{ y: -1 }}
+                      className="group inline-flex items-center gap-1.5 rounded-full bg-[color:var(--brand)]/10 px-3 py-1.5 text-[13.5px] text-[color:var(--brand-deep)]"
+                    >
+                      {it}
+                      <button
+                        onClick={() => removeInterest(it)}
+                        className="opacity-0 transition group-hover:opacity-100"
+                      >
+                        <X size={10} className="hover:text-foreground" />
+                      </button>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                <AddPill
+                  value={newInterest}
+                  setValue={setNewInterest}
+                  onSubmit={() => {
+                    addInterest(newInterest);
+                    setNewInterest("");
+                  }}
+                />
+              </div>
+            </SectionCard>
+
+            <SectionCard icon={Award} title="Certifications" count={certifications.length}>
+              <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
+                <AnimatePresence initial={false}>
+                  {certifications.map((c, i) => (
+                    <RowItem
+                      key={`${c.name}-${i}`}
+                      idx={i}
+                      icon={Award}
+                      title={c.name}
+                      subtitle={c.issuer}
+                      meta={c.year}
+                      onRemove={() => removeCertification(i)}
+                    />
+                  ))}
+                </AnimatePresence>
+                <AddSimpleRow
+                  placeholderA="Certification name"
+                  placeholderB="Year"
+                  onAdd={(a, b) => addCertification({ name: a, issuer: "—", year: b })}
+                />
+              </div>
+            </SectionCard>
+
+            <SectionCard icon={FolderGit2} title="Projects" count={projects.length}>
+              <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
+                <AnimatePresence initial={false}>
+                  {projects.map((p, i) => (
+                    <RowItem
+                      key={`${p.name}-${i}`}
+                      idx={i}
+                      icon={FolderGit2}
+                      title={p.name}
+                      subtitle={p.detail}
+                      meta={p.year}
+                      onRemove={() => removeProject(i)}
+                    />
+                  ))}
+                </AnimatePresence>
+                <AddSimpleRow
+                  placeholderA="Project name"
+                  placeholderB="Year"
+                  onAdd={(a, b) => addProject({ name: a, detail: "—", year: b })}
+                />
+              </div>
+            </SectionCard>
+          </div>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+          className="flex items-center justify-between gap-3"
+        >
+          <button
+            onClick={() => setStage("entry")}
+            className="text-[13px] text-foreground/60 transition hover:text-foreground"
+          >
+            ← back to input
+          </button>
+          <motion.button
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setStage("matching")}
+            className="group inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-[14px] font-medium text-white"
+            style={{
+              background: "var(--gradient-warm)",
+              boxShadow:
+                "0 10px 24px -12px color-mix(in oklab, var(--brand-deep) 60%, transparent)",
+            }}
+          >
+            See matching roles
+            <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+          </motion.button>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────  Building blocks  ───────────────────────── */
+
+function RowItem({
+  idx,
+  title,
+  subtitle,
+  meta,
+  onRemove,
+  icon: Icon,
+}: {
+  idx: number;
+  title: string;
+  subtitle: string;
+  meta: string;
+  onRemove: () => void;
+  icon?: LucideIcon;
+}) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, x: 6 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -6 }}
+      transition={{ delay: idx * 0.03, type: "spring", stiffness: 340, damping: 26 }}
+      className="group flex items-center gap-3 rounded-xl border border-foreground/10 bg-white/70 px-3 py-2"
+    >
+      {Icon ? (
+        <Icon size={14} className="shrink-0 text-[color:var(--brand)]" />
+      ) : (
+        <span
+          className="h-9 w-1 shrink-0 rounded-full"
+          style={{ background: "var(--gradient-warm)" }}
+        />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[14px] font-medium leading-tight">{title}</p>
+        <p className="truncate text-[12px] text-foreground/55">{subtitle}</p>
+      </div>
+      <span className="shrink-0 text-[12px] tabular-nums text-foreground/60">{meta}</span>
+      <button onClick={onRemove} className="opacity-0 transition group-hover:opacity-100">
+        <X size={12} className="text-foreground/50 hover:text-foreground" />
+      </button>
+    </motion.div>
+  );
+}
+
+function AddPill({
+  value,
+  setValue,
+  onSubmit,
+}: {
+  value: string;
+  setValue: (v: string) => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <div className="inline-flex items-center gap-1 rounded-full border border-dashed border-foreground/20 bg-white/60 px-2.5 py-1 text-[13px]">
+      <Plus size={12} className="text-foreground/45" />
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onSubmit();
+        }}
+        placeholder="Add"
+        className="w-20 bg-transparent py-0.5 outline-none placeholder:text-foreground/40"
+      />
+    </div>
+  );
+}
+
+function SectionCard({
+  icon: Icon,
+  title,
+  count,
+  children,
+  className,
+}: {
+  icon?: LucideIcon;
+  title: string;
+  count?: number;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className={cn("liquid-glass flex min-h-0 flex-col rounded-2xl p-4", className)}
+    >
+      <div className="mb-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon size={15} className="text-[color:var(--brand)]" />}
+          <h3 className="font-display text-[16px] tracking-tight">{title}</h3>
+        </div>
+        {typeof count === "number" && (
+          <span className="text-[12px] tabular-nums text-foreground/50">{count}</span>
+        )}
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+    </motion.div>
+  );
+}
+
+function AddExperienceRow({
+  onAdd,
+}: {
+  onAdd: (e: { role: string; company: string; start: string; end: string }) => void;
+}) {
+  const [role, setRole] = useState("");
+  const [company, setCompany] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const submit = () => {
+    if (!role.trim() || !company.trim()) return;
+    onAdd({
+      role: role.trim(),
+      company: company.trim(),
+      start: start.trim() || "—",
+      end: end.trim() || "Present",
+    });
+    setRole("");
+    setCompany("");
+    setStart("");
+    setEnd("");
+  };
+  return (
+    <div className="mt-1 grid grid-cols-[1fr_1fr_auto_auto_auto] items-center gap-1 rounded-lg border border-dashed border-foreground/15 bg-white/50 px-2 py-2 text-[13px]">
+      <input
+        value={role}
+        onChange={(e) => setRole(e.target.value)}
+        placeholder="Role"
+        className="bg-transparent outline-none placeholder:text-foreground/40"
+      />
+      <input
+        value={company}
+        onChange={(e) => setCompany(e.target.value)}
+        placeholder="Company"
+        className="bg-transparent outline-none placeholder:text-foreground/40"
+      />
+      <input
+        value={start}
+        onChange={(e) => setStart(e.target.value)}
+        placeholder="From"
+        className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
+      />
+      <input
+        value={end}
+        onChange={(e) => setEnd(e.target.value)}
+        placeholder="To"
+        className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
+      />
+      <button
+        onClick={submit}
+        className="grid h-6 w-6 place-items-center rounded-full text-white"
+        style={{ background: "var(--gradient-warm)" }}
+      >
+        <Plus size={11} />
+      </button>
+    </div>
+  );
+}
+
+function AddEducationRow({
+  onAdd,
+}: {
+  onAdd: (e: { degree: string; school: string; start: string; end: string }) => void;
+}) {
+  const [degree, setDegree] = useState("");
+  const [school, setSchool] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const submit = () => {
+    if (!degree.trim() || !school.trim()) return;
+    onAdd({
+      degree: degree.trim(),
+      school: school.trim(),
+      start: start.trim() || "—",
+      end: end.trim() || "—",
+    });
+    setDegree("");
+    setSchool("");
+    setStart("");
+    setEnd("");
+  };
+  return (
+    <div className="mt-1 grid grid-cols-[1fr_1fr_auto_auto_auto] items-center gap-1 rounded-lg border border-dashed border-foreground/15 bg-white/50 px-2 py-2 text-[13px]">
+      <input
+        value={degree}
+        onChange={(e) => setDegree(e.target.value)}
+        placeholder="Degree"
+        className="bg-transparent outline-none placeholder:text-foreground/40"
+      />
+      <input
+        value={school}
+        onChange={(e) => setSchool(e.target.value)}
+        placeholder="School"
+        className="bg-transparent outline-none placeholder:text-foreground/40"
+      />
+      <input
+        value={start}
+        onChange={(e) => setStart(e.target.value)}
+        placeholder="From"
+        className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
+      />
+      <input
+        value={end}
+        onChange={(e) => setEnd(e.target.value)}
+        placeholder="To"
+        className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
+      />
+      <button
+        onClick={submit}
+        className="grid h-6 w-6 place-items-center rounded-full text-white"
+        style={{ background: "var(--gradient-warm)" }}
+      >
+        <Plus size={11} />
+      </button>
+    </div>
+  );
+}
+
+function AddSimpleRow({
+  placeholderA,
+  placeholderB,
+  onAdd,
+}: {
+  placeholderA: string;
+  placeholderB: string;
+  onAdd: (a: string, b: string) => void;
+}) {
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const submit = () => {
+    if (!a.trim()) return;
+    onAdd(a.trim(), b.trim() || "—");
+    setA("");
+    setB("");
+  };
+  return (
+    <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-1 rounded-lg border border-dashed border-foreground/15 bg-white/50 px-2 py-2 text-[13px]">
+      <input
+        value={a}
+        onChange={(e) => setA(e.target.value)}
+        placeholder={placeholderA}
+        className="bg-transparent outline-none placeholder:text-foreground/40"
+      />
+      <input
+        value={b}
+        onChange={(e) => setB(e.target.value)}
+        placeholder={placeholderB}
+        className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
+      />
+      <button
+        onClick={submit}
+        className="grid h-6 w-6 place-items-center rounded-full text-white"
+        style={{ background: "var(--gradient-warm)" }}
+      >
+        <Plus size={11} />
+      </button>
+    </div>
+  );
+}

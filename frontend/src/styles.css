@@ -1,0 +1,307 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-coral: var(--coral);
+  --color-coral-soft: var(--coral-soft);
+  --color-sage: var(--sage);
+  --color-sage-soft: var(--sage-soft);
+  --color-teal: var(--teal);
+  --color-bone: var(--bone);
+  --color-navy: var(--navy);
+  --color-ink: var(--ink);
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Inter Tight", system-ui, sans-serif;
+}
+
+:root {
+  --radius: 1rem;
+
+  /* Canvas — white with a single blue family. */
+  --bone: oklch(0.995 0.002 240);
+  --bone-soft: oklch(0.98 0.005 240);
+  --ink: oklch(0.24 0.06 250);
+  --ink-soft: oklch(0.48 0.04 250);
+  --navy: oklch(0.28 0.09 250);
+
+  /* Single muted LinkedIn-blue family — everything is one accent.
+     We keep legacy variable names so the rest of the app keeps working,
+     but they all point to a coherent blue scale. */
+  --brand: oklch(0.55 0.13 250); /* muted LinkedIn blue */
+  --brand-soft: oklch(0.78 0.08 245);
+  --brand-deep: oklch(0.42 0.13 252);
+  --brand-tint: oklch(0.94 0.025 245);
+
+  --sage: var(--brand-soft);
+  --sage-soft: oklch(0.9 0.05 245);
+  --teal: var(--brand);
+  --coral: var(--brand-deep);
+  --coral-soft: var(--brand-soft);
+
+  /* Legacy "warm" names — remapped to the same blue family so any
+     residual reference reads as the accent, not orange/red. */
+  --amber: var(--brand);
+  --amber-soft: var(--brand-soft);
+  --rose: var(--brand-deep);
+  --rose-soft: var(--brand-soft);
+
+  --background: var(--bone);
+  --foreground: var(--ink);
+  --card: oklch(1 0 0 / 0.78);
+  --card-foreground: var(--ink);
+  --popover: oklch(1 0 0 / 0.96);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: var(--brand-soft);
+  --secondary-foreground: var(--ink);
+  --muted: oklch(0.97 0.012 245);
+  --muted-foreground: oklch(0.48 0.03 250);
+  --accent: var(--brand);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.6 0.2 25);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.24 0.06 250 / 0.1);
+  --input: oklch(0.24 0.06 250 / 0.14);
+  --ring: var(--brand);
+
+  /* Muted blue gradients used as the single accent for buttons + highlights. */
+  --gradient-accent: linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%);
+  --gradient-accent-soft: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--brand) 12%, transparent),
+    color-mix(in oklab, var(--brand-deep) 10%, transparent)
+  );
+  --gradient-warm: linear-gradient(135deg, var(--brand) 0%, var(--brand-deep) 100%);
+  --gradient-warm-soft: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--brand) 14%, transparent),
+    color-mix(in oklab, var(--brand-deep) 10%, transparent)
+  );
+  --gradient-aurora: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--brand-soft) 60%, white) 0%,
+    var(--brand) 60%,
+    var(--brand-deep) 100%
+  );
+
+  --shadow-card:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset, 0 12px 28px -22px oklch(0.24 0.08 250 / 0.18),
+    0 1px 2px oklch(0.24 0.08 250 / 0.05);
+  --shadow-elevated:
+    0 1px 0 rgba(255, 255, 255, 1) inset, 0 24px 50px -34px oklch(0.24 0.08 250 / 0.22),
+    0 3px 8px oklch(0.24 0.08 250 / 0.06);
+}
+
+.dark {
+  --background: var(--bone);
+  --foreground: var(--ink);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  html {
+    overflow-x: hidden;
+  }
+  html {
+    color: var(--ink);
+    background: #ffffff;
+  }
+  body {
+    background: #ffffff;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  @media (max-width: 1023px) {
+    body {
+      overflow: auto;
+    }
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+    font-feature-settings: "ss01";
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .h-hero {
+    font-family: var(--font-display);
+    font-feature-settings: "ss01";
+    font-size: clamp(2.25rem, 6.4vw, 4rem);
+    line-height: 0.98;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .h-stage {
+    font-family: var(--font-display);
+    font-feature-settings: "ss01";
+    font-size: clamp(1.5rem, 3vw, 2.25rem);
+    line-height: 1.02;
+    letter-spacing: -0.015em;
+  }
+  .h-card {
+    font-family: var(--font-display);
+    font-feature-settings: "ss01";
+    font-size: clamp(1.15rem, 2vw, 1.55rem);
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+  }
+  .eyebrow {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: color-mix(in oklab, var(--ink) 55%, transparent);
+  }
+
+  /* Liquid glass tuned for a white canvas. */
+  .liquid-glass,
+  .soft-card,
+  .glass {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.85) 0%,
+      rgba(255, 255, 255, 0.62) 100%
+    );
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid color-mix(in oklab, var(--brand) 14%, white);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 1) inset,
+      0 -1px 0 rgba(255, 255, 255, 0.35) inset,
+      0 14px 32px -22px oklch(0.24 0.08 250 / 0.2),
+      0 2px 6px oklch(0.24 0.08 250 / 0.05);
+  }
+  .liquid-glass-strong,
+  .soft-card-elevated,
+  .glass-strong {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0.78) 100%
+    );
+    backdrop-filter: blur(16px) saturate(145%);
+    -webkit-backdrop-filter: blur(16px) saturate(145%);
+    border: 1px solid color-mix(in oklab, var(--brand) 18%, white);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 1) inset,
+      0 22px 50px -32px oklch(0.24 0.08 250 / 0.26),
+      0 3px 10px oklch(0.24 0.08 250 / 0.06);
+  }
+  .liquid-glass-tint {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0.55) 100%),
+      var(--gradient-warm-soft);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid color-mix(in oklab, var(--brand) 22%, white);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 1) inset,
+      0 14px 32px -22px oklch(0.24 0.08 250 / 0.22);
+  }
+
+  .pill {
+    border-radius: 999px;
+  }
+
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.018;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/></svg>");
+  }
+
+  .gradient-text,
+  .gradient-text-warm {
+    background: var(--gradient-warm);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .bento-tile {
+    position: relative;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(255, 255, 255, 0.72) 100%
+    );
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid color-mix(in oklab, var(--brand) 16%, white);
+    border-radius: 1.25rem;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 1) inset,
+      0 14px 32px -22px oklch(0.24 0.08 250 / 0.2);
+    transition:
+      transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 280ms ease,
+      border-color 280ms ease;
+    overflow: hidden;
+  }
+  .bento-tile:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 1) inset,
+      0 24px 50px -28px oklch(0.24 0.08 250 / 0.28);
+    border-color: color-mix(in oklab, var(--brand) 32%, white);
+  }
+
+  .no-scroll-x {
+    overflow-x: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
