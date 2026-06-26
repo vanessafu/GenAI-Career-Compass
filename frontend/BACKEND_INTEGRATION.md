@@ -20,8 +20,11 @@ The typed client lives in `frontend/src/lib/api.ts` (base URL in
 | Entry (upload)     | `POST /api/v1/parse-cv` (multipart `file`) → `CVData` | Seeds the editable Recap lists.                                  |
 | Entry (manual)     | `POST /api/v1/manual-cv` (`ManualCVInput`) → `CVData` | Backend maps the thin form DTO to full `CVData`.                 |
 | Recap (identity)   | `POST /api/v1/prompt-engineering/starter-profile`     | Sends a client-built `ConfirmedCVData`; uses `starter_identity`. |
-| Matching           | `POST /api/v1/roles/match` (`{ cv_data, top_k: 6 }`)  | Requires the populated pgvector DB.                              |
+| Matching           | `POST /api/v1/roles/match` (`{ profile, top_k: 9 }`)   | Requires the populated pgvector DB; returns up to 9 bucketed roles. |
 | Directions / Focus | _from match results_                                  | Rendered from `RoleMatch` (no extra calls).                      |
+
+Balanced matching displays up to 3 roles per bucket, so the response can contain fewer
+than 9 roles when a bucket has fewer qualified candidates.
 
 ### Manual entry (`POST /api/v1/manual-cv`)
 

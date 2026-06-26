@@ -87,7 +87,7 @@ export function MatchingStage() {
           className="flex flex-col items-center text-center"
         >
           <h1 className="h-hero">
-            Finding the best{" "}
+            Finding your strongest{" "}
             <span
               className="italic"
               style={{
@@ -97,7 +97,7 @@ export function MatchingStage() {
                 color: "transparent",
               }}
             >
-              nine roles for you.
+              role matches.
             </span>
           </h1>
         </motion.div>
