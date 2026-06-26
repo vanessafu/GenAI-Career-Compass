@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import unittest
 from unittest.mock import patch
 from pathlib import Path
@@ -20,8 +22,9 @@ from backend.app.features.role_matching.schemas import (
     UserProject,
 )
 from backend.app.features.role_matching.service import (
-    _match_roles_sync,
+    _apply_role_summaries,
     _cert_overlap,
+    _match_roles_sync,
     build_capability_text,
     build_intent_text,
     infer_seniority_gap,
@@ -240,6 +243,64 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
         ]
 
         self.assertEqual([93, 81, 63], scores)
+
+
+class RoleCardSummaryGenerationTests(unittest.TestCase):
+    def test_generated_card_summaries_describe_roles_not_user_fit(self) -> None:
+        role = role_schemas.RoleMatch(
+            role_id=123,
+            job_title="Business Intelligence Analyst",
+            description="Analyzes data to provide insights and support business decision-making.",
+            final_score=0.72,
+            bucket=RecommendationBucket.ready_now,
+            salary="EUR 67k",
+            esco_title="Business analyst",
+            matched_skills=["python", "sql", "tableau"],
+            missing_skills=["business acumen"],
+            matched_domains=["data_analytics"],
+            matched_certifications=["Google Data Analytics Certificate"],
+            signal_breakdown=role_schemas.RoleMatchSignalBreakdown(),
+        )
+        response = role_schemas.RoleMatchResponse(
+            mode=RecommendationMode.balanced,
+            buckets=role_schemas.BucketedRoles(ready_now=[role]),
+        )
+        captured: dict[str, object] = {}
+
+        async def fake_parse_structured(messages, response_format, **kwargs):
+            captured["messages"] = messages
+            captured["payload"] = json.loads(messages[1]["content"])
+            return role_schemas.RoleSummaryBatch(
+                summaries=[
+                    role_schemas.RoleSummaryItem(
+                        role_id="123",
+                        summary=(
+                            "Designs dashboards for business leaders. "
+                            "Uses Python, SQL, and Tableau for analysis."
+                        ),
+                    )
+                ]
+            )
+
+        with patch(
+            "backend.app.features.role_matching.service.openai_client.parse_structured",
+            fake_parse_structured,
+        ):
+            asyncio.run(_apply_role_summaries(sample_profile(), response))
+
+        system_prompt = captured["messages"][0]["content"]  # type: ignore[index]
+        payload = captured["payload"]  # type: ignore[assignment]
+        payload_role = payload["roles"][0]  # type: ignore[index]
+
+        self.assertIn("one present-tense sentence", system_prompt)
+        self.assertIn("Do not mention the user", system_prompt)
+        self.assertIn("Do not list skills", system_prompt)
+        self.assertNotIn("profile", payload)
+        self.assertEqual(
+            {"role_id", "title", "esco_title", "description"},
+            set(payload_role),
+        )
+        self.assertEqual("Designs dashboards for business leaders.", role.description)
 
 
 class CleanProfileTextBuilderTests(unittest.TestCase):

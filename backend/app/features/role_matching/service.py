@@ -32,6 +32,7 @@ from backend.app.features.role_matching.schemas import (
 logger = logging.getLogger("CareerCompass.RoleMatching.Service")
 
 _MAX_TEXT = 700
+_MAX_ROLE_CARD_SUMMARY = 150
 
 DOMAIN_KEYWORDS: dict[str, tuple[str, ...]] = {
     "architecture": ("architect", "architecture", "system design", "distributed systems"),
@@ -166,6 +167,19 @@ def _truncate(value: str, max_chars: int = _MAX_TEXT) -> str:
     if len(cleaned) <= max_chars:
         return cleaned
     return cleaned[:max_chars].rsplit(" ", 1)[0] + " ..."
+
+
+def _clean_role_card_summary(value: Any) -> str | None:
+    cleaned = _clean_text(value)
+    if not cleaned:
+        return None
+    sentence_end = re.search(r"[.!?](?:\s|$)", cleaned)
+    if sentence_end:
+        cleaned = cleaned[: sentence_end.end()].strip()
+    if len(cleaned) <= _MAX_ROLE_CARD_SUMMARY:
+        return cleaned
+    shortened = cleaned[: _MAX_ROLE_CARD_SUMMARY - 3].rsplit(" ", 1)[0].rstrip(" ,;:-")
+    return f"{shortened}..."
 
 
 def _format_salary(monthly_gross_eur: Any) -> str:
@@ -591,7 +605,7 @@ def _candidate_from_row(
     return Candidate(
         role_id=role_id,
         job_title=row.get("job_title") or "",
-        description=row.get("job_description") or "",
+        description=_clean_role_card_summary(row.get("job_description")) or "",
         salary=_format_salary(row.get("salary_median_monthly_gross_eur")),
         esco_title=row.get("esco_title") or "",
         esco_uri=row.get("esco_uri") or "",
@@ -680,32 +694,21 @@ def _selected_roles(response: RoleMatchResponse) -> list[RoleMatch]:
     ]
 
 
-def _summary_payload(profile: UserCareerProfile, roles: list[RoleMatch]) -> dict[str, Any]:
+def _summary_payload(roles: list[RoleMatch]) -> dict[str, Any]:
     return {
-        "profile": {
-            "career_identity": profile.career_identity.model_dump(),
-            "skills": profile.skills[:30],
-            "interests": profile.interests[:20],
-        },
         "roles": [
             {
                 "role_id": str(role.role_id),
                 "title": role.job_title,
-                "bucket": role.bucket.value,
-                "salary": role.salary,
                 "esco_title": role.esco_title,
-                "description": _truncate(role.description, 500),
-                "matched_skills": role.matched_skills[:8],
-                "missing_skills": role.missing_skills[:8],
-                "matched_domains": role.matched_domains[:6],
-                "matched_certifications": role.matched_certifications[:4],
+                "description": _clean_role_card_summary(role.description) or "",
             }
             for role in roles
         ],
     }
 
 
-async def _apply_role_summaries(profile: UserCareerProfile, response: RoleMatchResponse) -> None:
+async def _apply_role_summaries(_profile: UserCareerProfile, response: RoleMatchResponse) -> None:
     roles = _selected_roles(response)
     if not roles:
         return
@@ -716,13 +719,16 @@ async def _apply_role_summaries(profile: UserCareerProfile, response: RoleMatchR
                 {
                     "role": "system",
                     "content": (
-                        "Write one concise, evidence-backed role summary per role. "
-                        "Use only the supplied role data and profile context. "
-                        "Do not invent salary, certifications, or requirements. "
-                        "Each summary must be one sentence under 28 words."
+                        "Write one role-card description per role. "
+                        "Each summary must be one present-tense sentence under 18 words and 150 characters. "
+                        "Describe what the role does. "
+                        "Do not mention the user, candidate, profile, fit, readiness, matched skills, "
+                        "missing skills, salary, certifications, or recommendations. "
+                        "Do not list skills. "
+                        "Use only supplied role title, ESCO title, and catalog description."
                     ),
                 },
-                {"role": "user", "content": json.dumps(_summary_payload(profile, roles))},
+                {"role": "user", "content": json.dumps(_summary_payload(roles))},
             ],
             response_format=RoleSummaryBatch,
             model_purpose="role_description",
@@ -737,7 +743,7 @@ async def _apply_role_summaries(profile: UserCareerProfile, response: RoleMatchR
     summaries = {
         item.role_id: cleaned
         for item in generated.summaries
-        if (cleaned := _clean_text(item.summary))
+        if (cleaned := _clean_role_card_summary(item.summary))
     }
     for role in roles:
         summary = summaries.get(str(role.role_id))
