@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useStageStore } from "@/state/useStageStore";
 import {
   ArrowRight,
@@ -19,6 +19,7 @@ import {
   GraduationCap,
   Award,
   FolderGit2,
+  PencilLine,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -63,6 +64,7 @@ export function RecapStage() {
 
   const [newSkill, setNewSkill] = useState("");
   const [newInterest, setNewInterest] = useState("");
+  const leadTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const archetype = identity?.archetype ?? (identityLoading ? "…" : "professional");
   const lead =
@@ -70,6 +72,13 @@ export function RecapStage() {
     (identityLoading
       ? "Generating your career identity…"
       : "We mapped your profile to realistic next roles.");
+
+  useLayoutEffect(() => {
+    const textarea = leadTextareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [lead]);
 
   return (
     <div className="relative w-full px-6 pb-6 pt-[max(5rem,calc(env(safe-area-inset-top)+4rem))] sm:px-10 lg:px-14 lg:pt-20">
@@ -113,22 +122,30 @@ export function RecapStage() {
                 {archetype}
               </span>
             </p>
-            <textarea
-              aria-label="Career context"
-              value={lead}
-              disabled={identityLoading && !identity}
-              onChange={(e) => setIdentityLead(e.target.value)}
-              className="mt-2 min-h-[4.5rem] w-full resize-none rounded-xl border border-foreground/10 bg-white/65 px-3 py-2 text-[13.5px] leading-snug text-foreground/70 outline-none transition placeholder:text-foreground/35 focus:border-[color:var(--brand)]/35 focus:bg-white/80"
-            />
+            <div className="group relative mt-2">
+              <textarea
+                ref={leadTextareaRef}
+                aria-label="Career context"
+                value={lead}
+                disabled={identityLoading && !identity}
+                onChange={(e) => setIdentityLead(e.target.value)}
+                className="block min-h-[4.5rem] w-full cursor-text resize-none overflow-hidden rounded-xl border border-foreground/10 bg-white/65 px-3 py-2 pr-9 text-[13.5px] leading-snug text-foreground/70 outline-none transition placeholder:text-foreground/35 hover:border-[color:var(--brand)]/25 focus:border-[color:var(--brand)]/35 focus:bg-white/80"
+              />
+              <PencilLine
+                aria-hidden="true"
+                size={14}
+                className="pointer-events-none absolute right-3 top-2.5 text-foreground/35 transition group-hover:text-[color:var(--brand)] group-focus-within:text-[color:var(--brand)]"
+              />
+            </div>
           </div>
         </motion.div>
 
-        {/* Two-row grid that fills the screen. */}
-        <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,3fr)_minmax(0,4fr)] gap-3">
+        {/* Two-row grid with a content-sized recap row. */}
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3">
           {/* Row 1 — Education (left) + Experience (right). */}
-          <div className="grid min-h-0 gap-3 lg:grid-cols-2">
+          <div className="grid gap-3 lg:grid-cols-2">
             <SectionCard icon={GraduationCap} title="Education" count={educations.length}>
-              <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
+              <div className="flex flex-col gap-1.5">
                 <AnimatePresence initial={false}>
                   {educations.map((e, i) => (
                     <RowItem
@@ -147,7 +164,7 @@ export function RecapStage() {
             </SectionCard>
 
             <SectionCard icon={Briefcase} title="Experience" count={experiences.length}>
-              <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
+              <div className="flex flex-col gap-1.5">
                 <AnimatePresence initial={false}>
                   {experiences.map((e, i) => (
                     <RowItem
