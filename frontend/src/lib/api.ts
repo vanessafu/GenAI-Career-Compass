@@ -298,6 +298,7 @@ export type GapReport = {
   role_id: string | number;
   job_title: string;
   job_description: string | null;
+  domain_tags: string[];
   overall_readiness: number;
   readiness_score: number;
   bucket: string;

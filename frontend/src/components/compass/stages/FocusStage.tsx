@@ -11,10 +11,8 @@ export function FocusStage() {
   const setStage = useStageStore((s) => s.setStage);
   const selectedIds = useStageStore((s) => s.selectedRoleIds);
   const roleMatches = useStageStore((s) => s.roleMatches);
-  const matchAnalysis = useStageStore((s) => s.matchAnalysis);
   const cvData = useStageStore((s) => s.cvData);
   const roleGapReports = useStageStore((s) => s.roleGapReports);
-  const roleGapLoading = useStageStore((s) => s.roleGapLoading);
   const roleGapErrors = useStageStore((s) => s.roleGapErrors);
   const careerPathReports = useStageStore((s) => s.careerPathReports);
   const careerPathLoading = useStageStore((s) => s.careerPathLoading);
@@ -95,9 +93,7 @@ export function FocusStage() {
       {gapRole && (
         <RoleDetailModal
           role={gapRole}
-          analysis={matchAnalysis}
           gapReport={roleGapReports[gapRole.id] ?? null}
-          gapLoading={!!roleGapLoading[gapRole.id]}
           gapError={roleGapErrors[gapRole.id] ?? null}
           open={!!gapRole}
           onClose={() => setGapRole(null)}

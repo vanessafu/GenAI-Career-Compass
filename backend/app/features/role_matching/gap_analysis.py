@@ -32,7 +32,7 @@ from backend.app.features.role_matching.schemas import (
     SkillDimension,
     SkillGap,
 )
-from backend.app.features.role_matching.service import as_cv_data, extract_user_skills
+from backend.app.features.role_matching.service import _listify, as_cv_data, extract_user_skills
 from backend.app.features.role_matching.skill_ontology import get_ontology
 
 logger = logging.getLogger("CareerCompass.GapAnalysis")
@@ -321,6 +321,7 @@ def analyze_role_gap(
         role_id=role_id,
         job_title=role["job_title"],
         job_description=role.get("job_description"),
+        domain_tags=_listify(role.get("domain_tags")),
         overall_readiness=readiness,
         skills=skills,
         certifications=certs,

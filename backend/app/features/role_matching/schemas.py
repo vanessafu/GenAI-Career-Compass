@@ -347,6 +347,7 @@ class GapReport(BaseModel):
     role_id: str | int
     job_title: str
     job_description: Optional[str] = None
+    domain_tags: list[str] = Field(default_factory=list)
     overall_readiness: float = 0.0
     readiness_score: float = 0.0
     bucket: RecommendationBucket = RecommendationBucket.ASPIRATIONAL

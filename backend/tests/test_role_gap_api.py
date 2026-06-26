@@ -34,6 +34,7 @@ def test_gap_analysis_endpoint_returns_report(monkeypatch):
             role_id=role_id,
             job_title="Backend Engineer",
             overall_readiness=0.75,
+            domain_tags=["backend", "cloud"],
         )
 
     from backend.app.features.role_matching import router as role_router
@@ -47,6 +48,7 @@ def test_gap_analysis_endpoint_returns_report(monkeypatch):
     assert response.json()["role_id"] == 42
     assert response.json()["job_title"] == "Backend Engineer"
     assert response.json()["overall_readiness"] == 0.75
+    assert response.json()["domain_tags"] == ["backend", "cloud"]
 
 
 def test_gap_analysis_endpoint_returns_404_for_missing_role(monkeypatch):
