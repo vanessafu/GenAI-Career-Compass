@@ -394,7 +394,11 @@ function emptyProject(): Project {
 /* ───────────────────────────  Confirmation  ────────────────────────────── */
 
 /** Wrap a CVData in the ConfirmedCVData envelope (mirrors backend to_confirmed_cv_data). */
-export function toConfirmedCvData(cvData: CVData): ConfirmedCVData {
+export function toConfirmedCvData(cvData: CVData, identity?: Identity | null): ConfirmedCVData {
+  const fallback = fallbackIdentity(cvData);
+  const label = textOrNull(identity?.archetype) ?? fallback.archetype;
+  const summary = textOrNull(identity?.lead) ?? fallback.lead;
+
   return {
     confirmed_cv_data: cvData,
     confirmation_metadata: {
@@ -403,5 +407,7 @@ export function toConfirmedCvData(cvData: CVData): ConfirmedCVData {
       skipped_sections: [],
       edited_fields: [],
     },
+    career_identity_statement: `${label}: ${summary}`,
+    career_identity_summary: { label, summary },
   };
 }

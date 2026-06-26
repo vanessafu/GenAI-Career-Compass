@@ -309,6 +309,29 @@ export type GapReport = {
   narrative: GapNarrative | null;
 };
 
+export type CareerPathMilestone = {
+  order: number;
+  title: string;
+  timeline: string;
+  rationale: string;
+  skills: string[];
+  projects: string[];
+};
+
+export type CareerPathReport = {
+  role_id: string | number;
+  current_profile_summary: string;
+  target_role: string;
+  readiness_score: number;
+  top_gaps: string[];
+  milestones: CareerPathMilestone[];
+  recommended_projects: string[];
+  skills_to_learn: string[];
+  certifications: string[];
+  estimated_timeline: string;
+  requirement_breakdown: GapReport;
+};
+
 type CareerResultsV1 = {
   results: RoleMatch[];
 };
@@ -440,6 +463,20 @@ export async function getRoleGapAnalysis(
       body: JSON.stringify(confirmedProfile),
     },
   );
+  if (!response.ok) await parseError(response);
+  return response.json();
+}
+
+/** Build a grounded career roadmap for one selected role and confirmed profile. */
+export async function getCareerPath(
+  roleId: string | number,
+  confirmedProfile: ConfirmedCVData,
+): Promise<CareerPathReport> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/roles/${encodeURIComponent(String(roleId))}/career-path`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(confirmedProfile),
+  });
   if (!response.ok) await parseError(response);
   return response.json();
 }

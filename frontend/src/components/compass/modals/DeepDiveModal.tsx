@@ -7,12 +7,14 @@ export function DeepDiveModal({
   onClose,
   title,
   subtitle,
+  wide = false,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   subtitle?: string;
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   const [desktop, setDesktop] = useState(true);
@@ -51,7 +53,9 @@ export function DeepDiveModal({
             transition={{ type: "spring", stiffness: 260, damping: 28 }}
             className={
               desktop
-                ? "fixed right-4 top-20 bottom-6 z-50 w-[clamp(420px,42vw,640px)]"
+                ? wide
+                  ? "fixed inset-x-4 top-20 bottom-6 z-50 mx-auto max-w-[1180px]"
+                  : "fixed right-4 top-20 bottom-6 z-50 w-[clamp(420px,42vw,640px)]"
                 : "fixed inset-x-3 bottom-3 z-50 max-h-[88dvh]"
             }
           >

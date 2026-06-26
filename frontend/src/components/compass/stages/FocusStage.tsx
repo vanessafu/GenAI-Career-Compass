@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useStageStore } from "@/state/useStageStore";
 import { roleMatchesToViews } from "@/lib/roleView";
 import type { RoleView } from "@/types";
+import { CareerRoadmapModal } from "../modals/CareerRoadmapModal";
 import { RoleDetailModal } from "../modals/RoleDetailModal";
 import { ArrowLeft, ChevronRight, Sparkles, BookOpen } from "lucide-react";
 
@@ -15,8 +16,13 @@ export function FocusStage() {
   const roleGapReports = useStageStore((s) => s.roleGapReports);
   const roleGapLoading = useStageStore((s) => s.roleGapLoading);
   const roleGapErrors = useStageStore((s) => s.roleGapErrors);
+  const careerPathReports = useStageStore((s) => s.careerPathReports);
+  const careerPathLoading = useStageStore((s) => s.careerPathLoading);
+  const careerPathErrors = useStageStore((s) => s.careerPathErrors);
   const loadRoleGapAnalysis = useStageStore((s) => s.loadRoleGapAnalysis);
-  const [detailRole, setDetailRole] = useState<RoleView | null>(null);
+  const loadCareerPath = useStageStore((s) => s.loadCareerPath);
+  const [gapRole, setGapRole] = useState<RoleView | null>(null);
+  const [roadmapRole, setRoadmapRole] = useState<RoleView | null>(null);
 
   const startRole = cvData?.personal_info.current_role?.trim() || "your current profile";
 
@@ -27,8 +33,12 @@ export function FocusStage() {
   }, [roleMatches, selectedIds]);
 
   useEffect(() => {
-    if (detailRole) void loadRoleGapAnalysis(detailRole.id);
-  }, [detailRole, loadRoleGapAnalysis]);
+    if (gapRole) void loadRoleGapAnalysis(gapRole.id);
+  }, [gapRole, loadRoleGapAnalysis]);
+
+  useEffect(() => {
+    if (roadmapRole) void loadCareerPath(roadmapRole.id);
+  }, [roadmapRole, loadCareerPath]);
 
   return (
     <div className="relative flex w-full flex-col px-6 pb-8 pt-[max(5.5rem,calc(env(safe-area-inset-top)+4.5rem))] sm:px-10 lg:px-16 lg:pt-24">
@@ -71,20 +81,37 @@ export function FocusStage() {
           style={{ gridTemplateRows: `repeat(${Math.max(paths.length, 1)}, minmax(0, 1fr))` }}
         >
           {paths.map((role, i) => (
-            <PathCard key={role.id} role={role} index={i} onDetails={() => setDetailRole(role)} />
+            <PathCard
+              key={role.id}
+              role={role}
+              index={i}
+              onGap={() => setGapRole(role)}
+              onRoadmap={() => setRoadmapRole(role)}
+            />
           ))}
         </div>
       </div>
 
-      {detailRole && (
+      {gapRole && (
         <RoleDetailModal
-          role={detailRole}
+          role={gapRole}
           analysis={matchAnalysis}
-          gapReport={roleGapReports[detailRole.id] ?? null}
-          gapLoading={!!roleGapLoading[detailRole.id]}
-          gapError={roleGapErrors[detailRole.id] ?? null}
-          open={!!detailRole}
-          onClose={() => setDetailRole(null)}
+          gapReport={roleGapReports[gapRole.id] ?? null}
+          gapLoading={!!roleGapLoading[gapRole.id]}
+          gapError={roleGapErrors[gapRole.id] ?? null}
+          open={!!gapRole}
+          onClose={() => setGapRole(null)}
+        />
+      )}
+
+      {roadmapRole && (
+        <CareerRoadmapModal
+          role={roadmapRole}
+          report={careerPathReports[roadmapRole.id] ?? null}
+          loading={!!careerPathLoading[roadmapRole.id]}
+          error={careerPathErrors[roadmapRole.id] ?? null}
+          open={!!roadmapRole}
+          onClose={() => setRoadmapRole(null)}
         />
       )}
     </div>
@@ -94,11 +121,13 @@ export function FocusStage() {
 function PathCard({
   role,
   index,
-  onDetails,
+  onGap,
+  onRoadmap,
 }: {
   role: RoleView;
   index: number;
-  onDetails: () => void;
+  onGap: () => void;
+  onRoadmap: () => void;
 }) {
   return (
     <motion.div
@@ -144,18 +173,29 @@ function PathCard({
         />
       </div>
 
-      <motion.button
-        onClick={onDetails}
-        whileHover={{ y: -1 }}
-        whileTap={{ scale: 0.97 }}
-        className="inline-flex w-fit items-center gap-1.5 self-end rounded-full px-4 py-2 text-[12.5px] font-medium text-white lg:self-center"
-        style={{
-          background: "var(--gradient-warm)",
-          boxShadow: "0 10px 24px -14px color-mix(in oklab, var(--brand-deep) 60%, transparent)",
-        }}
-      >
-        View gap report <ChevronRight size={13} />
-      </motion.button>
+      <div className="flex flex-wrap gap-2 self-end lg:self-center">
+        <motion.button
+          onClick={onGap}
+          whileHover={{ y: -1 }}
+          whileTap={{ scale: 0.97 }}
+          className="inline-flex w-fit items-center gap-1.5 rounded-full border border-[color:var(--brand)]/20 bg-white/70 px-4 py-2 text-[12.5px] font-medium text-[color:var(--brand-deep)]"
+        >
+          Show skill gap <ChevronRight size={13} />
+        </motion.button>
+        <motion.button
+          onClick={onRoadmap}
+          whileHover={{ y: -1 }}
+          whileTap={{ scale: 0.97 }}
+          className="inline-flex w-fit items-center gap-1.5 rounded-full px-4 py-2 text-[12.5px] font-medium text-white"
+          style={{
+            background: "var(--gradient-warm)",
+            boxShadow:
+              "0 10px 24px -14px color-mix(in oklab, var(--brand-deep) 60%, transparent)",
+          }}
+        >
+          Show roadmap <ChevronRight size={13} />
+        </motion.button>
+      </div>
     </motion.div>
   );
 }

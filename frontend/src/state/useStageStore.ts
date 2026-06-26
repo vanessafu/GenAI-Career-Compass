@@ -1,10 +1,12 @@
 import { create } from "zustand";
 import {
   ApiError,
+  getCareerPath,
   getRoleGapAnalysis,
   matchRoles,
   parseCv,
   submitManualCv,
+  type CareerPathReport,
   type CVData,
   type EmbeddingProfile,
   type GapReport,
@@ -88,6 +90,9 @@ type Store = {
   roleGapReports: Record<string, GapReport>;
   roleGapLoading: Record<string, boolean>;
   roleGapErrors: Record<string, string | null>;
+  careerPathReports: Record<string, CareerPathReport>;
+  careerPathLoading: Record<string, boolean>;
+  careerPathErrors: Record<string, string | null>;
 
   /** Async status for the current network action. */
   loading: boolean;
@@ -100,6 +105,7 @@ type Store = {
   generateIdentity: () => Promise<void>;
   runMatching: () => Promise<boolean>;
   loadRoleGapAnalysis: (roleId: string) => Promise<void>;
+  loadCareerPath: (roleId: string) => Promise<void>;
   reset: () => void;
 };
 
@@ -139,6 +145,9 @@ const initialState = {
   roleGapReports: {} as Record<string, GapReport>,
   roleGapLoading: {} as Record<string, boolean>,
   roleGapErrors: {} as Record<string, string | null>,
+  careerPathReports: {} as Record<string, CareerPathReport>,
+  careerPathLoading: {} as Record<string, boolean>,
+  careerPathErrors: {} as Record<string, string | null>,
   loading: false,
   error: null as string | null,
 };
@@ -217,6 +226,9 @@ export const useStageStore = create<Store>((set, get) => ({
         roleGapReports: {},
         roleGapLoading: {},
         roleGapErrors: {},
+        careerPathReports: {},
+        careerPathLoading: {},
+        careerPathErrors: {},
         loading: false,
       });
       return true;
@@ -247,6 +259,9 @@ export const useStageStore = create<Store>((set, get) => ({
         roleGapReports: {},
         roleGapLoading: {},
         roleGapErrors: {},
+        careerPathReports: {},
+        careerPathLoading: {},
+        careerPathErrors: {},
         loading: false,
       });
       return true;
@@ -300,6 +315,9 @@ export const useStageStore = create<Store>((set, get) => ({
         roleGapReports: {},
         roleGapLoading: {},
         roleGapErrors: {},
+        careerPathReports: {},
+        careerPathLoading: {},
+        careerPathErrors: {},
         loading: false,
       });
       return true;
@@ -323,7 +341,7 @@ export const useStageStore = create<Store>((set, get) => ({
       roleGapErrors: { ...s.roleGapErrors, [roleId]: null },
     }));
     try {
-      const report = await getRoleGapAnalysis(roleId, toConfirmedCvData(outgoing));
+      const report = await getRoleGapAnalysis(roleId, toConfirmedCvData(outgoing, state.identity));
       set((s) => ({
         roleGapReports: { ...s.roleGapReports, [roleId]: report },
         roleGapLoading: { ...s.roleGapLoading, [roleId]: false },
@@ -334,6 +352,38 @@ export const useStageStore = create<Store>((set, get) => ({
         roleGapErrors: {
           ...s.roleGapErrors,
           [roleId]: errorMessage(err, "Gap analysis is unavailable."),
+        },
+      }));
+    }
+  },
+
+  loadCareerPath: async (roleId) => {
+    const state = get();
+    if (state.careerPathReports[roleId] || state.careerPathLoading[roleId]) return;
+    const outgoing = buildOutgoingCvData(state);
+    if (!outgoing) {
+      set((s) => ({
+        careerPathErrors: { ...s.careerPathErrors, [roleId]: "No CV data to map." },
+      }));
+      return;
+    }
+
+    set((s) => ({
+      careerPathLoading: { ...s.careerPathLoading, [roleId]: true },
+      careerPathErrors: { ...s.careerPathErrors, [roleId]: null },
+    }));
+    try {
+      const report = await getCareerPath(roleId, toConfirmedCvData(outgoing, state.identity));
+      set((s) => ({
+        careerPathReports: { ...s.careerPathReports, [roleId]: report },
+        careerPathLoading: { ...s.careerPathLoading, [roleId]: false },
+      }));
+    } catch (err) {
+      set((s) => ({
+        careerPathLoading: { ...s.careerPathLoading, [roleId]: false },
+        careerPathErrors: {
+          ...s.careerPathErrors,
+          [roleId]: errorMessage(err, "Career roadmap is unavailable."),
         },
       }));
     }

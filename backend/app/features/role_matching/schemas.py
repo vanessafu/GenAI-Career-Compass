@@ -342,3 +342,29 @@ class GapReport(BaseModel):
     grounding_used: list[str] = Field(default_factory=list)
     action_plan: list[GapActionItem] = Field(default_factory=list)
     narrative: Optional[GapNarrative] = None
+
+
+class CareerPathMilestone(BaseModel):
+    order: int = Field(ge=1)
+    title: str
+    timeline: str = ""
+    rationale: str = ""
+    skills: list[str] = Field(default_factory=list)
+    projects: list[str] = Field(default_factory=list)
+
+
+class CareerPathDraft(BaseModel):
+    milestones: list[CareerPathMilestone] = Field(default_factory=list)
+    recommended_projects: list[str] = Field(default_factory=list)
+    estimated_timeline: str = ""
+    certifications: list[str] = Field(default_factory=list)
+
+
+class CareerPathReport(CareerPathDraft):
+    role_id: str | int
+    current_profile_summary: str
+    target_role: str
+    readiness_score: float = 0.0
+    top_gaps: list[str] = Field(default_factory=list)
+    skills_to_learn: list[str] = Field(default_factory=list)
+    requirement_breakdown: GapReport
