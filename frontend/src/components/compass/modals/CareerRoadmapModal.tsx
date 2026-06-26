@@ -21,9 +21,7 @@ export function CareerRoadmapModal({
     <DeepDiveModal open={open} onClose={onClose} title={role.title} subtitle="Career roadmap" wide>
       {loading && (
         <ModalBlock className="mb-6">
-          <p className="text-[13px] leading-relaxed text-foreground/60">
-            Preparing roadmap...
-          </p>
+          <p className="text-[13px] leading-relaxed text-foreground/60">Preparing roadmap...</p>
         </ModalBlock>
       )}
 
@@ -49,18 +47,14 @@ function RoadmapContent({ report }: { report: CareerPathReport }) {
       <ModalBlock className="mb-5">
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-foreground/10 pb-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-foreground/45">
-              Readiness
-            </p>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-foreground/45">Readiness</p>
             <p className="font-display text-4xl tracking-tight text-[color:var(--brand-deep)]">
               {readiness}%
             </p>
           </div>
           {report.estimated_timeline && (
             <div className="text-right">
-              <p className="text-[10px] uppercase tracking-[0.18em] text-foreground/45">
-                Timeline
-              </p>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-foreground/45">Timeline</p>
               <p className="text-[13px] font-medium text-foreground/80">
                 {report.estimated_timeline}
               </p>
@@ -90,9 +84,7 @@ function RoadmapContent({ report }: { report: CareerPathReport }) {
                     {milestone.title}
                   </h4>
                   {milestone.timeline && (
-                    <p className="mt-1 text-[11.5px] text-foreground/50">
-                      {milestone.timeline}
-                    </p>
+                    <p className="mt-1 text-[11.5px] text-foreground/50">{milestone.timeline}</p>
                   )}
                   {milestone.rationale && (
                     <p className="mt-2 text-[12.5px] leading-relaxed text-foreground/65">
@@ -152,9 +144,7 @@ function ListBlock({ title, items }: { title: string; items: string[] }) {
 
 function RequirementBreakdown({ report }: { report: CareerPathReport }) {
   const breakdown = report.requirement_breakdown;
-  const missing = unique(
-    breakdown.skills.skill_gaps.map((gap) => gap.required_skill || gap.skill),
-  );
+  const missing = unique(breakdown.skills.skill_gaps.map((gap) => gap.required_skill || gap.skill));
   const certs = unique(
     [...breakdown.certifications.missing, ...breakdown.certifications.missing_certifications].map(
       (gap) => gap.required_certification || gap.name || gap.normalized_name,

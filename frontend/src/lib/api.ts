@@ -472,11 +472,14 @@ export async function getCareerPath(
   roleId: string | number,
   confirmedProfile: ConfirmedCVData,
 ): Promise<CareerPathReport> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/roles/${encodeURIComponent(String(roleId))}/career-path`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(confirmedProfile),
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/roles/${encodeURIComponent(String(roleId))}/career-path`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(confirmedProfile),
+    },
+  );
   if (!response.ok) await parseError(response);
   return response.json();
 }

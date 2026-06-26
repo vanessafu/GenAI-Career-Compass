@@ -304,8 +304,7 @@ export function EntryStage() {
 
   const buildManualProfile = async () => {
     if (parsing) return;
-    const parsedYears =
-      yearsOfExperience.trim() === "" ? null : Number(yearsOfExperience);
+    const parsedYears = yearsOfExperience.trim() === "" ? null : Number(yearsOfExperience);
     if (!role.trim()) {
       setFormError("Add your current role.");
       return;
@@ -314,7 +313,12 @@ export function EntryStage() {
       setFormError("Select your seniority.");
       return;
     }
-    if (parsedYears === null || !Number.isInteger(parsedYears) || parsedYears < 0 || parsedYears > 80) {
+    if (
+      parsedYears === null ||
+      !Number.isInteger(parsedYears) ||
+      parsedYears < 0 ||
+      parsedYears > 80
+    ) {
       setFormError("Add years of experience as a whole number from 0 to 80.");
       return;
     }
@@ -544,37 +548,37 @@ export function EntryStage() {
                     placeholder="e.g. Senior Backend Developer"
                   />
                   <div className="grid gap-2.5 sm:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                      Seniority
-                    </span>
-                    <select
-                      value={seniority}
-                      onChange={(e) => setSeniority(e.target.value)}
-                      className="manual-input"
-                    >
-                      <option value="">Select…</option>
-                      {SENIORITY_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                      Years of experience
-                    </span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={80}
-                      value={yearsOfExperience}
-                      onChange={(e) => setYearsOfExperience(e.target.value)}
-                      placeholder="e.g. 5"
-                      className="manual-input"
-                    />
-                  </label>
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+                        Seniority
+                      </span>
+                      <select
+                        value={seniority}
+                        onChange={(e) => setSeniority(e.target.value)}
+                        className="manual-input"
+                      >
+                        <option value="">Select…</option>
+                        {SENIORITY_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+                        Years of experience
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={80}
+                        value={yearsOfExperience}
+                        onChange={(e) => setYearsOfExperience(e.target.value)}
+                        placeholder="e.g. 5"
+                        className="manual-input"
+                      />
+                    </label>
                   </div>
                 </div>
 
@@ -721,9 +725,7 @@ export function EntryStage() {
                   </p>
                   <TagField
                     tags={targetConstraints}
-                    onRemove={(t) =>
-                      setTargetConstraints(targetConstraints.filter((x) => x !== t))
-                    }
+                    onRemove={(t) => setTargetConstraints(targetConstraints.filter((x) => x !== t))}
                     typeahead={
                       <PlainTagInput
                         draft={targetConstraintDraft}

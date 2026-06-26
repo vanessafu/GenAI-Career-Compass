@@ -189,8 +189,7 @@ function PathCard({
           className="inline-flex w-fit items-center gap-1.5 rounded-full px-4 py-2 text-[12.5px] font-medium text-white"
           style={{
             background: "var(--gradient-warm)",
-            boxShadow:
-              "0 10px 24px -14px color-mix(in oklab, var(--brand-deep) 60%, transparent)",
+            boxShadow: "0 10px 24px -14px color-mix(in oklab, var(--brand-deep) 60%, transparent)",
           }}
         >
           Show roadmap <ChevronRight size={13} />
