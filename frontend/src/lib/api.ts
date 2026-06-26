@@ -229,6 +229,86 @@ export type RoleMatchResponse = {
   analysis: string | null;
 };
 
+export type DimensionStatus = "strong" | "partial" | "weak";
+
+export type SkillGap = {
+  skill: string;
+  importance: string;
+  suggestion: string;
+  required_skill: string;
+  user_closest_skill: string | null;
+  transferability: number;
+  severity: string;
+  source: string;
+};
+
+export type SkillDimension = {
+  matched_skills: string[];
+  missing_skills: string[];
+  optional_missing_skills: string[];
+  skill_gaps: SkillGap[];
+  coverage: number;
+  status: DimensionStatus;
+  summary: string;
+};
+
+export type CertificationGap = {
+  name: string;
+  provider: string | null;
+  priority: string;
+  reason: string;
+  required_certification: string;
+  normalized_name: string;
+  user_closest_certification: string | null;
+  similarity: number;
+  status: string;
+};
+
+export type CertificationDimension = {
+  matched_certifications: string[];
+  missing_certifications: CertificationGap[];
+  held: string[];
+  related: CertificationGap[];
+  missing: CertificationGap[];
+  coverage: number;
+  status: DimensionStatus;
+  summary: string;
+};
+
+export type SeniorityDimension = {
+  user_seniority: string;
+  role_seniority: string;
+  fit: string;
+  user_level: string | null;
+  role_level: string | null;
+  user_years: number | null;
+  gap: string;
+  note: string | null;
+  summary: string;
+};
+
+export type GapNarrative = {
+  readiness_summary: string;
+  why_this_role: string;
+  main_gaps: string;
+  next_steps: string;
+};
+
+export type GapReport = {
+  role_id: string | number;
+  job_title: string;
+  job_description: string | null;
+  overall_readiness: number;
+  readiness_score: number;
+  bucket: string;
+  skills: SkillDimension;
+  certifications: CertificationDimension;
+  seniority: SeniorityDimension;
+  grounding_used: string[];
+  action_plan: { title: string; description: string; effort: string; priority: string }[];
+  narrative: GapNarrative | null;
+};
+
 type CareerResultsV1 = {
   results: RoleMatch[];
 };
@@ -345,4 +425,21 @@ export async function matchRoles(profile: UserCareerProfile, topK = 9): Promise<
     matched_roles: payload.results,
     analysis: null,
   };
+}
+
+/** Build a gap report for one selected role and confirmed profile. */
+export async function getRoleGapAnalysis(
+  roleId: string | number,
+  confirmedProfile: ConfirmedCVData,
+): Promise<GapReport> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/roles/${encodeURIComponent(String(roleId))}/gap-analysis`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(confirmedProfile),
+    },
+  );
+  if (!response.ok) await parseError(response);
+  return response.json();
 }

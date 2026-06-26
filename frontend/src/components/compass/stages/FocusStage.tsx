@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useStageStore } from "@/state/useStageStore";
 import { roleMatchesToViews } from "@/lib/roleView";
 import type { RoleView } from "@/types";
@@ -12,6 +12,10 @@ export function FocusStage() {
   const roleMatches = useStageStore((s) => s.roleMatches);
   const matchAnalysis = useStageStore((s) => s.matchAnalysis);
   const cvData = useStageStore((s) => s.cvData);
+  const roleGapReports = useStageStore((s) => s.roleGapReports);
+  const roleGapLoading = useStageStore((s) => s.roleGapLoading);
+  const roleGapErrors = useStageStore((s) => s.roleGapErrors);
+  const loadRoleGapAnalysis = useStageStore((s) => s.loadRoleGapAnalysis);
   const [detailRole, setDetailRole] = useState<RoleView | null>(null);
 
   const startRole = cvData?.personal_info.current_role?.trim() || "your current profile";
@@ -21,6 +25,10 @@ export function FocusStage() {
     if (selectedIds.length === 0) return views.slice(0, 3);
     return views.filter((r) => selectedIds.includes(r.id));
   }, [roleMatches, selectedIds]);
+
+  useEffect(() => {
+    if (detailRole) void loadRoleGapAnalysis(detailRole.id);
+  }, [detailRole, loadRoleGapAnalysis]);
 
   return (
     <div className="relative flex w-full flex-col px-6 pb-8 pt-[max(5.5rem,calc(env(safe-area-inset-top)+4.5rem))] sm:px-10 lg:px-16 lg:pt-24">
@@ -72,6 +80,9 @@ export function FocusStage() {
         <RoleDetailModal
           role={detailRole}
           analysis={matchAnalysis}
+          gapReport={roleGapReports[detailRole.id] ?? null}
+          gapLoading={!!roleGapLoading[detailRole.id]}
+          gapError={roleGapErrors[detailRole.id] ?? null}
           open={!!detailRole}
           onClose={() => setDetailRole(null)}
         />
@@ -143,7 +154,7 @@ function PathCard({
           boxShadow: "0 10px 24px -14px color-mix(in oklab, var(--brand-deep) 60%, transparent)",
         }}
       >
-        View full plan <ChevronRight size={13} />
+        View gap report <ChevronRight size={13} />
       </motion.button>
     </motion.div>
   );

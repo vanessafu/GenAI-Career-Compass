@@ -1,11 +1,13 @@
 import { create } from "zustand";
 import {
   ApiError,
+  getRoleGapAnalysis,
   matchRoles,
   parseCv,
   submitManualCv,
   type CVData,
   type EmbeddingProfile,
+  type GapReport,
   type RoleMatch,
 } from "@/lib/api";
 import {
@@ -15,6 +17,7 @@ import {
   fallbackIdentity,
   identityLeadWithTargetPreferences,
   manualFormToInput,
+  toConfirmedCvData,
   type RecapEdits,
 } from "@/lib/cvData";
 import type {
@@ -82,6 +85,9 @@ type Store = {
   toggleSelectedRole: (id: string) => void;
   selectedRoleId: string | null;
   setSelectedRoleId: (id: string | null) => void;
+  roleGapReports: Record<string, GapReport>;
+  roleGapLoading: Record<string, boolean>;
+  roleGapErrors: Record<string, string | null>;
 
   /** Async status for the current network action. */
   loading: boolean;
@@ -93,6 +99,7 @@ type Store = {
   submitManualProfile: (form: ManualProfileForm) => Promise<boolean>;
   generateIdentity: () => Promise<void>;
   runMatching: () => Promise<boolean>;
+  loadRoleGapAnalysis: (roleId: string) => Promise<void>;
   reset: () => void;
 };
 
@@ -129,6 +136,9 @@ const initialState = {
   matchAnalysis: null as string | null,
   selectedRoleIds: [] as string[],
   selectedRoleId: null as string | null,
+  roleGapReports: {} as Record<string, GapReport>,
+  roleGapLoading: {} as Record<string, boolean>,
+  roleGapErrors: {} as Record<string, string | null>,
   loading: false,
   error: null as string | null,
 };
@@ -200,6 +210,13 @@ export const useStageStore = create<Store>((set, get) => ({
           lead: identityLeadWithTargetPreferences(result.cv_data, identitySummary.summary),
         },
         ...cvDataToRecapEdits(result.cv_data),
+        roleMatches: [],
+        matchAnalysis: null,
+        selectedRoleIds: [],
+        selectedRoleId: null,
+        roleGapReports: {},
+        roleGapLoading: {},
+        roleGapErrors: {},
         loading: false,
       });
       return true;
@@ -223,6 +240,13 @@ export const useStageStore = create<Store>((set, get) => ({
           lead: identityLeadWithTargetPreferences(result.cv_data, identitySummary.summary),
         },
         ...cvDataToRecapEdits(result.cv_data),
+        roleMatches: [],
+        matchAnalysis: null,
+        selectedRoleIds: [],
+        selectedRoleId: null,
+        roleGapReports: {},
+        roleGapLoading: {},
+        roleGapErrors: {},
         loading: false,
       });
       return true;
@@ -273,12 +297,45 @@ export const useStageStore = create<Store>((set, get) => ({
         roleMatches: result.matched_roles,
         matchAnalysis: result.analysis,
         selectedRoleIds: [],
+        roleGapReports: {},
+        roleGapLoading: {},
+        roleGapErrors: {},
         loading: false,
       });
       return true;
     } catch (err) {
       set({ loading: false, error: errorMessage(err, "Role matching is unavailable.") });
       return false;
+    }
+  },
+
+  loadRoleGapAnalysis: async (roleId) => {
+    const state = get();
+    if (state.roleGapReports[roleId] || state.roleGapLoading[roleId]) return;
+    const outgoing = buildOutgoingCvData(state);
+    if (!outgoing) {
+      set((s) => ({ roleGapErrors: { ...s.roleGapErrors, [roleId]: "No CV data to analyze." } }));
+      return;
+    }
+
+    set((s) => ({
+      roleGapLoading: { ...s.roleGapLoading, [roleId]: true },
+      roleGapErrors: { ...s.roleGapErrors, [roleId]: null },
+    }));
+    try {
+      const report = await getRoleGapAnalysis(roleId, toConfirmedCvData(outgoing));
+      set((s) => ({
+        roleGapReports: { ...s.roleGapReports, [roleId]: report },
+        roleGapLoading: { ...s.roleGapLoading, [roleId]: false },
+      }));
+    } catch (err) {
+      set((s) => ({
+        roleGapLoading: { ...s.roleGapLoading, [roleId]: false },
+        roleGapErrors: {
+          ...s.roleGapErrors,
+          [roleId]: errorMessage(err, "Gap analysis is unavailable."),
+        },
+      }));
     }
   },
 

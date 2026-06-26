@@ -2,7 +2,9 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from backend.app.features.role_matching.schemas import CareerResultsV1, RoleMatchRequest
+from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
+from backend.app.features.role_matching.gap_analysis import explain_role_gap
+from backend.app.features.role_matching.schemas import CareerResultsV1, GapReport, RoleMatchRequest
 from backend.app.features.role_matching.service import match_roles_for_profile
 
 router = APIRouter(prefix="/api/v1/roles", tags=["Role Matching"])
@@ -28,4 +30,15 @@ async def match_roles(request: RoleMatchRequest) -> CareerResultsV1:
         return CareerResultsV1.from_bucketed_roles(response.buckets)
     except Exception as exc:
         logger.exception("Role matching failed: %s", exc)
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+@router.post("/{role_id}/gap-analysis", response_model=GapReport)
+async def analyze_role_gap(role_id: int, confirmed_profile: ConfirmedCVData) -> GapReport:
+    try:
+        return await explain_role_gap(role_id, confirmed_profile)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        logger.exception("Gap analysis failed: %s", exc)
         raise HTTPException(status_code=503, detail=str(exc))
