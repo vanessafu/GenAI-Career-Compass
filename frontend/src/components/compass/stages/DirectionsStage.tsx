@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useStageStore, MAX_PICKS } from "@/state/useStageStore";
 import { roleMatchesToViews } from "@/lib/roleView";
 import type { RoleView } from "@/types";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function DirectionsStage() {
@@ -185,27 +185,30 @@ function RoleCard({
         </span>
       </div>
 
-      {(role.salary || role.escoTitle) && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-foreground/55">
-          {role.salary && <span>{role.salary}</span>}
-          {role.escoTitle && <span>ESCO: {role.escoTitle}</span>}
-        </div>
-      )}
-
       {role.summary && (
         <p className="line-clamp-2 text-[12.5px] leading-snug text-foreground/65">{role.summary}</p>
       )}
 
-      {topSkills.length > 0 && (
-        <div className="mt-auto flex flex-wrap gap-1.5 pt-2">
-          {topSkills.map((skill) => (
-            <span
-              key={skill}
-              className="line-clamp-1 max-w-full rounded-full bg-foreground/[0.05] px-2 py-0.5 text-[11px] text-foreground/70"
-            >
-              {skill}
-            </span>
-          ))}
+      {(topSkills.length > 0 || role.salary) && (
+        <div className="mt-auto flex flex-col gap-2 pt-2">
+          {topSkills.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {topSkills.map((skill) => (
+                <span
+                  key={skill}
+                  className="line-clamp-1 max-w-full rounded-full bg-foreground/[0.05] px-2 py-0.5 text-[11px] text-foreground/70"
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+          )}
+          {role.salary && (
+            <div className="flex items-center gap-1.5 text-[12px] text-foreground/55">
+              <Wallet aria-hidden="true" size={13} className="shrink-0" />
+              <span>{role.salary}</span>
+            </div>
+          )}
         </div>
       )}
     </motion.button>
