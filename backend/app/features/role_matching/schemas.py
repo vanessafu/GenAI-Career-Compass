@@ -36,6 +36,21 @@ class ScoringWeights(BaseModel):
 
 DEFAULT_WEIGHTS = ScoringWeights()
 
+_DISPLAY_SCORE_RANGES = {
+    RecommendationBucket.READY_NOW: (90, 98),
+    RecommendationBucket.NEXT_STEP: (76, 89),
+    RecommendationBucket.ASPIRATIONAL: (55, 75),
+}
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _display_matching_score(final_score: float, bucket: RecommendationBucket) -> int:
+    low, high = _DISPLAY_SCORE_RANGES[bucket]
+    return int(round(low + _clamp01(final_score) * (high - low)))
+
 
 def _has_text(value: Optional[str]) -> bool:
     return bool(value and value.strip())
@@ -190,12 +205,11 @@ class CareerResultV1(BaseModel):
 
     @classmethod
     def from_role_match(cls, role: RoleMatch) -> "CareerResultV1":
-        score = max(0.0, min(1.0, role.final_score))
         return cls(
             role_id=role.role_id,
             bucket=role.bucket.value,
             title=role.job_title,
-            matching_score=int(round(score * 100)),
+            matching_score=_display_matching_score(role.final_score, role.bucket),
             salary=role.salary,
             description=role.description,
             esco_title=role.esco_title,

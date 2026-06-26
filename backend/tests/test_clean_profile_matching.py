@@ -195,7 +195,7 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
                         "role_id": 123,
                         "bucket": "ready_now",
                         "title": "Data Engineer",
-                        "matching_score": 95,
+                        "matching_score": 98,
                         "salary": "EUR 95k",
                         "description": "Designs scalable data pipelines.",
                         "esco_title": "Data engineer",
@@ -208,6 +208,38 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
                 ]
             },
         )
+
+    def test_matching_score_is_calibrated_by_recommendation_bucket(self) -> None:
+        roles = [
+            role_schemas.RoleMatch(
+                role_id="ready",
+                job_title="Ready Role",
+                final_score=0.42,
+                bucket=RecommendationBucket.ready_now,
+                signal_breakdown=role_schemas.RoleMatchSignalBreakdown(),
+            ),
+            role_schemas.RoleMatch(
+                role_id="next",
+                job_title="Next Role",
+                final_score=0.42,
+                bucket=RecommendationBucket.next_step,
+                signal_breakdown=role_schemas.RoleMatchSignalBreakdown(),
+            ),
+            role_schemas.RoleMatch(
+                role_id="stretch",
+                job_title="Stretch Role",
+                final_score=0.42,
+                bucket=RecommendationBucket.aspirational,
+                signal_breakdown=role_schemas.RoleMatchSignalBreakdown(),
+            ),
+        ]
+
+        scores = [
+            role_schemas.CareerResultV1.from_role_match(role).matching_score
+            for role in roles
+        ]
+
+        self.assertEqual([93, 81, 63], scores)
 
 
 class CleanProfileTextBuilderTests(unittest.TestCase):
