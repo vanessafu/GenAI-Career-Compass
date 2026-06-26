@@ -39,6 +39,7 @@ const SKILL_ICONS: Record<string, LucideIcon> = {
 export function RecapStage() {
   const setStage = useStageStore((s) => s.setStage);
   const identity = useStageStore((s) => s.identity);
+  const setIdentityLead = useStageStore((s) => s.setIdentityLead);
   const identityLoading = useStageStore((s) => s.identityLoading);
   const skills = useStageStore((s) => s.skills);
   const interests = useStageStore((s) => s.interests);
@@ -112,7 +113,13 @@ export function RecapStage() {
                 {archetype}
               </span>
             </p>
-            <p className="mt-1 text-[13.5px] leading-snug text-foreground/65">{lead}</p>
+            <textarea
+              aria-label="Career context"
+              value={lead}
+              disabled={identityLoading && !identity}
+              onChange={(e) => setIdentityLead(e.target.value)}
+              className="mt-2 min-h-[4.5rem] w-full resize-none rounded-xl border border-foreground/10 bg-white/65 px-3 py-2 text-[13.5px] leading-snug text-foreground/70 outline-none transition placeholder:text-foreground/35 focus:border-[color:var(--brand)]/35 focus:bg-white/80"
+            />
           </div>
         </motion.div>
 

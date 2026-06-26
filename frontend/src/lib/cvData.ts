@@ -221,6 +221,26 @@ function uniqueText(values: Iterable<string | null | undefined>): string[] {
   return out;
 }
 
+function targetPreferences(cv: CVData): string[] {
+  return uniqueText(
+    cv.unmapped_information
+      .filter((item) => item.label === "target_constraint")
+      .map((item) => item.value),
+  );
+}
+
+export function identityLeadWithTargetPreferences(
+  cv: CVData,
+  lead: string | null | undefined,
+): string {
+  const base = textOrNull(lead) ?? fallbackIdentity(cv).lead;
+  const preferences = targetPreferences(cv);
+  if (preferences.length === 0) return base;
+
+  const line = `Target preferences: ${preferences.join(", ")}`;
+  return base.includes(line) ? base : `${base}\n\n${line}`;
+}
+
 /** Project edited CVData into the clean profile schema expected by role matching. */
 export function cvDataToUserCareerProfile(
   cv: CVData,
