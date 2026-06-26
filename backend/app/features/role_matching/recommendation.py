@@ -32,6 +32,8 @@ class Candidate:
     job_title: str
     description: str = ""
     salary: str = ""
+    esco_title: str = ""
+    esco_uri: str = ""
     required_skills: list[str] = field(default_factory=list)
     domain_tags: list[str] = field(default_factory=list)
     role_certifications: list[str] = field(default_factory=list)
@@ -125,6 +127,8 @@ def _to_match(candidate: Candidate) -> RoleMatch:
         description=candidate.description or "",
         final_score=round(candidate.final_score, 4),
         salary=candidate.salary or "",
+        esco_title=candidate.esco_title or "",
+        esco_uri=candidate.esco_uri or "",
         bucket=candidate.bucket,
         matched_skills=candidate.matched_skills,
         missing_skills=candidate.missing_skills,

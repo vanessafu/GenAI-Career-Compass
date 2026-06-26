@@ -16,13 +16,16 @@ import re
 from collections import defaultdict
 from typing import Any, Iterable
 
+from backend.app.core import openai_client
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
 from backend.app.features.cv_parsing.schemas import CVData
 from backend.app.features.role_matching.recommendation import Candidate, recommend
 from backend.app.features.role_matching.schemas import (
     RecommendationMode,
+    RoleMatch,
     RoleMatchDebug,
     RoleMatchResponse,
+    RoleSummaryBatch,
     UserCareerProfile,
 )
 
@@ -458,12 +461,22 @@ def _fetch_catalog(
             cr.raw_skills,
             cr.domain_tags,
             rs.salary_median_monthly_gross_eur,
+            esco.esco_title,
+            esco.esco_uri,
             1 - (cr.capability_embedding <=> %(v_capability)s::vector) AS capability_vector_similarity,
             1 - (cr.intent_embedding <=> %(v_intent)s::vector) AS intent_vector_similarity
         FROM career_roles cr
         LEFT JOIN role_salaries rs
           ON rs.role_id = cr.role_id
          AND rs.region = 'Deutschland'
+        LEFT JOIN LATERAL (
+            SELECT COALESCE(em.esco_title, eo.name) AS esco_title, em.esco_uri
+            FROM esco_mappings em
+            JOIN esco_occupations eo ON eo.esco_uri = em.esco_uri
+            WHERE em.role_id = cr.role_id
+            ORDER BY COALESCE(em.esco_title, eo.name), em.esco_uri
+            LIMIT 1
+        ) esco ON TRUE
         WHERE cr.capability_embedding IS NOT NULL
           AND cr.intent_embedding IS NOT NULL
     """
@@ -580,6 +593,8 @@ def _candidate_from_row(
         job_title=row.get("job_title") or "",
         description=row.get("job_description") or "",
         salary=_format_salary(row.get("salary_median_monthly_gross_eur")),
+        esco_title=row.get("esco_title") or "",
+        esco_uri=row.get("esco_uri") or "",
         capability_vector_similarity=float(row.get("capability_vector_similarity") or 0.0),
         intent_vector_similarity=float(row.get("intent_vector_similarity") or 0.0),
         normalized_skill_overlap=skill_overlap,
@@ -629,7 +644,12 @@ def _match_roles_sync(
         for row in roles
     ]
 
-    buckets = recommend(candidates, top_k=top_k, mode=mode)
+    buckets = recommend(
+        candidates,
+        top_k=None if top_k == 9 and mode == RecommendationMode.BALANCED else top_k,
+        mode=mode,
+        per_bucket=3 if top_k == 9 and mode == RecommendationMode.BALANCED else None,
+    )
     logger.info(
         "Matched %d roles -> ready=%d next=%d aspirational=%d",
         len(candidates),
@@ -652,11 +672,85 @@ def _match_roles_sync(
     )
 
 
+def _selected_roles(response: RoleMatchResponse) -> list[RoleMatch]:
+    return [
+        *response.buckets.ready_now,
+        *response.buckets.next_step,
+        *response.buckets.aspirational,
+    ]
+
+
+def _summary_payload(profile: UserCareerProfile, roles: list[RoleMatch]) -> dict[str, Any]:
+    return {
+        "profile": {
+            "career_identity": profile.career_identity.model_dump(),
+            "skills": profile.skills[:30],
+            "interests": profile.interests[:20],
+        },
+        "roles": [
+            {
+                "role_id": str(role.role_id),
+                "title": role.job_title,
+                "bucket": role.bucket.value,
+                "salary": role.salary,
+                "esco_title": role.esco_title,
+                "description": _truncate(role.description, 500),
+                "matched_skills": role.matched_skills[:8],
+                "missing_skills": role.missing_skills[:8],
+                "matched_domains": role.matched_domains[:6],
+                "matched_certifications": role.matched_certifications[:4],
+            }
+            for role in roles
+        ],
+    }
+
+
+async def _apply_role_summaries(profile: UserCareerProfile, response: RoleMatchResponse) -> None:
+    roles = _selected_roles(response)
+    if not roles:
+        return
+
+    try:
+        generated = await openai_client.parse_structured(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Write one concise, evidence-backed role summary per role. "
+                        "Use only the supplied role data and profile context. "
+                        "Do not invent salary, certifications, or requirements. "
+                        "Each summary must be one sentence under 28 words."
+                    ),
+                },
+                {"role": "user", "content": json.dumps(_summary_payload(profile, roles))},
+            ],
+            response_format=RoleSummaryBatch,
+        )
+    except Exception as exc:
+        logger.warning("Role summary generation failed; using catalog descriptions: %s", exc)
+        return
+
+    if generated is None:
+        return
+
+    summaries = {
+        item.role_id: cleaned
+        for item in generated.summaries
+        if (cleaned := _clean_text(item.summary))
+    }
+    for role in roles:
+        summary = summaries.get(str(role.role_id))
+        if summary:
+            role.description = summary
+
+
 async def match_roles_for_profile(
     profile: UserCareerProfile,
-    top_k: int = 6,
+    top_k: int = 9,
     mode: RecommendationMode = RecommendationMode.BALANCED,
     include_debug: bool = False,
 ) -> RoleMatchResponse:
     """Offload blocking embedding + DB work to a worker thread."""
-    return await asyncio.to_thread(_match_roles_sync, profile, top_k, mode, include_debug)
+    response = await asyncio.to_thread(_match_roles_sync, profile, top_k, mode, include_debug)
+    await _apply_role_summaries(profile, response)
+    return response

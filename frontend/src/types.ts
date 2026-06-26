@@ -86,10 +86,17 @@ export const emptyManualProfileForm: ManualProfileForm = {
 export type RoleView = {
   id: string;
   title: string;
+  bucket: string;
+  bucketLabel: string;
   trackLabel: string;
   summary: string;
   /** Similarity fit in 0..1. */
   fit: number;
+  salary: string;
+  escoTitle: string;
+  escoUri: string;
+  matchedSkills: string[];
+  missingSkills: string[];
   essentialSkills: string[];
   optionalSkills: string[];
   essentialKnowledge: string[];

@@ -6,11 +6,6 @@ import type { RoleView } from "@/types";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/**
- * Matched roles — backend ESCO occupations ranked by similarity.
- * Selection: card lifts, gets a tinted background and a "Selected" badge.
- * Duration/target-salary are intentionally omitted (no backend source).
- */
 export function DirectionsStage() {
   const setStage = useStageStore((s) => s.setStage);
   const roleMatches = useStageStore((s) => s.roleMatches);
@@ -29,25 +24,7 @@ export function DirectionsStage() {
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
           className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"
         >
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.22em] text-foreground/55">
-              Stage 03 · Matching roles
-            </p>
-            <h2 className="h-stage mt-1">
-              Pick up to {MAX_PICKS} routes to{" "}
-              <span
-                className="italic"
-                style={{
-                  background: "var(--gradient-warm)",
-                  WebkitBackgroundClip: "text",
-                  backgroundClip: "text",
-                  color: "transparent",
-                }}
-              >
-                explore further.
-              </span>
-            </h2>
-          </div>
+          <h2 className="h-stage">Pick up to 3 roles to explore further.</h2>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setStage("recap")}
@@ -84,7 +61,7 @@ export function DirectionsStage() {
             </p>
           </div>
         ) : (
-          <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:min-h-0 lg:grid-cols-3 lg:grid-rows-2">
+          <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:min-h-0 lg:grid-cols-3 lg:grid-rows-3">
             {ranked.map((role, i) => (
               <RoleCard
                 key={role.id}
@@ -121,8 +98,6 @@ export function DirectionsStage() {
   );
 }
 
-/* ------------------------------------------------------------------ */
-
 function RoleCard({
   role,
   index,
@@ -136,7 +111,9 @@ function RoleCard({
   onToggle: () => void;
   picksFull: boolean;
 }) {
-  const topSkills = role.essentialSkills.slice(0, 3);
+  const topSkills = role.matchedSkills.slice(0, 3);
+  const tone = bucketTone(role.bucket);
+
   return (
     <motion.button
       initial={{ opacity: 0, y: 12 }}
@@ -147,7 +124,7 @@ function RoleCard({
       onClick={onToggle}
       disabled={picksFull}
       className={cn(
-        "liquid-glass group relative flex flex-col gap-2.5 overflow-hidden rounded-3xl p-5 text-left transition-shadow duration-300",
+        "liquid-glass group relative flex min-h-[172px] flex-col gap-2 overflow-hidden rounded-3xl p-4 text-left transition-shadow duration-300",
         selected &&
           "ring-2 ring-[color:var(--brand)]/45 shadow-[0_18px_50px_-22px_color-mix(in_oklab,var(--brand-deep)_55%,transparent)]",
         picksFull && "cursor-not-allowed opacity-50",
@@ -179,22 +156,25 @@ function RoleCard({
         Selected
       </motion.span>
 
-      <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[color:var(--brand)]/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-[color:var(--brand-deep)]">
-        <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--brand)]" />
-        {role.trackLabel}
+      <span
+        className="inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em]"
+        style={{ backgroundColor: tone.background, color: tone.text }}
+      >
+        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tone.dot }} />
+        {role.bucketLabel}
       </span>
 
       <div className="flex items-start justify-between gap-3">
         <h3
           className="font-display tracking-tight text-balance"
-          style={{ fontSize: "clamp(1.15rem, 1.7vw, 1.35rem)", lineHeight: 1.15 }}
+          style={{ fontSize: "clamp(1.08rem, 1.45vw, 1.25rem)", lineHeight: 1.15 }}
         >
           {role.title}
         </h3>
         <span
           className="shrink-0 font-display leading-none tracking-tight"
           style={{
-            fontSize: "clamp(1.85rem, 2.6vw, 2.4rem)",
+            fontSize: "clamp(1.55rem, 2.1vw, 2rem)",
             background: "var(--gradient-warm)",
             WebkitBackgroundClip: "text",
             backgroundClip: "text",
@@ -205,8 +185,15 @@ function RoleCard({
         </span>
       </div>
 
+      {(role.salary || role.escoTitle) && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-foreground/55">
+          {role.salary && <span>{role.salary}</span>}
+          {role.escoTitle && <span>ESCO: {role.escoTitle}</span>}
+        </div>
+      )}
+
       {role.summary && (
-        <p className="line-clamp-3 text-[12.5px] leading-snug text-foreground/65">{role.summary}</p>
+        <p className="line-clamp-2 text-[12.5px] leading-snug text-foreground/65">{role.summary}</p>
       )}
 
       {topSkills.length > 0 && (
@@ -223,4 +210,21 @@ function RoleCard({
       )}
     </motion.button>
   );
+}
+
+function bucketTone(bucket: string) {
+  switch (bucket) {
+    case "ready_now":
+      return { background: "#e7f6ee", text: "#17633f", dot: "#20a162" };
+    case "next_step":
+      return { background: "#e8f0fb", text: "#225a9d", dot: "#2f79d1" };
+    case "aspirational":
+      return { background: "#fff1d6", text: "#875400", dot: "#d99000" };
+    default:
+      return {
+        background: "color-mix(in oklab, var(--brand) 10%, white)",
+        text: "var(--brand-deep)",
+        dot: "var(--brand)",
+      };
+  }
 }

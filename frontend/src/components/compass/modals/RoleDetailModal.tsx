@@ -24,6 +24,26 @@ export function RoleDetailModal({
         </ModalBlock>
       )}
 
+      {(role.escoTitle || role.escoUri) && (
+        <ModalBlock className="mb-6">
+          <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-foreground/45">
+            ESCO reference
+          </p>
+          {role.escoUri ? (
+            <a
+              href={role.escoUri}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[13px] font-medium text-[color:var(--brand-deep)] underline-offset-4 hover:underline"
+            >
+              {role.escoTitle || role.escoUri}
+            </a>
+          ) : (
+            <p className="text-[13px] leading-relaxed text-foreground/75">{role.escoTitle}</p>
+          )}
+        </ModalBlock>
+      )}
+
       {analysis && (
         <ModalBlock className="mb-6">
           <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-foreground/45">
@@ -33,10 +53,10 @@ export function RoleDetailModal({
         </ModalBlock>
       )}
 
-      <SkillSection title="Essential skills" items={role.essentialSkills} highlight />
-      <SkillSection title="Optional skills" items={role.optionalSkills} />
-      <SkillSection title="Essential knowledge" items={role.essentialKnowledge} highlight />
-      <SkillSection title="Optional knowledge" items={role.optionalKnowledge} />
+      <SkillSection title="Matched skills" items={role.matchedSkills} highlight />
+      <SkillSection title="Missing skills" items={role.missingSkills} />
+      <SkillSection title="Matched domains" items={role.essentialKnowledge} highlight />
+      <SkillSection title="Matched certifications" items={role.optionalKnowledge} />
     </DeepDiveModal>
   );
 }

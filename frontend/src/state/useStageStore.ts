@@ -268,7 +268,7 @@ export const useStageStore = create<Store>((set, get) => ({
     }
     set({ loading: true, error: null, cvData: outgoing });
     try {
-      const result = await matchRoles(cvDataToUserCareerProfile(outgoing, state.identity), 6);
+      const result = await matchRoles(cvDataToUserCareerProfile(outgoing, state.identity), 9);
       set({
         roleMatches: result.matched_roles,
         matchAnalysis: result.analysis,

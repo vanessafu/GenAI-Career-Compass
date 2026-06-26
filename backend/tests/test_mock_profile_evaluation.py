@@ -69,7 +69,7 @@ class MockProfileEvaluationFixturesTests(unittest.TestCase):
     def test_mock_frontend_profiles_match_public_schema(self) -> None:
         for name, profile in mock_frontend_profiles().items():
             with self.subTest(name=name):
-                request = RoleMatchRequest(profile=profile, top_k=5)
+                request = RoleMatchRequest(profile=profile, top_k=9)
                 self.assertEqual(profile, request.profile)
 
     def test_mock_frontend_profiles_build_split_query_texts(self) -> None:
@@ -138,7 +138,7 @@ class LiveMockProfileEvaluationTests(unittest.IsolatedAsyncioTestCase):
 
         for name, profile in mock_frontend_profiles().items():
             with self.subTest(name=name):
-                response = await match_roles_for_profile(profile, top_k=5, include_debug=True)
+                response = await match_roles_for_profile(profile, top_k=9, include_debug=True)
                 titles = [
                     role.job_title.casefold()
                     for role in [

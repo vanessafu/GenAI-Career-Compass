@@ -26,12 +26,12 @@ DimensionStatus = Literal["strong", "partial", "weak"]
 
 
 class ScoringWeights(BaseModel):
-    capability_vector_similarity: float = 0.25
+    capability_vector_similarity: float = 0.20
     intent_vector_similarity: float = 0.15
-    normalized_skill_overlap: float = 0.30
-    interest_domain_overlap: float = 0.15
+    normalized_skill_overlap: float = 0.35
+    interest_domain_overlap: float = 0.10
     certification_overlap: float = 0.10
-    seniority_fit: float = 0.05
+    seniority_fit: float = 0.10
 
 
 DEFAULT_WEIGHTS = ScoringWeights()
@@ -158,6 +158,8 @@ class RoleMatch(BaseModel):
     description: str = ""
     final_score: float
     salary: str = ""
+    esco_title: str = ""
+    esco_uri: str = ""
     bucket: RecommendationBucket
     matched_skills: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)
@@ -179,6 +181,8 @@ class CareerResultV1(BaseModel):
     matching_score: int = Field(ge=0, le=100)
     salary: str = ""
     description: str = ""
+    esco_title: str = ""
+    esco_uri: str = ""
     matched_skills: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)
     matched_domains: list[str] = Field(default_factory=list)
@@ -194,6 +198,8 @@ class CareerResultV1(BaseModel):
             matching_score=int(round(score * 100)),
             salary=role.salary,
             description=role.description,
+            esco_title=role.esco_title,
+            esco_uri=role.esco_uri,
             matched_skills=role.matched_skills,
             missing_skills=role.missing_skills,
             matched_domains=role.matched_domains,
@@ -214,6 +220,15 @@ class CareerResultsV1(BaseModel):
         return cls(results=[CareerResultV1.from_role_match(role) for role in roles])
 
 
+class RoleSummaryItem(BaseModel):
+    role_id: str
+    summary: str = ""
+
+
+class RoleSummaryBatch(BaseModel):
+    summaries: list[RoleSummaryItem] = Field(default_factory=list)
+
+
 class RoleMatchDebug(BaseModel):
     capability_text: str
     intent_text: str
@@ -225,7 +240,7 @@ class RoleMatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     profile: UserCareerProfile
-    top_k: int = Field(default=6, ge=1, le=20)
+    top_k: int = Field(default=9, ge=1, le=20)
     mode: RecommendationMode = RecommendationMode.BALANCED
     include_debug: bool = False
 

@@ -97,7 +97,7 @@ export function MatchingStage() {
                 color: "transparent",
               }}
             >
-              six routes for you.
+              nine roles for you.
             </span>
           </h1>
         </motion.div>

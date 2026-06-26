@@ -1,16 +1,11 @@
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useStageStore } from "@/state/useStageStore";
 import { roleMatchesToViews } from "@/lib/roleView";
 import type { RoleView } from "@/types";
 import { RoleDetailModal } from "../modals/RoleDetailModal";
 import { ArrowLeft, ChevronRight, Sparkles, BookOpen } from "lucide-react";
 
-/**
- * Your paths — each picked role becomes a detail card built from the backend
- * RoleMatch: the essential skills and knowledge the role demands. "View full
- * plan" opens the complete breakdown (incl. optional skills + analysis).
- */
 export function FocusStage() {
   const setStage = useStageStore((s) => s.setStage);
   const selectedIds = useStageStore((s) => s.selectedRoleIds);
@@ -36,10 +31,7 @@ export function FocusStage() {
           className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"
         >
           <div>
-            <p className="text-[11px] uppercase tracking-[0.22em] text-foreground/55">
-              Stage 04 · Your paths
-            </p>
-            <h2 className="h-stage mt-1">
+            <h2 className="h-stage">
               What these roles{" "}
               <span
                 className="italic"
@@ -88,8 +80,6 @@ export function FocusStage() {
   );
 }
 
-/* ------------------------------------------------------------------ */
-
 function PathCard({
   role,
   index,
@@ -118,7 +108,7 @@ function PathCard({
           {role.title}
         </h3>
         <span
-          className="w-fit font-medium text-[12px]"
+          className="w-fit text-[12px] font-medium"
           style={{
             background: "var(--gradient-warm)",
             WebkitBackgroundClip: "text",
@@ -133,12 +123,12 @@ function PathCard({
       <div className="grid gap-3 sm:grid-cols-2">
         <SkillPreview
           icon={<Sparkles size={12} />}
-          label="Essential skills"
-          items={role.essentialSkills}
+          label="Matched skills"
+          items={role.matchedSkills}
         />
         <SkillPreview
           icon={<BookOpen size={12} />}
-          label="Essential knowledge"
+          label="Matched domains"
           items={role.essentialKnowledge}
         />
       </div>
@@ -159,15 +149,7 @@ function PathCard({
   );
 }
 
-function SkillPreview({
-  icon,
-  label,
-  items,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  items: string[];
-}) {
+function SkillPreview({ icon, label, items }: { icon: ReactNode; label: string; items: string[] }) {
   const shown = items.slice(0, 4);
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
@@ -176,7 +158,7 @@ function SkillPreview({
         {label}
       </p>
       {shown.length === 0 ? (
-        <p className="text-[12px] text-foreground/45">—</p>
+        <p className="text-[12px] text-foreground/45">-</p>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {shown.map((item) => (

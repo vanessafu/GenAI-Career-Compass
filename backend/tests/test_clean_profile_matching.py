@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -19,6 +20,7 @@ from backend.app.features.role_matching.schemas import (
     UserProject,
 )
 from backend.app.features.role_matching.service import (
+    _match_roles_sync,
     _cert_overlap,
     build_capability_text,
     build_intent_text,
@@ -99,6 +101,11 @@ class CleanProfileSchemaTests(unittest.TestCase):
         self.assertFalse(request.include_debug)
         self.assertEqual(request.profile.career_identity.title, "Robust Systems Architect")
 
+    def test_role_match_request_defaults_to_nine_results(self) -> None:
+        request = RoleMatchRequest(profile=sample_profile())
+
+        self.assertEqual(9, request.top_k)
+
     def test_empty_profile_is_rejected(self) -> None:
         with self.assertRaises(ValidationError):
             RoleMatchRequest(profile=UserCareerProfile())
@@ -132,6 +139,8 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
             matching_score=95,
             salary="EUR 95k",
             description="Designs scalable data pipelines and warehouse systems.",
+            esco_title="Data engineer",
+            esco_uri="http://data.europa.eu/esco/occupation/example",
         )
 
         self.assertEqual(
@@ -143,6 +152,8 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
                 "matching_score": 95,
                 "salary": "EUR 95k",
                 "description": "Designs scalable data pipelines and warehouse systems.",
+                "esco_title": "Data engineer",
+                "esco_uri": "http://data.europa.eu/esco/occupation/example",
                 "matched_skills": [],
                 "missing_skills": [],
                 "matched_domains": [],
@@ -163,6 +174,8 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
                     final_score=0.95,
                     bucket=RecommendationBucket.ready_now,
                     salary="EUR 95k",
+                    esco_title="Data engineer",
+                    esco_uri="http://data.europa.eu/esco/occupation/example",
                     matched_skills=["python"],
                     missing_skills=["spark"],
                     matched_domains=["data_engineering"],
@@ -185,6 +198,8 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
                         "matching_score": 95,
                         "salary": "EUR 95k",
                         "description": "Designs scalable data pipelines.",
+                        "esco_title": "Data engineer",
+                        "esco_uri": "http://data.europa.eu/esco/occupation/example",
                         "matched_skills": ["python"],
                         "missing_skills": ["spark"],
                         "matched_domains": ["data_engineering"],
@@ -462,6 +477,65 @@ class RankingBehaviorTests(unittest.TestCase):
         self.assertEqual(0, len(buckets.ready_now))
         self.assertEqual(3, len(buckets.next_step))
         self.assertEqual(3, len(buckets.aspirational))
+
+    def test_default_match_path_does_not_redistribute_empty_bucket_slots(self) -> None:
+        rows = []
+        role_skills: dict[str, list[str]] = {}
+        for i in range(6):
+            next_id = f"next-{i}"
+            asp_id = f"asp-{i}"
+            rows.extend(
+                [
+                    {
+                        "role_id": next_id,
+                        "job_title": f"Next {i}",
+                        "job_description": "Builds useful data tools.",
+                        "raw_skills": "",
+                        "domain_tags": "",
+                        "salary_median_monthly_gross_eur": None,
+                        "capability_vector_similarity": 0.7,
+                        "intent_vector_similarity": 0.7,
+                        "esco_title": "Data engineer",
+                        "esco_uri": "http://data.europa.eu/esco/occupation/next",
+                    },
+                    {
+                        "role_id": asp_id,
+                        "job_title": f"Aspirational {i}",
+                        "job_description": "Builds platform systems.",
+                        "raw_skills": "",
+                        "domain_tags": "",
+                        "salary_median_monthly_gross_eur": None,
+                        "capability_vector_similarity": 0.7,
+                        "intent_vector_similarity": 0.7,
+                        "esco_title": "Platform engineer",
+                        "esco_uri": "http://data.europa.eu/esco/occupation/asp",
+                    },
+                ]
+            )
+            role_skills[next_id] = ["python", "postgresql", "spark", "airflow", "dbt"]
+            role_skills[asp_id] = ["rust", "go", "kubernetes"]
+
+        class FakeEmbedder:
+            def encode_queries(self, texts: list[str]) -> tuple[list[float], list[float]]:
+                return [0.1], [0.2]
+
+        with (
+            patch("backend.app.features.role_matching.embedder.get_embedder", return_value=FakeEmbedder()),
+            patch(
+                "backend.app.features.role_matching.service._fetch_catalog",
+                return_value=(rows, {}, role_skills, {}),
+            ),
+        ):
+            response = _match_roles_sync(
+                sample_profile(),
+                top_k=9,
+                mode=RecommendationMode.balanced,
+                include_debug=False,
+            )
+
+        self.assertEqual(0, len(response.buckets.ready_now))
+        self.assertEqual(3, len(response.buckets.next_step))
+        self.assertEqual(3, len(response.buckets.aspirational))
 
     def test_ready_now_requires_skill_and_capability_alignment(self) -> None:
         aligned_broad_role = Candidate(

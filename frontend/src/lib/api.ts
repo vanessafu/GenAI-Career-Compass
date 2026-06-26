@@ -210,40 +210,27 @@ export type UserCareerProfile = {
 };
 
 export type RoleMatch = {
-  uri: string;
-  isco_group: string | null;
-  isco_label: string | null;
-  title: string;
-  alt_labels: string[];
-  description: string | null;
-  essential_knowledge: string[];
-  essential_skills: string[];
-  optional_knowledge: string[];
-  optional_skills: string[];
-  similarity_score: number;
-};
-
-export type RoleMatchResponse = {
-  query_text: string;
-  matched_roles: RoleMatch[];
-  analysis: string | null;
-};
-
-type CareerResultV1 = {
   role_id: string | number;
   bucket: string;
   title: string;
   matching_score: number;
   salary: string;
   description: string;
+  esco_title: string;
+  esco_uri: string;
   matched_skills: string[];
   missing_skills: string[];
   matched_domains: string[];
   matched_certifications: string[];
 };
 
+export type RoleMatchResponse = {
+  matched_roles: RoleMatch[];
+  analysis: string | null;
+};
+
 type CareerResultsV1 = {
-  results: CareerResultV1[];
+  results: RoleMatch[];
 };
 
 // Manual CV input
@@ -316,31 +303,6 @@ async function parseError(response: Response): Promise<never> {
   throw new ApiError(detail, response.status);
 }
 
-function bucketLabel(bucket: string): string {
-  const label = bucket
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-  return label || "Role";
-}
-
-function resultToRoleMatch(result: CareerResultV1): RoleMatch {
-  return {
-    uri: String(result.role_id),
-    isco_group: result.bucket,
-    isco_label: bucketLabel(result.bucket),
-    title: result.title,
-    alt_labels: result.salary ? [result.salary] : [],
-    description: result.description || null,
-    essential_knowledge: result.matched_domains,
-    essential_skills: result.matched_skills,
-    optional_knowledge: result.matched_certifications,
-    optional_skills: result.missing_skills,
-    similarity_score: Math.max(0, Math.min(1, result.matching_score / 100)),
-  };
-}
-
 /** Upload a PDF CV and run parsing + prompt engineering in one backend pipeline. */
 export async function parseCv(file: File): Promise<ProfilePipelineResponse> {
   const formData = new FormData();
@@ -366,7 +328,7 @@ export async function submitManualCv(input: ManualCVInput): Promise<ProfilePipel
 }
 
 /** Match a cleaned career profile against the backend RAG pipeline. */
-export async function matchRoles(profile: UserCareerProfile, topK = 6): Promise<RoleMatchResponse> {
+export async function matchRoles(profile: UserCareerProfile, topK = 9): Promise<RoleMatchResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/roles/match`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -380,8 +342,7 @@ export async function matchRoles(profile: UserCareerProfile, topK = 6): Promise<
   if (!response.ok) await parseError(response);
   const payload: CareerResultsV1 = await response.json();
   return {
-    query_text: "",
-    matched_roles: payload.results.map(resultToRoleMatch),
+    matched_roles: payload.results,
     analysis: null,
   };
 }
