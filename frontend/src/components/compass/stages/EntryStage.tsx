@@ -363,8 +363,8 @@ export function EntryStage() {
   };
 
   return (
-    <div className="relative flex w-full flex-col items-stretch px-6 pb-10 pt-[max(6rem,calc(env(safe-area-inset-top)+5rem))] sm:px-10 lg:px-16 lg:pt-24">
-      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-7">
+    <div className="relative flex w-full flex-col items-stretch px-6 pb-10 pt-[max(4.75rem,calc(env(safe-area-inset-top)+4.25rem))] sm:px-10 sm:pt-20 lg:px-16 lg:pt-[5.5rem]">
+      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 sm:gap-6">
         {/* Headline — transform-only animation, glides centered when loading appears. */}
         <motion.div
           animate={{ scale: parsing ? 0.86 : 1, y: parsing ? 4 : 0 }}
@@ -376,7 +376,7 @@ export function EntryStage() {
           )}
         >
           <h1 className="h-hero">
-            Map your expertise to{" "}
+            Mapping your expertise to{" "}
             <span
               className="italic"
               style={{
@@ -433,7 +433,7 @@ export function EntryStage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6, scale: 0.98 }}
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              className="grid w-full gap-5 md:grid-cols-2"
+              className="grid w-full items-start gap-5 md:grid-cols-2"
             >
               {/* ── Upload CV ── */}
               <motion.div
