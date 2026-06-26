@@ -173,6 +173,7 @@ class BucketedRoles(BaseModel):
 
 
 class CareerResultV1(BaseModel):
+    role_id: str | int
     bucket: str
     title: str
     matching_score: int = Field(ge=0, le=100)
@@ -187,6 +188,7 @@ class CareerResultV1(BaseModel):
     def from_role_match(cls, role: RoleMatch) -> "CareerResultV1":
         score = max(0.0, min(1.0, role.final_score))
         return cls(
+            role_id=role.role_id,
             bucket=role.bucket.value,
             title=role.job_title,
             matching_score=int(round(score * 100)),

@@ -98,16 +98,12 @@ export function EntryStage() {
   });
   const [seniority, setSeniority] = useState("");
   const [yearsOfExperience, setYearsOfExperience] = useState("");
-  const [degree, setDegree] = useState("");
-  const [school, setSchool] = useState("");
-  const [latestJobRole, setLatestJobRole] = useState("");
-  const [latestJobCompany, setLatestJobCompany] = useState("");
-  const [latestJobFrom, setLatestJobFrom] = useState("");
-  const [latestJobTo, setLatestJobTo] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
   const [skillDraft, setSkillDraft] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
   const [interestDraft, setInterestDraft] = useState("");
+  const [targetConstraints, setTargetConstraints] = useState<string[]>([]);
+  const [targetConstraintDraft, setTargetConstraintDraft] = useState("");
 
   // Tier 2 — add more context (collapsed by default)
   const [showMore, setShowMore] = useState(false);
@@ -116,6 +112,30 @@ export function EntryStage() {
   const [softSkillDraft, setSoftSkillDraft] = useState("");
   const [languageName, setLanguageName] = useState("");
   const [languageLevel, setLanguageLevel] = useState("");
+  const [projects, setProjects] = useState<
+    {
+      title: string;
+      description: string;
+      technologies: string[];
+      startDate: string;
+      endDate: string;
+    }[]
+  >([]);
+  const [projectDraft, setProjectDraft] = useState({
+    title: "",
+    description: "",
+    technologies: "",
+    startDate: "",
+    endDate: "",
+  });
+  const [certifications, setCertifications] = useState<
+    { name: string; issuingOrganization: string; issueDate: string }[]
+  >([]);
+  const [certificationDraft, setCertificationDraft] = useState({
+    name: "",
+    issuingOrganization: "",
+    issueDate: "",
+  });
 
   const [parsing, setParsing] = useState(false);
   const [steps, setSteps] = useState<string[]>(PARSE_STEPS);
@@ -186,6 +206,13 @@ export function EntryStage() {
     setInterestDraft("");
   };
 
+  const addTargetConstraint = (s: string) => {
+    const val = s.trim();
+    if (!val || targetConstraints.some((item) => item.toLowerCase() === val.toLowerCase())) return;
+    setTargetConstraints([...targetConstraints, val]);
+    setTargetConstraintDraft("");
+  };
+
   const addEducation = () => {
     if (!educationDraft.degree.trim()) return;
     setEducation([
@@ -221,6 +248,37 @@ export function EntryStage() {
     setExperienceDraft({ role: "", organization: "", startDate: "", endDate: "" });
   };
 
+  const addProject = () => {
+    if (!projectDraft.title.trim()) return;
+    setProjects([
+      ...projects,
+      {
+        title: projectDraft.title.trim(),
+        description: projectDraft.description.trim(),
+        technologies: projectDraft.technologies
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+        startDate: projectDraft.startDate.trim(),
+        endDate: projectDraft.endDate.trim(),
+      },
+    ]);
+    setProjectDraft({ title: "", description: "", technologies: "", startDate: "", endDate: "" });
+  };
+
+  const addCertification = () => {
+    if (!certificationDraft.name.trim()) return;
+    setCertifications([
+      ...certifications,
+      {
+        name: certificationDraft.name.trim(),
+        issuingOrganization: certificationDraft.issuingOrganization.trim(),
+        issueDate: certificationDraft.issueDate.trim(),
+      },
+    ]);
+    setCertificationDraft({ name: "", issuingOrganization: "", issueDate: "" });
+  };
+
   const analyzeCv = async () => {
     if (parsing) return;
     if (!file) {
@@ -246,8 +304,26 @@ export function EntryStage() {
 
   const buildManualProfile = async () => {
     if (parsing) return;
-    if (!role.trim() && skills.length === 0) {
-      setFormError("Add at least your current role or one skill.");
+    const parsedYears =
+      yearsOfExperience.trim() === "" ? null : Number(yearsOfExperience);
+    if (!role.trim()) {
+      setFormError("Add your current role.");
+      return;
+    }
+    if (!seniority.trim()) {
+      setFormError("Select your seniority.");
+      return;
+    }
+    if (parsedYears === null || !Number.isInteger(parsedYears) || parsedYears < 0 || parsedYears > 80) {
+      setFormError("Add years of experience as a whole number from 0 to 80.");
+      return;
+    }
+    if (skills.length === 0) {
+      setFormError("Add at least one technical skill.");
+      return;
+    }
+    if (interests.length === 0 && targetConstraints.length === 0) {
+      setFormError("Add at least one interest or target constraint.");
       return;
     }
     setFormError(null);
@@ -258,14 +334,19 @@ export function EntryStage() {
 
     const ok = await submitManualProfile({
       currentRole: role,
+      seniorityLevel: seniority,
+      yearsOfExperience: parsedYears,
       education,
       experience,
       skills,
       interests,
+      targetConstraints,
       summary,
       softSkills,
       languageName,
       languageLevel,
+      projects,
+      certifications,
     });
     if (ok) {
       finishProgress();
@@ -462,7 +543,8 @@ export function EntryStage() {
                     presets={ROLE_PRESETS}
                     placeholder="e.g. Senior Backend Developer"
                   />
-                  <label className="hidden">
+                  <div className="grid gap-2.5 sm:grid-cols-2">
+                  <label className="block">
                     <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
                       Seniority
                     </span>
@@ -479,43 +561,22 @@ export function EntryStage() {
                       ))}
                     </select>
                   </label>
-                </div>
-
-                <div className="hidden">
-                  <AutocompleteInput
-                    label="Degree"
-                    value={degree}
-                    onChange={setDegree}
-                    presets={EDU_PRESETS}
-                    placeholder="e.g. MSc Computer Science"
-                  />
                   <label className="block">
                     <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                      School
+                      Years of experience
                     </span>
                     <input
-                      value={school}
-                      onChange={(e) => setSchool(e.target.value)}
-                      placeholder="e.g. TU Munich"
+                      type="number"
+                      min={0}
+                      max={80}
+                      value={yearsOfExperience}
+                      onChange={(e) => setYearsOfExperience(e.target.value)}
+                      placeholder="e.g. 5"
                       className="manual-input"
                     />
                   </label>
+                  </div>
                 </div>
-
-                <label className="hidden">
-                  <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                    Years of experience
-                  </span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={80}
-                    value={yearsOfExperience}
-                    onChange={(e) => setYearsOfExperience(e.target.value)}
-                    placeholder="e.g. 5"
-                    className="manual-input"
-                  />
-                </label>
 
                 <RepeatableSection
                   title="Education"
@@ -654,6 +715,26 @@ export function EntryStage() {
                   />
                 </div>
 
+                <div>
+                  <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+                    Target constraints
+                  </p>
+                  <TagField
+                    tags={targetConstraints}
+                    onRemove={(t) =>
+                      setTargetConstraints(targetConstraints.filter((x) => x !== t))
+                    }
+                    typeahead={
+                      <PlainTagInput
+                        draft={targetConstraintDraft}
+                        setDraft={setTargetConstraintDraft}
+                        onAdd={addTargetConstraint}
+                        placeholder="Add constraint"
+                      />
+                    }
+                  />
+                </div>
+
                 {/* Collapsible Tier 2 — add more context */}
                 <button
                   type="button"
@@ -678,38 +759,6 @@ export function EntryStage() {
                       className="overflow-hidden"
                     >
                       <div className="flex flex-col gap-3.5 pt-0.5">
-                        <div className="hidden">
-                          <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                            Most recent job
-                          </p>
-                          <div className="grid gap-2.5 sm:grid-cols-2">
-                            <input
-                              value={latestJobRole}
-                              onChange={(e) => setLatestJobRole(e.target.value)}
-                              placeholder="Role"
-                              className="manual-input"
-                            />
-                            <input
-                              value={latestJobCompany}
-                              onChange={(e) => setLatestJobCompany(e.target.value)}
-                              placeholder="Company"
-                              className="manual-input"
-                            />
-                            <input
-                              value={latestJobFrom}
-                              onChange={(e) => setLatestJobFrom(e.target.value)}
-                              placeholder="From (e.g. 2021)"
-                              className="manual-input"
-                            />
-                            <input
-                              value={latestJobTo}
-                              onChange={(e) => setLatestJobTo(e.target.value)}
-                              placeholder="To (e.g. Present)"
-                              className="manual-input"
-                            />
-                          </div>
-                        </div>
-
                         <div>
                           <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
                             Professional summary
@@ -761,13 +810,118 @@ export function EntryStage() {
                             />
                           </div>
                         </div>
+
+                        <RepeatableSection
+                          title="Projects"
+                          items={projects.map((item) => ({
+                            title: item.title,
+                            subtitle: item.description,
+                            meta: [item.startDate, item.endDate].filter(Boolean).join("-"),
+                          }))}
+                          onRemove={(idx) => setProjects(projects.filter((_, i) => i !== idx))}
+                        >
+                          <div className="grid gap-2.5 sm:grid-cols-2">
+                            <input
+                              value={projectDraft.title}
+                              onChange={(e) =>
+                                setProjectDraft({ ...projectDraft, title: e.target.value })
+                              }
+                              placeholder="Project title"
+                              className="manual-input"
+                            />
+                            <input
+                              value={projectDraft.technologies}
+                              onChange={(e) =>
+                                setProjectDraft({ ...projectDraft, technologies: e.target.value })
+                              }
+                              placeholder="Technologies, comma-separated"
+                              className="manual-input"
+                            />
+                            <input
+                              value={projectDraft.description}
+                              onChange={(e) =>
+                                setProjectDraft({ ...projectDraft, description: e.target.value })
+                              }
+                              placeholder="Short description"
+                              className="manual-input"
+                            />
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <input
+                                value={projectDraft.startDate}
+                                onChange={(e) =>
+                                  setProjectDraft({ ...projectDraft, startDate: e.target.value })
+                                }
+                                placeholder="From"
+                                className="manual-input"
+                              />
+                              <input
+                                value={projectDraft.endDate}
+                                onChange={(e) =>
+                                  setProjectDraft({ ...projectDraft, endDate: e.target.value })
+                                }
+                                placeholder="To"
+                                className="manual-input"
+                              />
+                            </div>
+                          </div>
+                          <AddRowButton onClick={addProject} label="Add project" />
+                        </RepeatableSection>
+
+                        <RepeatableSection
+                          title="Certifications"
+                          items={certifications.map((item) => ({
+                            title: item.name,
+                            subtitle: item.issuingOrganization,
+                            meta: item.issueDate,
+                          }))}
+                          onRemove={(idx) =>
+                            setCertifications(certifications.filter((_, i) => i !== idx))
+                          }
+                        >
+                          <div className="grid gap-2.5 sm:grid-cols-3">
+                            <input
+                              value={certificationDraft.name}
+                              onChange={(e) =>
+                                setCertificationDraft({
+                                  ...certificationDraft,
+                                  name: e.target.value,
+                                })
+                              }
+                              placeholder="Certification"
+                              className="manual-input"
+                            />
+                            <input
+                              value={certificationDraft.issuingOrganization}
+                              onChange={(e) =>
+                                setCertificationDraft({
+                                  ...certificationDraft,
+                                  issuingOrganization: e.target.value,
+                                })
+                              }
+                              placeholder="Issuer"
+                              className="manual-input"
+                            />
+                            <input
+                              value={certificationDraft.issueDate}
+                              onChange={(e) =>
+                                setCertificationDraft({
+                                  ...certificationDraft,
+                                  issueDate: e.target.value,
+                                })
+                              }
+                              placeholder="Year"
+                              className="manual-input"
+                            />
+                          </div>
+                          <AddRowButton onClick={addCertification} label="Add certification" />
+                        </RepeatableSection>
                       </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
 
                 <p className="text-[11.5px] leading-snug text-foreground/50">
-                  You can add more experience, projects and certifications on the next screen.
+                  You can review and edit everything on the next screen.
                 </p>
 
                 <motion.button

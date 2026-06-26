@@ -58,6 +58,8 @@ export function manualFormToInput(form: ManualProfileForm): ManualCVInput {
 
   return {
     current_role: form.currentRole.trim() || null,
+    seniority_level: form.seniorityLevel.trim() || null,
+    years_of_experience: form.yearsOfExperience,
     summary: form.summary.trim() || null,
     education: form.education
       .filter((item) => item.degree.trim())
@@ -80,6 +82,23 @@ export function manualFormToInput(form: ManualProfileForm): ManualCVInput {
     soft_skills: form.softSkills.map((s) => s.trim()).filter(Boolean),
     languages,
     interests: form.interests.map((s) => s.trim()).filter(Boolean),
+    projects: form.projects
+      .filter((item) => item.title.trim())
+      .map((item) => ({
+        title: item.title.trim(),
+        description: item.description.trim() || null,
+        technologies: item.technologies.map((s) => s.trim()).filter(Boolean),
+        start_date: item.startDate.trim() || null,
+        end_date: item.endDate.trim() || null,
+      })),
+    certifications: form.certifications
+      .filter((item) => item.name.trim())
+      .map((item) => ({
+        name: item.name.trim(),
+        issuing_organization: item.issuingOrganization.trim() || null,
+        issue_date: item.issueDate.trim() || null,
+      })),
+    target_constraints: form.targetConstraints.map((s) => s.trim()).filter(Boolean),
   };
 }
 

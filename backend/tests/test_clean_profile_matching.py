@@ -126,6 +126,7 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
         self.assertIsNotNone(CareerResultV1, "CareerResultV1 schema should exist")
 
         result = CareerResultV1(
+            role_id=123,
             bucket="top_match",
             title="Data Engineer",
             matching_score=95,
@@ -136,6 +137,7 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
         self.assertEqual(
             result.model_dump(),
             {
+                "role_id": 123,
                 "bucket": "top_match",
                 "title": "Data Engineer",
                 "matching_score": 95,
@@ -177,6 +179,7 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
             {
                 "results": [
                     {
+                        "role_id": 123,
                         "bucket": "ready_now",
                         "title": "Data Engineer",
                         "matching_score": 95,

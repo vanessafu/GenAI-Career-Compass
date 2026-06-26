@@ -18,10 +18,18 @@ class ManualExperienceInput(BaseModel):
     end_date: str | None = None
 
 
+class ManualCertificationInput(BaseModel):
+    name: str
+    issuing_organization: str | None = None
+    issue_date: str | None = None
+
+
 class ManualProjectInput(BaseModel):
     title: str
     description: str | None = None
     technologies: list[str] = Field(default_factory=list)
+    start_date: str | None = None
+    end_date: str | None = None
 
 
 class ManualCVInput(BaseModel):
@@ -42,3 +50,5 @@ class ManualCVInput(BaseModel):
     languages: list[Language] = Field(default_factory=list)
     interests: list[str] = Field(default_factory=list)
     projects: list[ManualProjectInput] = Field(default_factory=list)
+    certifications: list[ManualCertificationInput] = Field(default_factory=list)
+    target_constraints: list[str] = Field(default_factory=list)

@@ -31,31 +31,55 @@ export type ManualExperienceFormItem = {
   endDate: string;
 };
 
+export type ManualProjectFormItem = {
+  title: string;
+  description: string;
+  technologies: string[];
+  startDate: string;
+  endDate: string;
+};
+
+export type ManualCertificationFormItem = {
+  name: string;
+  issuingOrganization: string;
+  issueDate: string;
+};
+
 /** Manual-entry form captured on the entry screen (tier 1 + collapsible tier 2). */
 export type ManualProfileForm = {
   // Tier 1 — quick start
   currentRole: string;
+  seniorityLevel: string;
+  yearsOfExperience: number | null;
   education: ManualEducationFormItem[];
   experience: ManualExperienceFormItem[];
   skills: string[];
   interests: string[];
+  targetConstraints: string[];
   // Tier 2 — add more context
   summary: string;
   softSkills: string[];
   languageName: string;
   languageLevel: string;
+  projects: ManualProjectFormItem[];
+  certifications: ManualCertificationFormItem[];
 };
 
 export const emptyManualProfileForm: ManualProfileForm = {
   currentRole: "",
+  seniorityLevel: "",
+  yearsOfExperience: null,
   education: [],
   experience: [],
   skills: [],
   interests: [],
+  targetConstraints: [],
   summary: "",
   softSkills: [],
   languageName: "",
   languageLevel: "",
+  projects: [],
+  certifications: [],
 };
 
 /** A matched role projected for the cards and detail view. */

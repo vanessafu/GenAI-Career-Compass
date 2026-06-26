@@ -134,6 +134,7 @@ export function RecapStage() {
                     />
                   ))}
                 </AnimatePresence>
+                {educations.length === 0 && <EmptyPrompt>Add education history to improve matching.</EmptyPrompt>}
                 <AddEducationRow onAdd={(e) => addEducation(e)} />
               </div>
             </SectionCard>
@@ -152,6 +153,7 @@ export function RecapStage() {
                     />
                   ))}
                 </AnimatePresence>
+                {experiences.length === 0 && <EmptyPrompt>Add recent work or internship history.</EmptyPrompt>}
                 <AddExperienceRow onAdd={(e) => addExperience(e)} />
               </div>
             </SectionCard>
@@ -161,6 +163,7 @@ export function RecapStage() {
           <div className="grid min-h-0 gap-3 lg:grid-cols-4">
             <SectionCard title="Strongest skills" count={skills.length}>
               <div className="flex flex-1 flex-wrap content-start gap-1.5 overflow-y-auto">
+                {skills.length === 0 && <EmptyPrompt>Add core technical skills.</EmptyPrompt>}
                 <AnimatePresence initial={false}>
                   {skills.map((s, i) => {
                     const Icon = SKILL_ICONS[s.name] ?? SKILL_ICONS.default;
@@ -211,6 +214,7 @@ export function RecapStage() {
 
             <SectionCard title="Interests" count={interests.length}>
               <div className="flex flex-1 flex-wrap content-start gap-1.5 overflow-y-auto">
+                {interests.length === 0 && <EmptyPrompt>Add interests or target areas.</EmptyPrompt>}
                 <AnimatePresence initial={false}>
                   {interests.map((it, i) => (
                     <motion.div
@@ -259,6 +263,7 @@ export function RecapStage() {
                     />
                   ))}
                 </AnimatePresence>
+                {certifications.length === 0 && <EmptyPrompt>Add certifications if you have any.</EmptyPrompt>}
                 <AddSimpleRow
                   placeholderA="Certification name"
                   placeholderB="Year"
@@ -282,6 +287,7 @@ export function RecapStage() {
                     />
                   ))}
                 </AnimatePresence>
+                {projects.length === 0 && <EmptyPrompt>Add projects that show your skills.</EmptyPrompt>}
                 <AddSimpleRow
                   placeholderA="Project name"
                   placeholderB="Year"
@@ -427,6 +433,14 @@ function SectionCard({
 
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </motion.div>
+  );
+}
+
+function EmptyPrompt({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="rounded-xl border border-dashed border-foreground/15 bg-white/45 px-3 py-2 text-[12.5px] leading-snug text-foreground/50">
+      {children}
+    </p>
   );
 }
 

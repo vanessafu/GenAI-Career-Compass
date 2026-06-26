@@ -230,6 +230,7 @@ export type RoleMatchResponse = {
 };
 
 type CareerResultV1 = {
+  role_id: string | number;
   bucket: string;
   title: string;
   matching_score: number;
@@ -262,6 +263,20 @@ export type ManualExperienceInput = {
   end_date?: string | null;
 };
 
+export type ManualProjectInput = {
+  title: string;
+  description?: string | null;
+  technologies?: string[];
+  start_date?: string | null;
+  end_date?: string | null;
+};
+
+export type ManualCertificationInput = {
+  name: string;
+  issuing_organization?: string | null;
+  issue_date?: string | null;
+};
+
 export type ManualCVInput = {
   current_role?: string | null;
   seniority_level?: string | null;
@@ -273,6 +288,9 @@ export type ManualCVInput = {
   soft_skills?: string[];
   languages?: Language[];
   interests?: string[];
+  projects?: ManualProjectInput[];
+  certifications?: ManualCertificationInput[];
+  target_constraints?: string[];
 };
 
 // HTTP helpers
@@ -307,9 +325,9 @@ function bucketLabel(bucket: string): string {
   return label || "Role";
 }
 
-function resultToRoleMatch(result: CareerResultV1, index: number): RoleMatch {
+function resultToRoleMatch(result: CareerResultV1): RoleMatch {
   return {
-    uri: `${result.bucket}:${result.title}:${index}`,
+    uri: String(result.role_id),
     isco_group: result.bucket,
     isco_label: bucketLabel(result.bucket),
     title: result.title,

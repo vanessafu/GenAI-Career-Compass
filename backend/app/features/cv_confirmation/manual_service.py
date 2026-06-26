@@ -2,6 +2,7 @@
 
 from backend.app.features.cv_confirmation.manual_schemas import ManualCVInput
 from backend.app.features.cv_parsing.schemas import (
+    Certification,
     CVData,
     Education,
     Experience,
@@ -13,6 +14,7 @@ from backend.app.features.cv_parsing.schemas import (
     SkillsExtracted,
     SourceDocument,
     TechnicalSkill,
+    UnmappedInformation,
 )
 
 MAX_LIST_ITEMS = 50
@@ -63,16 +65,25 @@ def _dedupe_languages(values: list[Language]) -> list[Language]:
 def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
     """Convert a ManualCVInput DTO into a validated CVData object.
 
-    Raises ManualCVValidationError when neither a current role nor any
-    technical skill is provided (mirrors the frontend minimum guard).
+    Raises ManualCVValidationError when required manual profile signal is missing
+    (mirrors the frontend minimum guard).
     """
     technical_skill_names = _dedupe_strings(request.technical_skills)
     current_role = _clean(request.current_role)
+    seniority_level = _clean(request.seniority_level)
+    interests = _dedupe_strings(request.interests)
+    target_constraints = _dedupe_strings(request.target_constraints)
 
-    if not current_role and not technical_skill_names:
-        raise ManualCVValidationError(
-            "Provide at least your current role or one technical skill."
-        )
+    if not current_role:
+        raise ManualCVValidationError("Provide your current role.")
+    if not seniority_level:
+        raise ManualCVValidationError("Provide your seniority level.")
+    if request.years_of_experience is None:
+        raise ManualCVValidationError("Provide your years of experience.")
+    if not technical_skill_names:
+        raise ManualCVValidationError("Provide at least one technical skill.")
+    if not interests and not target_constraints:
+        raise ManualCVValidationError("Provide at least one interest or target constraint.")
 
     education = [
         Education(
@@ -103,9 +114,21 @@ def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
             title=_clean(item.title),
             description=_clean(item.description),
             technologies=_dedupe_strings(item.technologies),
+            start_date=_clean(item.start_date),
+            end_date=_clean(item.end_date),
         )
         for item in request.projects[:MAX_LIST_ITEMS]
         if _clean(item.title)
+    ]
+
+    certifications = [
+        Certification(
+            name=_clean(item.name),
+            issuing_organization=_clean(item.issuing_organization),
+            issue_date=_clean(item.issue_date),
+        )
+        for item in request.certifications[:MAX_LIST_ITEMS]
+        if _clean(item.name)
     ]
 
     skills_extracted = SkillsExtracted(
@@ -120,12 +143,22 @@ def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
         personal_info=PersonalInfo(current_role=current_role),
         profile_summary=ProfileSummary(
             summary=_clean(request.summary),
-            current_seniority_level=_clean(request.seniority_level),
+            current_seniority_level=seniority_level,
             years_of_experience=request.years_of_experience,
         ),
         experience=experience,
         education=education,
         projects=projects,
+        certifications=certifications,
         skills_extracted=skills_extracted,
-        interests=_dedupe_strings(request.interests),
+        interests=interests,
+        unmapped_information=[
+            UnmappedInformation(
+                label="target_constraint",
+                value=value,
+                source_section="manual_entry",
+                reason_not_mapped="Career target preference captured outside the CV schema.",
+            )
+            for value in target_constraints
+        ],
     )
