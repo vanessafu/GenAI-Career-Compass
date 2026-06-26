@@ -170,7 +170,7 @@ export function cvDataToProjects(cv: CVData): ProjectItem[] {
 export function cvDataToRecapEdits(cv: CVData): RecapEdits {
   return {
     skills: cvDataToSkills(cv),
-    interests: [...cv.interests],
+    interests: normalizeInterests(cv.interests),
     experiences: cvDataToExperiences(cv),
     educations: cvDataToEducations(cv),
     certifications: cvDataToCertifications(cv),
@@ -219,6 +219,10 @@ function uniqueText(values: Iterable<string | null | undefined>): string[] {
     out.push(cleaned);
   }
   return out;
+}
+
+function normalizeInterests(values: Iterable<string | null | undefined>): string[] {
+  return uniqueText(Array.from(values).flatMap((value) => (value ?? "").split(/[,;\n]/)));
 }
 
 function targetPreferences(cv: CVData): string[] {
@@ -273,7 +277,7 @@ export function cvDataToUserCareerProfile(
       skills: uniqueText(item.contextual_skills),
     })),
     skills,
-    interests: uniqueText(cv.interests),
+    interests: normalizeInterests(cv.interests),
     certifications: cv.certifications.map((item) => ({
       name: textOrNull(item.name),
       issuer: null,
@@ -344,7 +348,7 @@ export function applyEditsToCvData(base: CVData, edits: RecapEdits): CVData {
         return { name: s.name, proficiency_indication: existing?.proficiency_indication ?? null };
       }),
     },
-    interests: [...edits.interests],
+    interests: normalizeInterests(edits.interests),
   };
 }
 

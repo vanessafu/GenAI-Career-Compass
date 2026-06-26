@@ -1,6 +1,7 @@
 import logging
 
 import fitz
+from pydantic import BaseModel, Field
 
 from backend.app.core import openai_client
 from backend.app.features.cv_parsing.schemas import CVData
@@ -33,6 +34,52 @@ _SYSTEM_PROMPT = (
     "in unmapped_information instead of discarding it."
 )
 
+_INTEREST_GENERATION_PROMPT = (
+    "Infer 3 to 5 concise career interests from the CV text. "
+    "Use only evidence in the text, avoid personal identifiers, and return short noun phrases. "
+    "Do not include duplicates or full sentences."
+)
+
+
+class _GeneratedInterests(BaseModel):
+    interests: list[str] = Field(default_factory=list)
+
+
+def _clean_interests(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    interests: list[str] = []
+    for value in values:
+        cleaned = value.strip()
+        key = cleaned.casefold()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        interests.append(cleaned)
+    return interests[:5]
+
+
+async def _fill_blank_interests(cv_data: CVData, raw_text: str) -> CVData:
+    if any(item.strip() for item in cv_data.interests):
+        cv_data.interests = _clean_interests(cv_data.interests)
+        return cv_data
+
+    try:
+        generated = await openai_client.parse_structured(
+            messages=[
+                {"role": "system", "content": _INTEREST_GENERATION_PROMPT},
+                {"role": "user", "content": raw_text},
+            ],
+            response_format=_GeneratedInterests,
+            model_purpose="identity",
+        )
+    except Exception as exc:
+        logger.warning("Interest generation failed; keeping blank interests: %s", exc)
+        return cv_data
+
+    if generated is not None:
+        cv_data.interests = _clean_interests(generated.interests)
+    return cv_data
+
 
 def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
     """Extract text from a PDF byte stream in memory."""
@@ -58,7 +105,7 @@ async def parse_cv_to_pydantic(raw_text: str) -> CVData:
             model_purpose="cv_parsing",
         )
         logger.info("CV parsed successfully.")
-        return result
+        return await _fill_blank_interests(result, raw_text)
     except Exception as exc:
         logger.exception("LLM communication error (%s): %s", type(exc).__name__, exc)
         raise RuntimeError(f"Error while processing with the LLM: {type(exc).__name__}: {exc}") from exc

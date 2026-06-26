@@ -20,6 +20,8 @@ import {
   Award,
   FolderGit2,
   PencilLine,
+  Target,
+  Info,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -40,6 +42,7 @@ const SKILL_ICONS: Record<string, LucideIcon> = {
 export function RecapStage() {
   const setStage = useStageStore((s) => s.setStage);
   const identity = useStageStore((s) => s.identity);
+  const cvData = useStageStore((s) => s.cvData);
   const setIdentityLead = useStageStore((s) => s.setIdentityLead);
   const identityLoading = useStageStore((s) => s.identityLoading);
   const skills = useStageStore((s) => s.skills);
@@ -72,6 +75,27 @@ export function RecapStage() {
     (identityLoading
       ? "Generating your career identity…"
       : "We mapped your profile to realistic next roles.");
+
+  const hasRole =
+    Boolean(cvData?.personal_info.current_role?.trim()) ||
+    experiences.some((item) => item.role.trim() && item.role !== "Role");
+  const hasSeniority = Boolean(cvData?.profile_summary.current_seniority_level?.trim());
+  const hasYears =
+    cvData?.profile_summary.years_of_experience !== null &&
+    cvData?.profile_summary.years_of_experience !== undefined;
+  const hasTargetDirection =
+    interests.length > 0 ||
+    Boolean(
+      cvData?.unmapped_information.some(
+        (item) => item.label === "target_constraint" && item.value.trim(),
+      ),
+    );
+  const missingCriticalInfo: string[] = [];
+  if (!hasRole) missingCriticalInfo.push("current role");
+  if (!hasSeniority) missingCriticalInfo.push("seniority");
+  if (!hasYears) missingCriticalInfo.push("years of experience");
+  if (skills.length === 0) missingCriticalInfo.push("skills");
+  if (!hasTargetDirection) missingCriticalInfo.push("career direction");
 
   useLayoutEffect(() => {
     const textarea = leadTextareaRef.current;
@@ -140,6 +164,8 @@ export function RecapStage() {
           </div>
         </motion.div>
 
+        {missingCriticalInfo.length > 0 && <MissingInfoPrompt items={missingCriticalInfo} />}
+
         {/* Two-row grid with a content-sized recap row. */}
         <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3">
           {/* Row 1 — Education (left) + Experience (right). */}
@@ -158,7 +184,9 @@ export function RecapStage() {
                     />
                   ))}
                 </AnimatePresence>
-                {educations.length === 0 && <EmptyPrompt>Add education history to improve matching.</EmptyPrompt>}
+                {educations.length === 0 && (
+                  <EmptyPrompt>Add education history to improve matching.</EmptyPrompt>
+                )}
                 <AddEducationRow onAdd={(e) => addEducation(e)} />
               </div>
             </SectionCard>
@@ -177,7 +205,9 @@ export function RecapStage() {
                     />
                   ))}
                 </AnimatePresence>
-                {experiences.length === 0 && <EmptyPrompt>Add recent work or internship history.</EmptyPrompt>}
+                {experiences.length === 0 && (
+                  <EmptyPrompt>Add recent work or internship history.</EmptyPrompt>
+                )}
                 <AddExperienceRow onAdd={(e) => addExperience(e)} />
               </div>
             </SectionCard>
@@ -185,7 +215,7 @@ export function RecapStage() {
 
           {/* Row 2 — Skills, Interests, Certifications, Projects (all open). */}
           <div className="grid min-h-0 gap-3 lg:grid-cols-4">
-            <SectionCard title="Strongest skills" count={skills.length}>
+            <SectionCard icon={Wrench} title="Skills" count={skills.length}>
               <div className="flex flex-1 flex-wrap content-start gap-1.5 overflow-y-auto">
                 {skills.length === 0 && <EmptyPrompt>Add core technical skills.</EmptyPrompt>}
                 <AnimatePresence initial={false}>
@@ -236,9 +266,13 @@ export function RecapStage() {
               </div>
             </SectionCard>
 
-            <SectionCard title="Interests" count={interests.length}>
+            <SectionCard icon={Target} title="Interests" count={interests.length}>
               <div className="flex flex-1 flex-wrap content-start gap-1.5 overflow-y-auto">
-                {interests.length === 0 && <EmptyPrompt>Add interests or target areas.</EmptyPrompt>}
+                {interests.length === 0 && (
+                  <EmptyPrompt icon={Target} title="No Interests Yet">
+                    Add interests or target areas to improve recommendations.
+                  </EmptyPrompt>
+                )}
                 <AnimatePresence initial={false}>
                   {interests.map((it, i) => (
                     <motion.div
@@ -249,12 +283,12 @@ export function RecapStage() {
                       exit={{ opacity: 0, scale: 0.85 }}
                       transition={{ delay: i * 0.02, type: "spring", stiffness: 400, damping: 24 }}
                       whileHover={{ y: -1 }}
-                      className="group inline-flex items-center gap-1.5 rounded-full bg-[color:var(--brand)]/10 px-3 py-1.5 text-[13.5px] text-[color:var(--brand-deep)]"
+                      className="group inline-flex max-w-full items-start gap-1.5 rounded-xl bg-[color:var(--brand)]/10 px-3 py-1.5 text-[13.5px] text-[color:var(--brand-deep)]"
                     >
-                      {it}
+                      <span className="min-w-0 break-words leading-snug">{it}</span>
                       <button
                         onClick={() => removeInterest(it)}
-                        className="opacity-0 transition group-hover:opacity-100"
+                        className="shrink-0 opacity-0 transition group-hover:opacity-100"
                       >
                         <X size={10} className="hover:text-foreground" />
                       </button>
@@ -287,7 +321,11 @@ export function RecapStage() {
                     />
                   ))}
                 </AnimatePresence>
-                {certifications.length === 0 && <EmptyPrompt>Add certifications if you have any.</EmptyPrompt>}
+                {certifications.length === 0 && (
+                  <EmptyPrompt icon={Award} title="No Certifications Yet">
+                    Add certifications if you have any.
+                  </EmptyPrompt>
+                )}
                 <AddSimpleRow
                   placeholderA="Certification name"
                   placeholderB="Year"
@@ -311,7 +349,11 @@ export function RecapStage() {
                     />
                   ))}
                 </AnimatePresence>
-                {projects.length === 0 && <EmptyPrompt>Add projects that show your skills.</EmptyPrompt>}
+                {projects.length === 0 && (
+                  <EmptyPrompt icon={FolderGit2} title="No Projects Yet">
+                    Add projects that show your skills.
+                  </EmptyPrompt>
+                )}
                 <AddSimpleRow
                   placeholderA="Project name"
                   placeholderB="Year"
@@ -460,11 +502,44 @@ function SectionCard({
   );
 }
 
-function EmptyPrompt({ children }: { children: React.ReactNode }) {
+function EmptyPrompt({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon?: LucideIcon;
+  title?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <p className="rounded-xl border border-dashed border-foreground/15 bg-white/45 px-3 py-2 text-[12.5px] leading-snug text-foreground/50">
-      {children}
-    </p>
+    <div className="flex w-full items-start gap-2 rounded-xl border border-dashed border-foreground/15 bg-white/45 px-3 py-2 text-[12.5px] leading-snug text-foreground/50">
+      {Icon && <Icon size={14} className="mt-0.5 shrink-0 text-[color:var(--brand)]" />}
+      <div className="min-w-0">
+        {title && <p className="font-medium text-foreground/65">{title}</p>}
+        <p>{children}</p>
+      </div>
+    </div>
+  );
+}
+
+function MissingInfoPrompt({ items }: { items: string[] }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="liquid-glass flex items-start gap-2 rounded-2xl px-4 py-3 text-[13px] text-foreground/65"
+    >
+      <Info size={15} className="mt-0.5 shrink-0 text-[color:var(--brand)]" />
+      <div className="min-w-0">
+        <p className="font-medium text-foreground/80">
+          Add missing info to improve recommendations.
+        </p>
+        <p className="mt-0.5">
+          Missing: {items.join(", ")}. Use Career context for role, seniority, or years; add skills
+          and interests below.
+        </p>
+      </div>
+    </motion.div>
   );
 }
 
