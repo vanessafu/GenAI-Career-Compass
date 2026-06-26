@@ -105,18 +105,12 @@ function FullPlanContent({ report }: { report: CareerPathReport }) {
             className="grid min-w-[720px] gap-3"
             style={{ gridTemplateColumns: `repeat(${milestones.length + 2}, minmax(140px, 1fr))` }}
           >
-            <PathNode
-              label="Start"
-              title="Current profile"
-              body={report.current_profile_summary}
-              active
-            />
+            <PathNode label="Start" title="Current profile" active />
             {milestones.map((milestone) => (
               <PathNode
                 key={`${milestone.order}-${milestone.title}`}
-                label={milestoneLabel(milestone)}
+                label={milestoneKindLabel(milestone.kind)}
                 title={milestone.title}
-                body={milestone.rationale}
                 meta={milestone.timeline}
               />
             ))}
@@ -124,6 +118,36 @@ function FullPlanContent({ report }: { report: CareerPathReport }) {
           </div>
         </div>
       </ModalBlock>
+
+      {milestones.length > 0 && (
+        <ModalBlock className="mb-6">
+          <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-foreground/45">
+            Step details
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {milestones.map((milestone) => (
+              <div
+                key={`detail-${milestone.order}-${milestone.title}`}
+                className="rounded-2xl border border-foreground/10 bg-white/60 p-3"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[13px] font-medium leading-snug text-foreground/85">
+                    {milestone.title}
+                  </p>
+                  <span className="rounded-full bg-[color:var(--brand)]/10 px-2 py-0.5 text-[10.5px] uppercase tracking-[0.12em] text-[color:var(--brand-deep)]">
+                    {milestoneKindLabel(milestone.kind)}
+                  </span>
+                </div>
+                {milestone.rationale && (
+                  <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-foreground/60">
+                    {milestone.rationale}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </ModalBlock>
+      )}
     </>
   );
 }
@@ -148,14 +172,12 @@ function Stat({ label, value, large = false }: { label: string; value: string; l
 function PathNode({
   label,
   title,
-  body,
   meta,
   active = false,
   terminal = false,
 }: {
   label: string;
   title: string;
-  body?: string;
   meta?: string;
   active?: boolean;
   terminal?: boolean;
@@ -177,15 +199,24 @@ function PathNode({
       <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-foreground/45">{label}</p>
       <h4 className="mt-1 text-[13px] font-medium leading-snug text-foreground/85">{title}</h4>
       {meta && <p className="mt-1 text-[11px] text-foreground/50">{meta}</p>}
-      {body && (
-        <p className="mt-2 line-clamp-3 text-[12px] leading-relaxed text-foreground/60">{body}</p>
-      )}
     </div>
   );
 }
 
-function milestoneLabel(milestone: CareerPathMilestone): string {
-  return milestone.timeline || `Step ${milestone.order}`;
+function milestoneKindLabel(kind: CareerPathMilestone["kind"]): string {
+  switch (kind) {
+    case "role":
+      return "Intermediate role";
+    case "project":
+      return "Project";
+    case "certification":
+      return "Certification";
+    case "experience":
+      return "Experience";
+    case "skill":
+    default:
+      return "Skill";
+  }
 }
 
 function percent(value: number): number {

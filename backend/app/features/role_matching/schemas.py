@@ -359,8 +359,12 @@ class GapReport(BaseModel):
     narrative: Optional[GapNarrative] = None
 
 
+MilestoneKind = Literal["role", "skill", "project", "certification", "experience"]
+
+
 class CareerPathMilestone(BaseModel):
     order: int = Field(ge=1)
+    kind: MilestoneKind = "skill"
     title: str
     timeline: str = ""
     rationale: str = ""

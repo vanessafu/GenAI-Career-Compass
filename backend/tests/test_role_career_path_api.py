@@ -48,6 +48,7 @@ def test_career_path_endpoint_returns_report(monkeypatch):
             "milestones": [
                 {
                     "order": 1,
+                    "kind": "project",
                     "title": "Build cloud evidence",
                     "timeline": "1 month",
                     "rationale": "Closes the largest visible skill gap.",
@@ -77,6 +78,7 @@ def test_career_path_endpoint_returns_report(monkeypatch):
     body = response.json()
     assert body["role_id"] == 42
     assert body["target_role"] == "Backend Engineer"
+    assert body["milestones"][0]["kind"] == "project"
     assert body["requirement_breakdown"]["job_title"] == "Backend Engineer"
 
 
@@ -175,3 +177,33 @@ def test_career_path_filters_llm_certifications_to_gap_report(monkeypatch):
     assert 3 <= len(report.milestones) <= 5
     assert report.estimated_timeline
     assert report.requirement_breakdown.job_title == "Backend Engineer"
+
+
+def test_career_path_milestone_kind_defaults_to_skill():
+    from backend.app.features.role_matching.schemas import CareerPathMilestone
+
+    milestone = CareerPathMilestone.model_validate(
+        {
+            "order": 1,
+            "title": "Build cloud evidence",
+            "timeline": "1 month",
+            "rationale": "Targets the largest gap.",
+        }
+    )
+
+    assert milestone.kind == "skill"
+
+
+def test_fallback_career_path_uses_meaningful_milestone_kinds():
+    from backend.app.features.role_matching import career_path
+
+    draft = career_path._fallback_draft(
+        ["Cloud architecture", "AWS Certified Developer - Associate"],
+        ["AWS Certified Developer - Associate"],
+    )
+
+    assert [milestone.kind for milestone in draft.milestones[:3]] == [
+        "skill",
+        "certification",
+        "project",
+    ]

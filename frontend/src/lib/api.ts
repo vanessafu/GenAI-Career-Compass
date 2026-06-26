@@ -312,6 +312,7 @@ export type GapReport = {
 
 export type CareerPathMilestone = {
   order: number;
+  kind: "role" | "skill" | "project" | "certification" | "experience";
   title: string;
   timeline: string;
   rationale: string;

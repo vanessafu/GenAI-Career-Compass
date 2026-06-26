@@ -25,7 +25,8 @@ _SYSTEM_PROMPT = (
     "You generate concise career roadmap text from a precomputed gap report. "
     "Use only the supplied role requirements, readiness score, skill gaps, and "
     "certification gaps. Do not invent certifications, salaries, job markets, "
-    "courses, bootcamps, or unsupported career claims."
+    "courses, bootcamps, or unsupported career claims. For every milestone, set "
+    "kind to exactly one of: role, skill, project, certification, experience."
 )
 
 
@@ -96,7 +97,7 @@ def _profile_summary(profile: ConfirmedCVData) -> str:
 
 def _fallback_draft(gaps: list[str], allowed_certs: list[str]) -> CareerPathDraft:
     targets = gaps[:3]
-    for generic in ("target-role evidence", "portfolio proof", "transition narrative"):
+    for generic in ("portfolio proof", "transition narrative", "target-role evidence"):
         if len(targets) >= 3:
             break
         targets.append(generic)
@@ -104,6 +105,7 @@ def _fallback_draft(gaps: list[str], allowed_certs: list[str]) -> CareerPathDraf
     milestones = [
         CareerPathMilestone(
             order=index + 1,
+            kind=_fallback_kind(gap, allowed_certs),
             title=f"Build evidence for {gap}",
             timeline="2-4 weeks",
             rationale=f"This directly addresses the visible {gap} gap.",
@@ -121,6 +123,20 @@ def _fallback_draft(gaps: list[str], allowed_certs: list[str]) -> CareerPathDraf
     )
 
 
+def _fallback_kind(target: str, allowed_certs: list[str]) -> str:
+    key = target.casefold()
+    cert_keys = {cert.casefold() for cert in allowed_certs}
+    if key in cert_keys or "certif" in key or "exam" in key:
+        return "certification"
+    if "portfolio" in key or "project" in key or "proof" in key:
+        return "project"
+    if "role" in key:
+        return "role"
+    if "experience" in key or "transition" in key:
+        return "experience"
+    return "skill"
+
+
 def _prompt_payload(
     report: GapReport,
     current_profile_summary: str,
@@ -134,6 +150,7 @@ def _prompt_payload(
         "top_gaps": top_gaps,
         "matched_skills": report.skills.matched_skills[:10],
         "certification_gaps": allowed_certs,
+        "allowed_milestone_kinds": ["role", "skill", "project", "certification", "experience"],
         "seniority": report.seniority.model_dump(mode="json"),
         "role_description": _clean(report.job_description)[:1200],
     }
@@ -184,6 +201,7 @@ def _normalize_milestones(milestones: list[CareerPathMilestone], gaps: list[str]
     return [
         CareerPathMilestone(
             order=index + 1,
+            kind=item.kind,
             title=item.title,
             timeline=item.timeline,
             rationale=item.rationale,

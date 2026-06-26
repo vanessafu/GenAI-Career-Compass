@@ -5,6 +5,18 @@ export type RoadmapPreviewNode = {
   title: string;
 };
 
+type MilestonePreview = Pick<CareerPathMilestone, "order" | "title"> & {
+  kind?: CareerPathMilestone["kind"];
+};
+
+const KIND_LABELS: Record<CareerPathMilestone["kind"], string> = {
+  role: "Intermediate role",
+  skill: "Skill",
+  project: "Project",
+  certification: "Certification",
+  experience: "Experience",
+};
+
 function clean(value: string | null | undefined, fallback: string): string {
   const trimmed = value?.trim();
   return trimmed || fallback;
@@ -17,7 +29,7 @@ export function buildRoadmapPreviewNodes({
 }: {
   currentRole: string | null | undefined;
   targetRole: string | null | undefined;
-  milestones: Pick<CareerPathMilestone, "order" | "title">[];
+  milestones: MilestonePreview[];
 }): RoadmapPreviewNode[] {
   const sorted = [...milestones]
     .filter((milestone) => milestone.title?.trim())
@@ -25,8 +37,13 @@ export function buildRoadmapPreviewNodes({
 
   return [
     { label: "Start", title: clean(currentRole, "Current profile") },
-    { label: "Milestone", title: clean(sorted[0]?.title, "Priority milestone") },
-    { label: "Proof", title: clean(sorted[1]?.title, "Proof milestone") },
+    { label: kindLabel(sorted[0]), title: clean(sorted[0]?.title, "Priority milestone") },
+    { label: kindLabel(sorted[1]), title: clean(sorted[1]?.title, "Proof milestone") },
     { label: "Target role", title: clean(targetRole, "Target role") },
   ];
+}
+
+function kindLabel(milestone: MilestonePreview | undefined): string {
+  if (!milestone?.kind) return "Milestone";
+  return KIND_LABELS[milestone.kind] ?? "Milestone";
 }

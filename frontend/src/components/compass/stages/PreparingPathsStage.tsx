@@ -10,8 +10,7 @@ const STEPS = ["Building roadmap milestones", "Checking skill gaps", "Putting yo
 export function PreparingPathsStage() {
   const selectedRoleIds = useStageStore((s) => s.selectedRoleIds);
   const setStage = useStageStore((s) => s.setStage);
-  const loadCareerPath = useStageStore((s) => s.loadCareerPath);
-  const loadRoleGapAnalysis = useStageStore((s) => s.loadRoleGapAnalysis);
+  const prepareSelectedPaths = useStageStore((s) => s.prepareSelectedPaths);
   const [step, setStep] = useState(0);
   const [progress, setProgress] = useState(8);
   const [done, setDone] = useState(false);
@@ -37,9 +36,7 @@ export function PreparingPathsStage() {
     tickProgress();
     progressTimerRef.current = setInterval(tickProgress, 250);
 
-    Promise.allSettled(
-      selectedRoleIds.flatMap((roleId) => [loadCareerPath(roleId), loadRoleGapAnalysis(roleId)]),
-    ).then(() => {
+    prepareSelectedPaths(selectedRoleIds).then(() => {
       if (!active) return;
       if (progressTimerRef.current) {
         clearInterval(progressTimerRef.current);
@@ -59,7 +56,7 @@ export function PreparingPathsStage() {
         progressTimerRef.current = null;
       }
     };
-  }, [loadCareerPath, loadRoleGapAnalysis, selectedRoleIds, setStage]);
+  }, [prepareSelectedPaths, selectedRoleIds, setStage]);
 
   return (
     <div className="relative flex w-full flex-col items-stretch px-6 pb-10 pt-[max(6rem,calc(env(safe-area-inset-top)+5rem))] sm:px-10 lg:px-16 lg:pt-24">

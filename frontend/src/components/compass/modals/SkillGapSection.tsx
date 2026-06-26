@@ -1,9 +1,11 @@
 import { ModalBlock } from "./DeepDiveModal";
+import { buildSkillRadarAxes, type SkillRadarAxis } from "@/lib/gapRadar";
 import type { GapReport, SeniorityDimension, SkillGap } from "@/lib/api";
 
 export function SkillGapSection({ report }: { report: GapReport }) {
   const topGaps = sortSkillGaps(report.skills.skill_gaps).slice(0, 3);
   const readiness = percent(report.overall_readiness || report.readiness_score);
+  const readinessText = readinessCopy(readiness);
 
   return (
     <>
@@ -12,25 +14,13 @@ export function SkillGapSection({ report }: { report: GapReport }) {
         <p className="font-display text-4xl tracking-tight text-[color:var(--brand-deep)]">
           {readiness}%
         </p>
-        <p className="mt-2 text-[13px] leading-relaxed text-foreground/70">
-          {report.narrative?.readiness_summary || readinessCopy(readiness)}
-        </p>
+        <p className="mt-1 text-[14px] font-medium text-foreground/80">{readinessText.title}</p>
+        <p className="mt-2 text-[13px] leading-relaxed text-foreground/70">{readinessText.body}</p>
       </ModalBlock>
 
-      <SkillMap report={report} />
+      <SkillRadar report={report} />
       <GapList title="Top skill gaps" gaps={topGaps} />
       <SeniorityGap seniority={report.seniority} />
-
-      {report.narrative?.next_steps && (
-        <ModalBlock className="mb-5">
-          <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-foreground/45">
-            Next steps
-          </p>
-          <p className="text-[13px] leading-relaxed text-foreground/75">
-            {report.narrative.next_steps}
-          </p>
-        </ModalBlock>
-      )}
     </>
   );
 }
@@ -47,38 +37,114 @@ const DOMAIN_LABELS: Record<string, string> = {
   ux_ui: "UX/UI",
 };
 
-function SkillMap({ report }: { report: GapReport }) {
-  const coverage = percent(report.skills.coverage);
-  const matched = report.skills.matched_skills.length;
-  const total = matched + report.skills.skill_gaps.length;
+function SkillRadar({ report }: { report: GapReport }) {
+  const axes = buildSkillRadarAxes(report);
   const domains = domainLabels(report.domain_tags);
 
   return (
     <ModalBlock className="mb-5">
       <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-foreground/45">Skill map</p>
-      <div className="flex flex-wrap gap-1.5">
-        {domains.map((domain) => (
-          <span
-            key={domain}
-            className="rounded-full bg-[color:var(--brand)]/10 px-2.5 py-1 text-[12px] text-[color:var(--brand-deep)]"
-          >
-            {domain}
-          </span>
-        ))}
-      </div>
-      <div className="mt-4">
-        <div className="mb-1.5 flex items-center justify-between gap-3 text-[11.5px] text-foreground/55">
-          <span>Skill coverage</span>
-          <span>{total > 0 ? `${matched} of ${total} core skills covered` : `${coverage}%`}</span>
+      {axes.length > 0 ? (
+        <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-center">
+          <RadarSvg axes={axes} />
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-1.5">
+              {domains.map((domain) => (
+                <span
+                  key={domain}
+                  className="rounded-full bg-[color:var(--brand)]/10 px-2.5 py-1 text-[12px] text-[color:var(--brand-deep)]"
+                >
+                  {domain}
+                </span>
+              ))}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {axes.map((axis) => (
+                <div
+                  key={axis.label}
+                  className="rounded-2xl border border-foreground/10 bg-white/60 p-3"
+                >
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="line-clamp-1 text-[12.5px] font-medium text-foreground/80">
+                      {axis.label}
+                    </p>
+                    <span className="text-[11px] text-foreground/45">{percent(axis.value)}%</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]">
+                    <div
+                      className="h-full rounded-full bg-[color:var(--brand)]"
+                      style={{ width: `${percent(axis.value)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-foreground/[0.08]">
-          <div
-            className="h-full rounded-full bg-[color:var(--brand)]"
-            style={{ width: `${coverage}%` }}
-          />
-        </div>
-      </div>
+      ) : (
+        <p className="text-[12.5px] text-foreground/55">No skill comparison is available yet.</p>
+      )}
     </ModalBlock>
+  );
+}
+
+function RadarSvg({ axes }: { axes: SkillRadarAxis[] }) {
+  const center = 120;
+  const radius = 78;
+  const grid = [0.33, 0.66, 1].map((scale) => radarPoints(axes.length, radius * scale, center));
+  const valuePoints = axes
+    .map((axis, index) => pointFor(index, axes.length, radius * axis.value, center))
+    .map((point) => `${point.x},${point.y}`)
+    .join(" ");
+
+  return (
+    <svg
+      viewBox="0 0 240 240"
+      role="img"
+      aria-label="Skill gap radar chart"
+      className="mx-auto h-64 w-64"
+    >
+      {grid.map((points) => (
+        <polygon
+          key={points}
+          points={points}
+          fill="none"
+          stroke="color-mix(in oklab, var(--brand) 20%, white)"
+          strokeWidth="1"
+        />
+      ))}
+      {axes.map((axis, index) => {
+        const edge = pointFor(index, axes.length, radius, center);
+        const label = pointFor(index, axes.length, radius + 24, center);
+        return (
+          <g key={axis.label}>
+            <line
+              x1={center}
+              y1={center}
+              x2={edge.x}
+              y2={edge.y}
+              stroke="color-mix(in oklab, var(--brand) 18%, white)"
+              strokeWidth="1"
+            />
+            <text
+              x={label.x}
+              y={label.y}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="fill-foreground/60 text-[10px]"
+            >
+              {shortLabel(axis.label)}
+            </text>
+          </g>
+        );
+      })}
+      <polygon
+        points={valuePoints}
+        fill="color-mix(in oklab, var(--brand) 22%, transparent)"
+        stroke="var(--brand)"
+        strokeWidth="2"
+      />
+    </svg>
   );
 }
 
@@ -142,10 +208,23 @@ function percent(value: number): number {
   return Math.round(clamp01(value > 1 ? value / 100 : value) * 100);
 }
 
-function readinessCopy(readiness: number): string {
-  if (readiness >= 70) return "You already cover most of what this role asks for.";
-  if (readiness >= 40) return "This looks reachable, but a few gaps need focused work.";
-  return "This role is a stretch based on the visible profile data.";
+function readinessCopy(readiness: number): { title: string; body: string } {
+  if (readiness >= 70) {
+    return {
+      title: "Strong starting point",
+      body: "You already show much of what this role needs. A few targeted proof points can make the path clearer.",
+    };
+  }
+  if (readiness >= 40) {
+    return {
+      title: "Reachable with focused gaps",
+      body: "This path looks realistic if you focus on the highest-impact gaps first.",
+    };
+  }
+  return {
+    title: "Stretch path",
+    body: "This role needs a bigger bridge. Start with the core gaps before adding extra credentials.",
+  };
 }
 
 function sortSkillGaps(gaps: SkillGap[]): SkillGap[] {
@@ -192,4 +271,23 @@ function formatDomainTag(tag: string): string {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function radarPoints(count: number, radius: number, center: number): string {
+  return Array.from({ length: count }, (_, index) => {
+    const point = pointFor(index, count, radius, center);
+    return `${point.x},${point.y}`;
+  }).join(" ");
+}
+
+function pointFor(index: number, count: number, radius: number, center: number) {
+  const angle = -Math.PI / 2 + (index * 2 * Math.PI) / count;
+  return {
+    x: center + Math.cos(angle) * radius,
+    y: center + Math.sin(angle) * radius,
+  };
+}
+
+function shortLabel(label: string): string {
+  return label.length > 16 ? `${label.slice(0, 14)}...` : label;
 }

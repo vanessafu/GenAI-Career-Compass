@@ -22,6 +22,7 @@ import {
   toConfirmedCvData,
   type RecapEdits,
 } from "@/lib/cvData";
+import { areSelectedPathsPrepared } from "@/lib/pathPreparation";
 import type {
   AnalyzedSkill,
   CertificationItem,
@@ -35,6 +36,7 @@ import type {
 export type Stage = "entry" | "recap" | "matching" | "directions" | "preparing_paths" | "focus";
 
 export const MAX_PICKS = 3;
+const PATH_PREP_TIMEOUT_MS = 90000;
 
 function errorMessage(err: unknown, fallback: string): string {
   if (err instanceof ApiError) return err.message;
@@ -106,6 +108,7 @@ type Store = {
   runMatching: () => Promise<boolean>;
   loadRoleGapAnalysis: (roleId: string) => Promise<void>;
   loadCareerPath: (roleId: string) => Promise<void>;
+  prepareSelectedPaths: (roleIds: string[]) => Promise<void>;
   reset: () => void;
 };
 
@@ -389,5 +392,48 @@ export const useStageStore = create<Store>((set, get) => ({
     }
   },
 
+  prepareSelectedPaths: async (roleIds) => {
+    const selected = [...new Set(roleIds.filter(Boolean))];
+    if (selected.length === 0) return;
+
+    await Promise.allSettled(
+      selected.flatMap((roleId) => [
+        get().loadCareerPath(roleId),
+        get().loadRoleGapAnalysis(roleId),
+      ]),
+    );
+
+    const startedAt = Date.now();
+    while (!areSelectedPathsPrepared(selected, get())) {
+      if (Date.now() - startedAt > PATH_PREP_TIMEOUT_MS) {
+        set((s) => {
+          const careerPathErrors = { ...s.careerPathErrors };
+          const roleGapErrors = { ...s.roleGapErrors };
+          const careerPathLoading = { ...s.careerPathLoading };
+          const roleGapLoading = { ...s.roleGapLoading };
+
+          for (const roleId of selected) {
+            if (!s.careerPathReports[roleId] && !careerPathErrors[roleId]) {
+              careerPathErrors[roleId] = "Career roadmap is still unavailable.";
+              careerPathLoading[roleId] = false;
+            }
+            if (!s.roleGapReports[roleId] && !roleGapErrors[roleId]) {
+              roleGapErrors[roleId] = "Gap analysis is still unavailable.";
+              roleGapLoading[roleId] = false;
+            }
+          }
+
+          return { careerPathErrors, roleGapErrors, careerPathLoading, roleGapLoading };
+        });
+        return;
+      }
+      await sleep(150);
+    }
+  },
+
   reset: () => set({ ...initialState }),
 }));
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
