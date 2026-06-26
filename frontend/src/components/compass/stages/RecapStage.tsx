@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useStageStore } from "@/state/useStageStore";
+import { buildMissingBigSections } from "@/lib/recapMissingInfo";
 import {
   ArrowRight,
   Sparkles,
@@ -42,7 +43,6 @@ const SKILL_ICONS: Record<string, LucideIcon> = {
 export function RecapStage() {
   const setStage = useStageStore((s) => s.setStage);
   const identity = useStageStore((s) => s.identity);
-  const cvData = useStageStore((s) => s.cvData);
   const setIdentityLead = useStageStore((s) => s.setIdentityLead);
   const identityLoading = useStageStore((s) => s.identityLoading);
   const skills = useStageStore((s) => s.skills);
@@ -76,26 +76,14 @@ export function RecapStage() {
       ? "Generating your career identity…"
       : "We mapped your profile to realistic next roles.");
 
-  const hasRole =
-    Boolean(cvData?.personal_info.current_role?.trim()) ||
-    experiences.some((item) => item.role.trim() && item.role !== "Role");
-  const hasSeniority = Boolean(cvData?.profile_summary.current_seniority_level?.trim());
-  const hasYears =
-    cvData?.profile_summary.years_of_experience !== null &&
-    cvData?.profile_summary.years_of_experience !== undefined;
-  const hasTargetDirection =
-    interests.length > 0 ||
-    Boolean(
-      cvData?.unmapped_information.some(
-        (item) => item.label === "target_constraint" && item.value.trim(),
-      ),
-    );
-  const missingCriticalInfo: string[] = [];
-  if (!hasRole) missingCriticalInfo.push("current role");
-  if (!hasSeniority) missingCriticalInfo.push("seniority");
-  if (!hasYears) missingCriticalInfo.push("years of experience");
-  if (skills.length === 0) missingCriticalInfo.push("skills");
-  if (!hasTargetDirection) missingCriticalInfo.push("career direction");
+  const missingBigSections = buildMissingBigSections({
+    educations,
+    experiences,
+    skills,
+    interests,
+    certifications,
+    projects,
+  });
 
   useLayoutEffect(() => {
     const textarea = leadTextareaRef.current;
@@ -164,7 +152,7 @@ export function RecapStage() {
           </div>
         </motion.div>
 
-        {missingCriticalInfo.length > 0 && <MissingInfoPrompt items={missingCriticalInfo} />}
+        {missingBigSections.length > 0 && <MissingInfoPrompt items={missingBigSections} />}
 
         {/* Two-row grid with a content-sized recap row. */}
         <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3">
@@ -535,8 +523,7 @@ function MissingInfoPrompt({ items }: { items: string[] }) {
           Add missing info to improve recommendations.
         </p>
         <p className="mt-0.5">
-          Missing: {items.join(", ")}. Use Career context for role, seniority, or years; add skills
-          and interests below.
+          Missing: {items.join(", ")}. Add details in the sections below.
         </p>
       </div>
     </motion.div>
