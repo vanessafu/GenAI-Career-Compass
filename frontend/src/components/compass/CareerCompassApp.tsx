@@ -6,6 +6,7 @@ import { EntryStage } from "./stages/EntryStage";
 import { RecapStage } from "./stages/RecapStage";
 import { MatchingStage } from "./stages/MatchingStage";
 import { DirectionsStage } from "./stages/DirectionsStage";
+import { PreparingPathsStage } from "./stages/PreparingPathsStage";
 import { FocusStage } from "./stages/FocusStage";
 
 export function CareerCompassApp() {
@@ -35,6 +36,7 @@ export function CareerCompassApp() {
           {stage === "recap" && <RecapStage />}
           {stage === "matching" && <MatchingStage />}
           {stage === "directions" && <DirectionsStage />}
+          {stage === "preparing_paths" && <PreparingPathsStage />}
           {stage === "focus" && <FocusStage />}
         </motion.div>
       </AnimatePresence>

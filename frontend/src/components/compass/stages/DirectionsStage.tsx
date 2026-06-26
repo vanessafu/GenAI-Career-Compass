@@ -36,7 +36,7 @@ export function DirectionsStage() {
               whileHover={canProceed ? { y: -1 } : undefined}
               whileTap={canProceed ? { scale: 0.98 } : undefined}
               disabled={!canProceed}
-              onClick={() => canProceed && setStage("focus")}
+              onClick={() => canProceed && setStage("preparing_paths")}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-medium text-white transition",
                 !canProceed && "cursor-not-allowed opacity-40",

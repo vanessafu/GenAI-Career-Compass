@@ -32,7 +32,7 @@ import type {
   ProjectItem,
 } from "@/types";
 
-export type Stage = "entry" | "recap" | "matching" | "directions" | "focus";
+export type Stage = "entry" | "recap" | "matching" | "directions" | "preparing_paths" | "focus";
 
 export const MAX_PICKS = 3;
 

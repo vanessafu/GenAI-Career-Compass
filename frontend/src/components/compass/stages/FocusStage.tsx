@@ -1,11 +1,13 @@
 import { motion } from "framer-motion";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useStageStore } from "@/state/useStageStore";
+import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { ArrowLeft, ChevronRight, Clock, Wallet } from "lucide-react";
+import { buildRoadmapPreviewNodes, type RoadmapPreviewNode } from "@/lib/roadmapPreview";
 import { roleMatchesToViews } from "@/lib/roleView";
+import { useStageStore } from "@/state/useStageStore";
+import type { CareerPathReport } from "@/lib/api";
 import type { RoleView } from "@/types";
-import { CareerRoadmapModal } from "../modals/CareerRoadmapModal";
-import { RoleDetailModal } from "../modals/RoleDetailModal";
-import { ArrowLeft, ChevronRight, Sparkles, BookOpen } from "lucide-react";
+import { FullPlanModal } from "../modals/FullPlanModal";
 
 export function FocusStage() {
   const setStage = useStageStore((s) => s.setStage);
@@ -13,16 +15,16 @@ export function FocusStage() {
   const roleMatches = useStageStore((s) => s.roleMatches);
   const cvData = useStageStore((s) => s.cvData);
   const roleGapReports = useStageStore((s) => s.roleGapReports);
+  const roleGapLoading = useStageStore((s) => s.roleGapLoading);
   const roleGapErrors = useStageStore((s) => s.roleGapErrors);
   const careerPathReports = useStageStore((s) => s.careerPathReports);
   const careerPathLoading = useStageStore((s) => s.careerPathLoading);
   const careerPathErrors = useStageStore((s) => s.careerPathErrors);
   const loadRoleGapAnalysis = useStageStore((s) => s.loadRoleGapAnalysis);
   const loadCareerPath = useStageStore((s) => s.loadCareerPath);
-  const [gapRole, setGapRole] = useState<RoleView | null>(null);
-  const [roadmapRole, setRoadmapRole] = useState<RoleView | null>(null);
+  const [planRole, setPlanRole] = useState<RoleView | null>(null);
 
-  const startRole = cvData?.personal_info.current_role?.trim() || "your current profile";
+  const startRole = cvData?.personal_info.current_role?.trim() || "Current profile";
 
   const paths = useMemo(() => {
     const views = roleMatchesToViews(roleMatches);
@@ -31,12 +33,14 @@ export function FocusStage() {
   }, [roleMatches, selectedIds]);
 
   useEffect(() => {
-    if (gapRole) void loadRoleGapAnalysis(gapRole.id);
-  }, [gapRole, loadRoleGapAnalysis]);
+    paths.forEach((role) => void loadCareerPath(role.id));
+  }, [loadCareerPath, paths]);
 
   useEffect(() => {
-    if (roadmapRole) void loadCareerPath(roadmapRole.id);
-  }, [roadmapRole, loadCareerPath]);
+    if (!planRole) return;
+    void loadCareerPath(planRole.id);
+    void loadRoleGapAnalysis(planRole.id);
+  }, [loadCareerPath, loadRoleGapAnalysis, planRole]);
 
   return (
     <div className="relative flex w-full flex-col px-6 pb-8 pt-[max(5.5rem,calc(env(safe-area-inset-top)+4.5rem))] sm:px-10 lg:px-16 lg:pt-24">
@@ -48,7 +52,7 @@ export function FocusStage() {
         >
           <div>
             <h2 className="h-stage">
-              What these roles{" "}
+              Where you are, and{" "}
               <span
                 className="italic"
                 style={{
@@ -58,12 +62,12 @@ export function FocusStage() {
                   color: "transparent",
                 }}
               >
-                ask of you.
+                how to get there.
               </span>
             </h2>
             <p className="mt-1 max-w-[60ch] text-[13px] leading-relaxed text-foreground/65">
               Starting from <span className="font-medium text-foreground/85">{startRole}</span>.
-              Open a role for the full skill and knowledge breakdown.
+              Open a role for the roadmap and skills gap.
             </p>
           </div>
           <button
@@ -83,31 +87,27 @@ export function FocusStage() {
               key={role.id}
               role={role}
               index={i}
-              onGap={() => setGapRole(role)}
-              onRoadmap={() => setRoadmapRole(role)}
+              currentRole={startRole}
+              report={careerPathReports[role.id] ?? null}
+              loading={!!careerPathLoading[role.id]}
+              error={careerPathErrors[role.id] ?? null}
+              onFullPlan={() => setPlanRole(role)}
             />
           ))}
         </div>
       </div>
 
-      {gapRole && (
-        <RoleDetailModal
-          role={gapRole}
-          gapReport={roleGapReports[gapRole.id] ?? null}
-          gapError={roleGapErrors[gapRole.id] ?? null}
-          open={!!gapRole}
-          onClose={() => setGapRole(null)}
-        />
-      )}
-
-      {roadmapRole && (
-        <CareerRoadmapModal
-          role={roadmapRole}
-          report={careerPathReports[roadmapRole.id] ?? null}
-          loading={!!careerPathLoading[roadmapRole.id]}
-          error={careerPathErrors[roadmapRole.id] ?? null}
-          open={!!roadmapRole}
-          onClose={() => setRoadmapRole(null)}
+      {planRole && (
+        <FullPlanModal
+          role={planRole}
+          report={careerPathReports[planRole.id] ?? null}
+          loading={!!careerPathLoading[planRole.id]}
+          error={careerPathErrors[planRole.id] ?? null}
+          gapReport={roleGapReports[planRole.id] ?? null}
+          gapLoading={!!roleGapLoading[planRole.id]}
+          gapError={roleGapErrors[planRole.id] ?? null}
+          open={!!planRole}
+          onClose={() => setPlanRole(null)}
         />
       )}
     </div>
@@ -117,111 +117,126 @@ export function FocusStage() {
 function PathCard({
   role,
   index,
-  onGap,
-  onRoadmap,
+  currentRole,
+  report,
+  loading,
+  error,
+  onFullPlan,
 }: {
   role: RoleView;
   index: number;
-  onGap: () => void;
-  onRoadmap: () => void;
+  currentRole: string;
+  report: CareerPathReport | null;
+  loading: boolean;
+  error: string | null;
+  onFullPlan: () => void;
 }) {
+  const nodes = buildRoadmapPreviewNodes({
+    currentRole,
+    targetRole: report?.target_role ?? role.title,
+    milestones: report?.milestones ?? [],
+  });
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay: index * 0.07, ease: [0.22, 1, 0.36, 1] }}
-      className="liquid-glass relative grid grid-cols-1 gap-4 overflow-hidden rounded-3xl p-5 lg:grid-cols-[240px_1fr_auto] lg:items-center lg:gap-6 lg:p-6"
+      className="liquid-glass relative grid grid-cols-1 gap-4 overflow-hidden rounded-3xl p-5 lg:grid-cols-[250px_minmax(0,1fr)_auto] lg:items-center lg:gap-7 lg:p-6"
     >
-      <div className="flex flex-col gap-2">
+      <div className="flex min-w-0 flex-col gap-2">
         <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[color:var(--brand)]/10 px-2 py-0.5 text-[10.5px] font-medium uppercase tracking-[0.16em] text-[color:var(--brand-deep)]">
           <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--brand)]" />
           {role.trackLabel}
         </span>
         <h3
-          className="font-display tracking-tight"
-          style={{ fontSize: "clamp(1.2rem, 1.6vw, 1.45rem)", lineHeight: 1.15 }}
+          className="font-display tracking-tight text-balance"
+          style={{ fontSize: "clamp(1.18rem, 1.5vw, 1.45rem)", lineHeight: 1.15 }}
         >
           {role.title}
         </h3>
-        <span
-          className="w-fit text-[12px] font-medium"
-          style={{
-            background: "var(--gradient-warm)",
-            WebkitBackgroundClip: "text",
-            backgroundClip: "text",
-            color: "transparent",
-          }}
-        >
-          {Math.round(role.fit * 100)}% fit
-        </span>
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-foreground/58">
+          {report?.estimated_timeline && (
+            <MetaItem icon={<Clock size={13} />} label={report.estimated_timeline} />
+          )}
+          {role.salary && <MetaItem icon={<Wallet size={13} />} label={role.salary} />}
+          <span
+            className="font-medium"
+            style={{
+              background: "var(--gradient-warm)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+            }}
+          >
+            {Math.round(role.fit * 100)}% fit
+          </span>
+        </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <SkillPreview
-          icon={<Sparkles size={12} />}
-          label="Matched skills"
-          items={role.matchedSkills}
-        />
-        <SkillPreview
-          icon={<BookOpen size={12} />}
-          label="Matched domains"
-          items={role.essentialKnowledge}
-        />
-      </div>
+      {error && !report ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50/70 px-3 py-2 text-[12.5px] text-red-700">
+          Roadmap unavailable. Open the full plan for details.
+        </div>
+      ) : (
+        <RoadmapPreview nodes={nodes} loading={loading && !report} />
+      )}
 
-      <div className="flex flex-wrap gap-2 self-end lg:self-center">
-        <motion.button
-          onClick={onGap}
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.97 }}
-          className="inline-flex w-fit items-center gap-1.5 rounded-full border border-[color:var(--brand)]/20 bg-white/70 px-4 py-2 text-[12.5px] font-medium text-[color:var(--brand-deep)]"
-        >
-          Show skill gap <ChevronRight size={13} />
-        </motion.button>
-        <motion.button
-          onClick={onRoadmap}
-          whileHover={{ y: -1 }}
-          whileTap={{ scale: 0.97 }}
-          className="inline-flex w-fit items-center gap-1.5 rounded-full px-4 py-2 text-[12.5px] font-medium text-white"
-          style={{
-            background: "var(--gradient-warm)",
-            boxShadow: "0 10px 24px -14px color-mix(in oklab, var(--brand-deep) 60%, transparent)",
-          }}
-        >
-          Show roadmap <ChevronRight size={13} />
-        </motion.button>
-      </div>
+      <motion.button
+        onClick={onFullPlan}
+        whileHover={{ y: -1 }}
+        whileTap={{ scale: 0.97 }}
+        className="inline-flex w-fit items-center gap-1.5 rounded-full px-4 py-2 text-[12.5px] font-medium text-white lg:justify-self-end"
+        style={{
+          background: "var(--gradient-warm)",
+          boxShadow: "0 10px 24px -14px color-mix(in oklab, var(--brand-deep) 60%, transparent)",
+        }}
+      >
+        View full plan <ChevronRight size={13} />
+      </motion.button>
     </motion.div>
   );
 }
 
-function SkillPreview({ icon, label, items }: { icon: ReactNode; label: string; items: string[] }) {
-  const shown = items.slice(0, 4);
+function RoadmapPreview({ nodes, loading }: { nodes: RoadmapPreviewNode[]; loading: boolean }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <p className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-foreground/45">
-        <span className="text-[color:var(--brand)]">{icon}</span>
-        {label}
-      </p>
-      {shown.length === 0 ? (
-        <p className="text-[12px] text-foreground/45">-</p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {shown.map((item) => (
+    <div className="overflow-x-auto pb-1" aria-busy={loading}>
+      <div className="grid min-w-[520px] grid-cols-4 gap-3">
+        {nodes.map((node, index) => (
+          <div
+            key={`${node.label}-${index}`}
+            className="relative flex min-w-0 flex-col items-center text-center"
+          >
+            {index < nodes.length - 1 && (
+              <span className="absolute left-1/2 top-5 h-px w-full translate-x-5 border-t border-dotted border-[color:var(--brand)]/50" />
+            )}
             <span
-              key={item}
-              className="line-clamp-1 max-w-full rounded-full border border-foreground/10 bg-white/70 px-2 py-0.5 text-[11.5px] text-foreground/75"
+              className={
+                index === 0 || index === nodes.length - 1
+                  ? "relative z-10 grid h-10 w-10 place-items-center rounded-full bg-[color:var(--brand)] text-white shadow-[0_12px_24px_-14px_color-mix(in_oklab,var(--brand-deep)_70%,transparent)]"
+                  : "relative z-10 grid h-10 w-10 place-items-center rounded-full border border-[color:var(--brand)]/20 bg-white text-[color:var(--brand-deep)]"
+              }
             >
-              {item}
+              <span className="h-2 w-2 rounded-full bg-current" />
             </span>
-          ))}
-          {items.length > shown.length && (
-            <span className="rounded-full px-1.5 py-0.5 text-[11.5px] text-foreground/45">
-              +{items.length - shown.length}
-            </span>
-          )}
-        </div>
-      )}
+            <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-foreground/45">
+              {node.label}
+            </p>
+            <p className="mt-1 line-clamp-2 text-[12.5px] font-medium leading-snug text-foreground/82">
+              {loading && index > 0 && index < nodes.length - 1 ? "Preparing..." : node.title}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
+  );
+}
+
+function MetaItem({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="text-foreground/42">{icon}</span>
+      {label}
+    </span>
   );
 }

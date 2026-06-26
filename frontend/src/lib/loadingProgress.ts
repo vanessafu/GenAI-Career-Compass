@@ -30,6 +30,14 @@ export const MATCHING_PROGRESS = [
   { elapsedMs: 24000, step: 2, progress: 89 },
 ] as const satisfies LoadingProgressConfig;
 
+export const PATH_PREP_PROGRESS = [
+  { elapsedMs: 0, step: 0, progress: 8 },
+  { elapsedMs: 2500, step: 0, progress: 30 },
+  { elapsedMs: 6500, step: 1, progress: 58 },
+  { elapsedMs: 12000, step: 2, progress: 82 },
+  { elapsedMs: 22000, step: 2, progress: 89 },
+] as const satisfies LoadingProgressConfig;
+
 function clampProgress(value: number): number {
   return Math.max(0, Math.min(95, value));
 }

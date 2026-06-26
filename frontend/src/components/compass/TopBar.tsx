@@ -16,7 +16,8 @@ export function TopBar() {
   const reset = useStageStore((s) => s.reset);
   const hasCv = useStageStore((s) => s.cvData !== null);
 
-  const currentIdx = STAGES.findIndex((s) => s.key === stage);
+  const visibleStage = stage === "preparing_paths" ? "focus" : stage;
+  const currentIdx = STAGES.findIndex((s) => s.key === visibleStage);
   const currentLabel = STAGES[currentIdx]?.label ?? "";
 
   return (
@@ -43,7 +44,7 @@ export function TopBar() {
         <nav className="hidden items-center gap-1 sm:flex">
           {STAGES.map((s, i) => {
             const reachable = i === 0 || hasCv;
-            const active = s.key === stage;
+            const active = s.key === visibleStage;
             const visited = i < currentIdx;
             return (
               <button
