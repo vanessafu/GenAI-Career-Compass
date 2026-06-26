@@ -23,6 +23,7 @@ from backend.app.features.role_matching.schemas import (
 )
 from backend.app.features.role_matching.service import (
     _apply_role_summaries,
+    _clean_role_card_summary,
     _cert_overlap,
     _match_roles_sync,
     build_capability_text,
@@ -275,8 +276,8 @@ class RoleCardSummaryGenerationTests(unittest.TestCase):
                     role_schemas.RoleSummaryItem(
                         role_id="123",
                         summary=(
-                            "Designs dashboards for business leaders. "
-                            "Uses Python, SQL, and Tableau for analysis."
+                            "Turns business data into dashboards leaders can use. "
+                            "Helps teams spot trends and act faster."
                         ),
                     )
                 ]
@@ -292,7 +293,9 @@ class RoleCardSummaryGenerationTests(unittest.TestCase):
         payload = captured["payload"]  # type: ignore[assignment]
         payload_role = payload["roles"][0]  # type: ignore[index]
 
-        self.assertIn("one present-tense sentence", system_prompt)
+        self.assertIn("one or two present-tense sentences", system_prompt)
+        self.assertIn("concrete day-to-day work", system_prompt)
+        self.assertIn("Avoid repetitive generic openers", system_prompt)
         self.assertIn("Do not mention the user", system_prompt)
         self.assertIn("Do not list skills", system_prompt)
         self.assertNotIn("profile", payload)
@@ -300,7 +303,25 @@ class RoleCardSummaryGenerationTests(unittest.TestCase):
             {"role_id", "title", "esco_title", "description"},
             set(payload_role),
         )
-        self.assertEqual("Designs dashboards for business leaders.", role.description)
+        self.assertEqual(
+            "Turns business data into dashboards leaders can use. Helps teams spot trends and act faster.",
+            role.description,
+        )
+
+    def test_role_card_summary_cleaner_keeps_two_sentences_with_a_short_cap(self) -> None:
+        summary = _clean_role_card_summary(
+            " Keeps workplace technology running by diagnosing device issues.  "
+            "Guides users through fixes and escalates harder problems. "
+            "This third sentence should not appear."
+        )
+
+        self.assertEqual(
+            "Keeps workplace technology running by diagnosing device issues. "
+            "Guides users through fixes and escalates harder problems.",
+            summary,
+        )
+        self.assertLessEqual(len(summary or ""), 180)
+        self.assertNotIn("third sentence", summary or "")
 
 
 class CleanProfileTextBuilderTests(unittest.TestCase):

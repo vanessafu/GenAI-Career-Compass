@@ -32,7 +32,7 @@ from backend.app.features.role_matching.schemas import (
 logger = logging.getLogger("CareerCompass.RoleMatching.Service")
 
 _MAX_TEXT = 700
-_MAX_ROLE_CARD_SUMMARY = 150
+_MAX_ROLE_CARD_SUMMARY = 180
 
 DOMAIN_KEYWORDS: dict[str, tuple[str, ...]] = {
     "architecture": ("architect", "architecture", "system design", "distributed systems"),
@@ -173,9 +173,9 @@ def _clean_role_card_summary(value: Any) -> str | None:
     cleaned = _clean_text(value)
     if not cleaned:
         return None
-    sentence_end = re.search(r"[.!?](?:\s|$)", cleaned)
-    if sentence_end:
-        cleaned = cleaned[: sentence_end.end()].strip()
+    sentence_ends = list(re.finditer(r"[.!?](?:\s|$)", cleaned))
+    if len(sentence_ends) >= 2:
+        cleaned = cleaned[: sentence_ends[1].end()].strip()
     if len(cleaned) <= _MAX_ROLE_CARD_SUMMARY:
         return cleaned
     shortened = cleaned[: _MAX_ROLE_CARD_SUMMARY - 3].rsplit(" ", 1)[0].rstrip(" ,;:-")
@@ -720,8 +720,9 @@ async def _apply_role_summaries(_profile: UserCareerProfile, response: RoleMatch
                     "role": "system",
                     "content": (
                         "Write one role-card description per role. "
-                        "Each summary must be one present-tense sentence under 18 words and 150 characters. "
-                        "Describe what the role does. "
+                        "Each summary must be one or two present-tense sentences under 35 words and 180 characters. "
+                        "Describe concrete day-to-day work plus the outcome the role creates. "
+                        "Avoid repetitive generic openers like 'Provides' or 'Develops' when a more specific verb fits. "
                         "Do not mention the user, candidate, profile, fit, readiness, matched skills, "
                         "missing skills, salary, certifications, or recommendations. "
                         "Do not list skills. "
