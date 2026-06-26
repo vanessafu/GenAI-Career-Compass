@@ -44,6 +44,7 @@ async def generate_career_identity(cv_data: CVData) -> CareerIdentityGeneration:
                 {"role": "user", "content": cv_data.model_dump_json()},
             ],
             response_format=CareerIdentityGeneration,
+            model_purpose="identity",
         )
         if generated is None:
             raise RuntimeError("LLM returned no parsed response for the career identity.")

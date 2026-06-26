@@ -55,6 +55,7 @@ async def parse_cv_to_pydantic(raw_text: str) -> CVData:
                 {"role": "user", "content": raw_text},
             ],
             response_format=CVData,
+            model_purpose="cv_parsing",
         )
         logger.info("CV parsed successfully.")
         return result

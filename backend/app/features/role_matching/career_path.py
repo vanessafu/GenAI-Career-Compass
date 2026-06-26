@@ -158,6 +158,7 @@ async def _generate_draft(
                 },
             ],
             response_format=CareerPathDraft,
+            model_purpose="career_path",
         )
         if draft is not None:
             return draft

@@ -725,6 +725,7 @@ async def _apply_role_summaries(profile: UserCareerProfile, response: RoleMatchR
                 {"role": "user", "content": json.dumps(_summary_payload(profile, roles))},
             ],
             response_format=RoleSummaryBatch,
+            model_purpose="role_description",
         )
     except Exception as exc:
         logger.warning("Role summary generation failed; using catalog descriptions: %s", exc)

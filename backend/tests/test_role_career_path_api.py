@@ -134,7 +134,7 @@ def test_career_path_filters_llm_certifications_to_gap_report(monkeypatch):
             ),
         )
 
-    async def fake_parse_structured(messages, response_format):
+    async def fake_parse_structured(messages, response_format, **kwargs):
         return career_path.CareerPathDraft(
             milestones=[
                 career_path.CareerPathMilestone(

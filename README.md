@@ -61,7 +61,11 @@ Required keys:
 | Variable | Purpose |
 |---|---|
 | `OPENAI_API_KEY` | API key used for CV parsing and role-matching analysis |
-| `OPENAI_MODEL` | Chat model to use, for example `gpt-4o-mini` |
+| `OPENAI_MODEL` | Fallback chat model for unclassified LLM calls |
+| `OPENAI_CV_PARSING_MODEL` | Strong model for CV parsing, default `gpt-5.5` |
+| `OPENAI_IDENTITY_MODEL` | Cheaper model for identity/context generation, default `gpt-5.4-mini` |
+| `OPENAI_ROLE_DESCRIPTION_MODEL` | Cheaper model for role card summaries, default `gpt-5.4-mini` |
+| `OPENAI_CAREER_PATH_MODEL` | Middle/strong model for career path generation, default `gpt-5.4` |
 | `OPENAI_TEMPERATURE` | Sampling temperature, default `0.0` |
 | `DATABASE_URL` | Postgres connection string for the `esco_occupations` pgvector table |
 
