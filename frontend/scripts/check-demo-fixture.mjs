@@ -75,7 +75,59 @@ for (const role of DEMO_ROLE_MATCHES) {
     DEMO_CAREER_PATH_REPORTS[roleId].requirement_breakdown === DEMO_GAP_REPORTS[roleId],
     `${roleId} career path should reuse the matching gap report object.`,
   );
+  assert(
+    DEMO_CAREER_PATH_REPORTS[roleId].plan_summary?.trim(),
+    `${roleId} career path should include a plan summary.`,
+  );
+  assert(
+    !hasRange(DEMO_CAREER_PATH_REPORTS[roleId].estimated_timeline),
+    `${roleId} career path should use one exact total timeline.`,
+  );
+  assert(
+    usesDisplayUnit(DEMO_CAREER_PATH_REPORTS[roleId].estimated_timeline),
+    `${roleId} total timeline should use weeks only up to 4 weeks, then months.`,
+  );
+  const milestoneWeeks = DEMO_CAREER_PATH_REPORTS[roleId].milestones.map((milestone) =>
+    durationWeeks(milestone.timeline),
+  );
+  assert(
+    milestoneWeeks.every((weeks) => weeks !== null),
+    `${roleId} milestones should use exact week/month durations.`,
+  );
+  assert(
+    DEMO_CAREER_PATH_REPORTS[roleId].milestones.every((milestone) =>
+      usesDisplayUnit(milestone.timeline),
+    ),
+    `${roleId} milestone timelines should use weeks only up to 4 weeks, then months.`,
+  );
+  assert(
+    DEMO_CAREER_PATH_REPORTS[roleId].estimated_timeline ===
+      formatDurationWeeks(milestoneWeeks.reduce((total, weeks) => total + (weeks ?? 0), 0)),
+    `${roleId} total timeline should add up from milestones and use display units.`,
+  );
 
   const readiness = DEMO_GAP_REPORTS[roleId].overall_readiness;
   assert(readiness >= 0 && readiness <= 1, `${roleId} readiness is invalid.`);
+}
+
+function hasRange(value) {
+  return /\d+\s*(?:-|to|–|—)\s*\d+/i.test(value);
+}
+
+function durationWeeks(value) {
+  const match = String(value).match(/^\s*(\d+)\s+(weeks?|months?)\s*$/i);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  return match[2].toLowerCase().startsWith("month") ? amount * 4 : amount;
+}
+
+function usesDisplayUnit(value) {
+  const match = String(value).match(/^\s*(\d+)\s+(weeks?|months?)\s*$/i);
+  return Boolean(match && (!match[2].toLowerCase().startsWith("week") || Number(match[1]) <= 4));
+}
+
+function formatDurationWeeks(weeks) {
+  if (weeks <= 4) return `${weeks} ${weeks === 1 ? "week" : "weeks"}`;
+  const months = Math.ceil(weeks / 4);
+  return `${months} ${months === 1 ? "month" : "months"}`;
 }

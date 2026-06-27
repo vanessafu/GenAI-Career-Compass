@@ -3,7 +3,7 @@ import { SkillGapSection } from "./SkillGapSection";
 import { AnimatedPercent } from "./AnimatedPercent";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, ChevronDown } from "lucide-react";
-import { useId } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { CareerPathMilestone, CareerPathReport, GapReport } from "@/lib/api";
 import type { RoadmapNodeKind } from "@/lib/roadmapPreview";
 import type { RoleView } from "@/types";
@@ -21,10 +21,17 @@ type PlanNode = {
 type RoadmapDetailNode = PlanNode & {
   index: number;
   x: number;
+  connectorStartY: number;
   detail: string;
   detailIndex: number;
   descriptionX: number;
 };
+
+const DEFAULT_ROADMAP_CANVAS_HEIGHT = 148;
+const DEFAULT_EXPANDED_ROADMAP_CANVAS_HEIGHT = 280;
+const DEFAULT_DETAIL_LAYER_HEIGHT = 148;
+const ROADMAP_HEIGHT_PADDING = 16;
+const SINGLE_TIMELINE_RE = /^\s*(\d+)\s*(weeks?|months?)\s*$/i;
 
 export function FullPlanModal({
   role,
@@ -58,7 +65,8 @@ export function FullPlanModal({
   const readiness = report
     ? percent(report.readiness_score || report.requirement_breakdown.overall_readiness)
     : null;
-  const profileSummary = report ? cleanProfileSummary(report.current_profile_summary) : "";
+  const planSummary = report ? reportPlanSummary(report) : "";
+  const visibleMilestones = report ? displayMilestones(report.milestones) : [];
 
   return (
     <DeepDiveModal
@@ -68,11 +76,11 @@ export function FullPlanModal({
       subtitle="Full plan"
       headerAside={
         readiness !== null ? (
-          <PlanStats readiness={readiness} timeline={report?.estimated_timeline} />
+          <PlanStats readiness={readiness} timeline={report ? displayTimeline(report) : undefined} />
         ) : undefined
       }
       headerDescription={
-        report ? <PlanHeaderDescription summary={profileSummary} role={role} /> : undefined
+        report ? <PlanHeaderDescription summary={planSummary} role={role} /> : undefined
       }
       wide
     >
@@ -91,6 +99,7 @@ export function FullPlanModal({
       {report && (
         <FullPlanContent
           report={report}
+          milestones={visibleMilestones}
           currentRole={currentRole}
           showStepDetails={showStepDetails}
           onToggleStepDetails={onToggleStepDetails}
@@ -106,7 +115,7 @@ export function FullPlanModal({
           <p className="text-[13px] leading-relaxed text-foreground/60">Preparing skills gap...</p>
         </ModalBlock>
       ) : fallbackGapReport ? (
-        <SkillGapSection report={fallbackGapReport} />
+        <SkillGapSection report={fallbackGapReport} milestones={visibleMilestones} />
       ) : (
         <ModalBlock className="mb-6">
           <p className="text-[13px] leading-relaxed text-foreground/60">
@@ -159,16 +168,17 @@ function PlanHeaderDescription({ summary, role }: { summary: string; role: RoleV
 
 function FullPlanContent({
   report,
+  milestones,
   currentRole,
   showStepDetails,
   onToggleStepDetails,
 }: {
   report: CareerPathReport;
+  milestones: CareerPathMilestone[];
   currentRole: string;
   showStepDetails: boolean;
   onToggleStepDetails: () => void;
 }) {
-  const milestones = [...report.milestones].sort((a, b) => a.order - b.order);
   const roadmapNodes: PlanNode[] = [
     { label: "Start", title: currentRole, kind: "start", active: true },
     ...milestones.map((milestone) => ({
@@ -212,11 +222,20 @@ function RoadmapCanvas({
   showStepDetails: boolean;
 }) {
   const reduceMotion = useReducedMotion();
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [roadmapHeights, setRoadmapHeights] = useState({
+    compact: DEFAULT_ROADMAP_CANVAS_HEIGHT,
+    expanded: DEFAULT_EXPANDED_ROADMAP_CANVAS_HEIGHT,
+  });
+  const [nodeBottoms, setNodeBottoms] = useState<Record<number, number>>({});
   const canvasWidth = 1000;
   const lineTop = 38;
   const iconTop = 18;
   const detailLayerTop = 132;
-  const detailLayerHeight = 148;
+  const detailLayerHeight = Math.max(
+    DEFAULT_DETAIL_LAYER_HEIGHT,
+    roadmapHeights.expanded - detailLayerTop,
+  );
   const nodeRemWidth = Math.max(7.5, Math.min(13, 74 / roadmapNodes.length));
   const nodePercentWidth = Math.min(16, (84 / Math.max(roadmapNodes.length - 1, 1)) * 0.9);
   const nodeWidth = `min(${nodeRemWidth}rem, ${nodePercentWidth}%)`;
@@ -224,9 +243,17 @@ function RoadmapCanvas({
     ...node,
     index,
     x: canvasX(index, roadmapNodes.length),
+    connectorStartY: nodeBottoms[index] ? Math.max(0, nodeBottoms[index] - detailLayerTop + 10) : 0,
   }));
   const rawDetailNodes = positionedNodes.filter(
-    (node): node is PlanNode & { index: number; x: number; detail: string } => Boolean(node.detail),
+    (
+      node,
+    ): node is PlanNode & {
+      index: number;
+      x: number;
+      connectorStartY: number;
+      detail: string;
+    } => Boolean(node.detail),
   );
   const detailNodes = rawDetailNodes.map((node, detailIndex) => ({
     ...node,
@@ -239,10 +266,56 @@ function RoadmapCanvas({
     ? { duration: 0 }
     : { type: "spring" as const, stiffness: 220, damping: 30, mass: 0.8 };
 
+  useLayoutEffect(() => {
+    const root = canvasRef.current;
+    if (!root) return;
+
+    const measure = () => {
+      const rootTop = root.getBoundingClientRect().top;
+      const nodeBottom = measuredBottom(root, "[data-roadmap-node]", rootTop);
+      const detailBottom = measuredBottom(root, "[data-roadmap-detail]", rootTop);
+      const nextNodeBottoms = Object.fromEntries(
+        Array.from(root.querySelectorAll<HTMLElement>("[data-roadmap-node]")).map((element) => [
+          Number(element.dataset.roadmapIndex),
+          element.getBoundingClientRect().bottom - rootTop,
+        ]),
+      ) as Record<number, number>;
+      const compact = Math.max(
+        DEFAULT_ROADMAP_CANVAS_HEIGHT,
+        Math.ceil(nodeBottom + ROADMAP_HEIGHT_PADDING),
+      );
+      const expanded = Math.max(
+        DEFAULT_EXPANDED_ROADMAP_CANVAS_HEIGHT,
+        Math.ceil(Math.max(nodeBottom, detailBottom) + ROADMAP_HEIGHT_PADDING),
+      );
+
+      setRoadmapHeights((current) =>
+        current.compact === compact && current.expanded === expanded
+          ? current
+          : { compact, expanded },
+      );
+      setNodeBottoms((current) =>
+        sameNumberRecord(current, nextNodeBottoms) ? current : nextNodeBottoms,
+      );
+    };
+
+    const frame = window.requestAnimationFrame(measure);
+    const observer = new ResizeObserver(measure);
+    root
+      .querySelectorAll<HTMLElement>("[data-roadmap-node],[data-roadmap-detail]")
+      .forEach((node) => observer.observe(node));
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [roadmapNodes, showStepDetails]);
+
   return (
     <motion.div
+      ref={canvasRef}
       className="relative overflow-hidden"
-      animate={{ height: showStepDetails ? 280 : 148 }}
+      animate={{ height: showStepDetails ? roadmapHeights.expanded : roadmapHeights.compact }}
       transition={heightTransition}
     >
       <span
@@ -277,6 +350,18 @@ function RoadmapCanvas({
   );
 }
 
+function measuredBottom(root: HTMLElement, selector: string, rootTop: number): number {
+  return Array.from(root.querySelectorAll<HTMLElement>(selector)).reduce((bottom, element) => {
+    const rect = element.getBoundingClientRect();
+    return Math.max(bottom, rect.bottom - rootTop);
+  }, 0);
+}
+
+function sameNumberRecord(left: Record<number, number>, right: Record<number, number>): boolean {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  return Array.from(keys).every((key) => left[Number(key)] === right[Number(key)]);
+}
+
 function RoadmapDetailLayer({
   canvasWidth,
   detailLayerHeight,
@@ -295,7 +380,7 @@ function RoadmapDetailLayer({
   const clipBaseId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const pillTop = 58;
   const descriptionTop = 102;
-  const lineEndTop = 94;
+  const lineEndTop = descriptionTop;
   const detailStepDelay = 0.18;
   const layerTransition = reduceMotion
     ? { duration: 0 }
@@ -324,7 +409,7 @@ function RoadmapDetailLayer({
     >
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full"
-        viewBox="0 0 1000 148"
+        viewBox={`0 0 ${canvasWidth} ${detailLayerHeight}`}
         preserveAspectRatio="none"
         aria-hidden
       >
@@ -354,7 +439,13 @@ function RoadmapDetailLayer({
           <path
             key={`${node.title}-connector-${node.index}`}
             clipPath={`url(#${clipBaseId}-${node.index})`}
-            d={canvasConnectorPath(node.x, node.descriptionX, 0, pillTop, lineEndTop)}
+            d={canvasConnectorPath(
+              node.x,
+              node.descriptionX,
+              node.connectorStartY,
+              pillTop,
+              lineEndTop,
+            )}
             fill="none"
             stroke="var(--brand)"
             strokeDasharray="4 7"
@@ -380,6 +471,7 @@ function RoadmapDetailLayer({
               return (
                 <motion.div
                   key={`${node.title}-detail-${node.index}`}
+                  data-roadmap-detail
                   className="min-w-0 px-4 text-center"
                   initial={false}
                   animate={{ opacity: showStepDetails ? 1 : 0, y: showStepDetails ? 0 : -5 }}
@@ -401,13 +493,14 @@ function RoadmapDetailLayer({
         return (
           <motion.div
             key={`${node.title}-meta-${node.index}`}
-            className="absolute -translate-x-1/2 whitespace-nowrap rounded-full bg-white/85 px-2 py-0.5 text-[11px] font-medium text-foreground/45"
+            data-roadmap-detail
+            className="absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full bg-white/85 px-2 py-0.5 text-[11px] font-medium text-foreground/45"
             initial={false}
             animate={{ opacity: showStepDetails ? 1 : 0, scale: showStepDetails ? 1 : 0.96 }}
             transition={fadeTransition(pillDelay)}
             style={{
               left: `${(node.descriptionX / canvasWidth) * 100}%`,
-              top: pillTop - 14,
+              top: pillTop,
             }}
           >
             {node.meta}
@@ -481,6 +574,7 @@ function EscoReference({ title, uri }: { title: string; uri: string }) {
 }
 
 function PathNode({
+  index,
   label,
   title,
   kind,
@@ -488,6 +582,7 @@ function PathNode({
   terminal = false,
   style,
 }: {
+  index?: number;
   label: string;
   title: string;
   kind: RoadmapNodeKind;
@@ -497,6 +592,8 @@ function PathNode({
 }) {
   return (
     <div
+      data-roadmap-node
+      data-roadmap-index={index}
       className={
         style
           ? "absolute flex min-w-0 -translate-x-1/2 flex-col items-center text-center"
@@ -623,9 +720,76 @@ function milestoneKindLabel(kind: CareerPathMilestone["kind"]): string {
   }
 }
 
-function cleanProfileSummary(summary: string): string {
-  const cleaned = summary.trim();
-  return cleaned.replace(/^[^:\n]{1,80}:\s*/, "") || "Your confirmed profile starts this plan.";
+function displayMilestones(milestones: CareerPathMilestone[]): CareerPathMilestone[] {
+  return [...milestones]
+    .sort((a, b) => a.order - b.order)
+    .map((milestone) => ({ ...milestone, timeline: formatTimeline(milestone.timeline) }));
+}
+
+function displayTimeline(report: CareerPathReport): string {
+  return totalTimeline(displayMilestones(report.milestones)) || formatTimeline(report.estimated_timeline);
+}
+
+function totalTimeline(milestones: CareerPathMilestone[]): string {
+  const durations = milestones.map((milestone) => durationWeeks(milestone.timeline));
+  if (durations.some((duration) => duration === null)) return "";
+
+  return formatDurationWeeks((durations as number[]).reduce((total, weeks) => total + weeks, 0));
+}
+
+function formatTimeline(timeline: string): string {
+  const weeks = durationWeeks(timeline);
+  return weeks === null ? timeline.trim() : formatDurationWeeks(weeks);
+}
+
+function durationWeeks(timeline: string): number | null {
+  const single = SINGLE_TIMELINE_RE.exec(timeline);
+  if (!single) return null;
+  const value = Number(single[1]);
+  const unit = single[2].toLowerCase();
+  return unit.startsWith("month") ? value * 4 : value;
+}
+
+function formatDurationWeeks(weeks: number): string {
+  const amount = Math.max(0, Math.round(weeks));
+  if (amount <= 4) return `${amount} ${amount === 1 ? "week" : "weeks"}`;
+  const months = Math.ceil(amount / 4);
+  return `${months} ${months === 1 ? "month" : "months"}`;
+}
+
+function reportPlanSummary(report: CareerPathReport): string {
+  const summary = (report.plan_summary ?? "").trim();
+  if (summary && !summaryMatchesProfile(summary, report.current_profile_summary)) return summary;
+
+  const gaps = report.top_gaps.filter(Boolean).slice(0, 3);
+  const matched = report.requirement_breakdown.skills.matched_skills.filter(Boolean).slice(0, 3);
+  const readiness = percent(report.readiness_score || report.requirement_breakdown.overall_readiness);
+  const closeness =
+    readiness >= 75
+      ? "You're already close"
+      : readiness >= 55
+        ? "You're within reach"
+        : "This is a stretch, but there is a path";
+  const matchedText = matched.length
+    ? `Your strongest overlap is ${formatList(matched)}.`
+    : "You already have some useful overlap with the role.";
+  const gapText = gaps.length
+    ? `The main thing to strengthen next is ${formatList(gaps)}.`
+    : "What remains is mostly making your fit easier to recognize.";
+
+  return `${closeness} for ${report.target_role}: about ${readiness}% of the role signals are already there. ${matchedText} ${gapText}`;
+}
+
+function summaryMatchesProfile(summary: string, profileSummary: string): boolean {
+  const summaryKey = summary.trim().replace(/\s+/g, " ").toLowerCase();
+  const profileKey = profileSummary.trim().replace(/\s+/g, " ").toLowerCase();
+  return Boolean(profileKey && (summaryKey === profileKey || summaryKey.startsWith(profileKey)));
+}
+
+function formatList(values: string[]): string {
+  if (values.length <= 1) return values[0] ?? "";
+  if (values.length === 2) return `${values[0]} and ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")}, and ${values[values.length - 1]}`;
 }
 
 function percent(value: number): number {

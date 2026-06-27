@@ -1,6 +1,7 @@
 import asyncio
 
 from fastapi.testclient import TestClient
+import pytest
 
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
 from backend.app.features.role_matching.schemas import (
@@ -41,6 +42,7 @@ def test_career_path_endpoint_returns_report(monkeypatch):
     async def fake_generate_career_path(role_id, confirmed_profile):
         return {
             "role_id": role_id,
+            "plan_summary": "This plan turns the largest gaps into direct proof for the target role.",
             "current_profile_summary": "Backend Developer: Builds APIs.",
             "target_role": "Backend Engineer",
             "readiness_score": 0.75,
@@ -77,6 +79,7 @@ def test_career_path_endpoint_returns_report(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["role_id"] == 42
+    assert body["plan_summary"]
     assert body["target_role"] == "Backend Engineer"
     assert body["milestones"][0]["kind"] == "project"
     assert body["requirement_breakdown"]["job_title"] == "Backend Engineer"
@@ -138,6 +141,10 @@ def test_career_path_filters_llm_certifications_to_gap_report(monkeypatch):
 
     async def fake_parse_structured(messages, response_format, **kwargs):
         return career_path.CareerPathDraft(
+            plan_summary=(
+                "Focus the roadmap on cloud architecture and observability evidence. "
+                "Use the project milestone to make the strongest gap easy to verify."
+            ),
             milestones=[
                 career_path.CareerPathMilestone(
                     order=1,
@@ -172,11 +179,116 @@ def test_career_path_filters_llm_certifications_to_gap_report(monkeypatch):
     )
 
     assert report.current_profile_summary == "Edited identity: wants backend platform work."
+    assert "cloud architecture" in report.plan_summary.lower()
     assert report.skills_to_learn == ["Cloud architecture", "Observability"]
     assert report.certifications == ["AWS Certified Developer - Associate"]
     assert 3 <= len(report.milestones) <= 5
     assert report.estimated_timeline
     assert report.requirement_breakdown.job_title == "Backend Engineer"
+
+
+def test_career_path_sums_exact_milestone_durations(monkeypatch):
+    from backend.app.features.role_matching import career_path
+
+    async def fake_explain_role_gap(role_id, confirmed_profile, *, with_narrative):
+        return GapReport(
+            role_id=role_id,
+            job_title="Backend Engineer",
+            overall_readiness=0.6,
+            skills=SkillDimension(
+                skill_gaps=[
+                    SkillGap(required_skill="Cloud architecture", severity="high"),
+                    SkillGap(required_skill="Observability", severity="medium"),
+                    SkillGap(required_skill="Release automation", severity="medium"),
+                ],
+            ),
+        )
+
+    async def fake_parse_structured(messages, response_format, **kwargs):
+        return career_path.CareerPathDraft(
+            plan_summary="Build cloud, observability, and release evidence for the target role.",
+            milestones=[
+                career_path.CareerPathMilestone(
+                    order=1,
+                    title="First",
+                    timeline="2 months",
+                    rationale="",
+                    skills=["Cloud architecture"],
+                ),
+                career_path.CareerPathMilestone(
+                    order=2,
+                    title="Second",
+                    timeline="3 weeks",
+                    rationale="",
+                    skills=["Observability"],
+                ),
+                career_path.CareerPathMilestone(
+                    order=3,
+                    title="Third",
+                    timeline="8 weeks",
+                    rationale="",
+                    skills=["Release automation"],
+                ),
+            ],
+        )
+
+    monkeypatch.setattr(career_path, "explain_role_gap", fake_explain_role_gap)
+    monkeypatch.setattr(career_path, "parse_structured", fake_parse_structured)
+
+    report = asyncio.run(
+        career_path.generate_career_path(
+            42,
+            ConfirmedCVData.model_validate(minimal_confirmed_profile()),
+        )
+    )
+
+    assert [milestone.timeline for milestone in report.milestones] == [
+        "2 months",
+        "3 weeks",
+        "2 months",
+    ]
+    assert report.estimated_timeline == "5 months"
+
+
+def test_career_path_replaces_profile_like_plan_summary(monkeypatch):
+    from backend.app.features.role_matching import career_path
+
+    async def fake_explain_role_gap(role_id, confirmed_profile, *, with_narrative):
+        return GapReport(
+            role_id=role_id,
+            job_title="Backend Engineer",
+            overall_readiness=0.75,
+            skills=SkillDimension(
+                skill_gaps=[SkillGap(required_skill="Cloud architecture", severity="high")],
+            ),
+        )
+
+    async def fake_parse_structured(messages, response_format, **kwargs):
+        return career_path.CareerPathDraft(
+            plan_summary="Backend Developer: Builds APIs.",
+            milestones=[
+                career_path.CareerPathMilestone(
+                    order=1,
+                    title="Build cloud evidence",
+                    timeline="1 month",
+                    rationale="",
+                    skills=["Cloud architecture"],
+                ),
+            ],
+        )
+
+    monkeypatch.setattr(career_path, "explain_role_gap", fake_explain_role_gap)
+    monkeypatch.setattr(career_path, "parse_structured", fake_parse_structured)
+
+    report = asyncio.run(
+        career_path.generate_career_path(
+            42,
+            ConfirmedCVData.model_validate(minimal_confirmed_profile()),
+        )
+    )
+
+    assert report.plan_summary != report.current_profile_summary
+    assert "cloud architecture" in report.plan_summary.lower()
 
 
 def test_career_path_milestone_kind_defaults_to_skill():
@@ -194,6 +306,20 @@ def test_career_path_milestone_kind_defaults_to_skill():
     assert milestone.kind == "skill"
 
 
+def test_career_path_milestone_rejects_timeline_ranges():
+    from backend.app.features.role_matching.schemas import CareerPathMilestone
+
+    with pytest.raises(ValueError):
+        CareerPathMilestone.model_validate(
+            {
+                "order": 1,
+                "title": "Build cloud evidence",
+                "timeline": "1-2 months",
+                "rationale": "Targets the largest gap.",
+            }
+        )
+
+
 def test_fallback_career_path_uses_meaningful_milestone_kinds():
     from backend.app.features.role_matching import career_path
 
@@ -202,8 +328,29 @@ def test_fallback_career_path_uses_meaningful_milestone_kinds():
         ["AWS Certified Developer - Associate"],
     )
 
+    assert draft.plan_summary
     assert [milestone.kind for milestone in draft.milestones[:3]] == [
         "skill",
         "certification",
         "project",
     ]
+    assert all("-" not in milestone.timeline for milestone in draft.milestones)
+
+
+def test_fallback_career_path_summary_is_user_focused():
+    from backend.app.features.role_matching import career_path
+
+    summary = career_path._fallback_plan_summary(["Cloud architecture", "Observability"], [])
+
+    assert "you're" in summary.lower()
+    assert "already" in summary.lower()
+    assert "Cloud architecture" in summary
+    assert "roadmap starts" not in summary.lower()
+    assert "certification work" not in summary.lower()
+
+
+def test_career_path_prompt_requests_exact_milestone_durations():
+    from backend.app.features.role_matching import career_path
+
+    assert "timeline as a single duration" in career_path._SYSTEM_PROMPT
+    assert "Do not output ranges" in career_path._SYSTEM_PROMPT

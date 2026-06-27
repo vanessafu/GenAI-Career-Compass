@@ -322,6 +322,7 @@ export type CareerPathMilestone = {
 
 export type CareerPathReport = {
   role_id: string | number;
+  plan_summary: string;
   current_profile_summary: string;
   target_role: string;
   readiness_score: number;

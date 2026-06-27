@@ -18,6 +18,10 @@ const fullPlanSource = await readFile(
   new URL("../src/components/compass/modals/FullPlanModal.tsx", import.meta.url),
   "utf8",
 );
+const skillGapSource = await readFile(
+  new URL("../src/components/compass/modals/SkillGapSection.tsx", import.meta.url),
+  "utf8",
+);
 const roleViewSource = await readFile(new URL("../src/lib/roleView.ts", import.meta.url), "utf8");
 
 function loadCommonJs(sourceText) {
@@ -61,20 +65,48 @@ assert(
   "Roadmap canvas positions should come from one x-coordinate helper.",
 );
 assert(
-  fullPlanSource.includes('viewBox="0 0 1000 148"') &&
-    fullPlanSource.includes("animate={{ height: showStepDetails ? 280 : 148 }}"),
-  "Roadmap canvas should animate between compact and detailed heights.",
+  fullPlanSource.includes("viewBox={`0 0 ${canvasWidth} ${detailLayerHeight}`}") &&
+    fullPlanSource.includes("useLayoutEffect") &&
+    fullPlanSource.includes("ResizeObserver") &&
+    fullPlanSource.includes("data-roadmap-node") &&
+    fullPlanSource.includes("data-roadmap-detail") &&
+    fullPlanSource.includes("showStepDetails ? roadmapHeights.expanded : roadmapHeights.compact") &&
+    !fullPlanSource.includes("animate={{ height: showStepDetails ? 280 : 148 }}"),
+  "Roadmap canvas should measure content and add height only when compact or detailed content needs it.",
+);
+assert(
+  fullPlanSource.includes("function reportPlanSummary") &&
+    fullPlanSource.includes("summaryMatchesProfile") &&
+    fullPlanSource.includes("You're") &&
+    !fullPlanSource.includes("The roadmap starts") &&
+    !fullPlanSource.includes("Certification work stays") &&
+    !fullPlanSource.includes("cleanProfileSummary"),
+  "FullPlanModal should synthesize plan/gap header copy instead of falling back to profile summary.",
+);
+assert(
+  fullPlanSource.includes("function displayTimeline") &&
+    fullPlanSource.includes("formatDurationWeeks") &&
+    fullPlanSource.includes("displayTimeline(report)") &&
+    fullPlanSource.includes("displayMilestones(report.milestones)") &&
+    !fullPlanSource.includes("normalizeMilestoneTimelines"),
+  "FullPlanModal should display exact durations and sum them without stale range conversion.",
 );
 assert(
   fullPlanSource.includes('ModalBlock className="mb-1 border-t border-foreground/10 pt-6"') &&
-    fullPlanSource.includes('ModalBlock className="mb-4 mt-1 border-t border-foreground/10 pt-4"'),
+    skillGapSource.includes('ModalBlock className="mb-5 mt-1 border-t border-foreground/10 pt-4"'),
   "Roadmap and skills-gap section margins should keep the separator close to descriptions.",
 );
 assert(
   fullPlanSource.includes("const detailLayerTop = 132") &&
-    fullPlanSource.includes("const detailLayerHeight = 148") &&
-    fullPlanSource.includes("const descriptionTop = 102"),
+    fullPlanSource.includes("DEFAULT_DETAIL_LAYER_HEIGHT") &&
+    fullPlanSource.includes("roadmapHeights.expanded - detailLayerTop") &&
+    fullPlanSource.includes("const descriptionTop = 102") &&
+    fullPlanSource.includes("const lineEndTop = descriptionTop"),
   "Roadmap canvas should keep detail content in a lower layer beneath the main path.",
+);
+assert(
+  fullPlanSource.includes("-translate-y-1/2") && fullPlanSource.includes("top: pillTop"),
+  "Roadmap duration pills should be vertically centered on their connector lines.",
 );
 assert(
   fullPlanSource.includes('className="min-w-0 px-4 text-center"') &&
@@ -88,10 +120,10 @@ assert(
 );
 assert(
   fullPlanSource.includes("d={canvasConnectorPath(") &&
-    fullPlanSource.includes("node.x") &&
+    fullPlanSource.includes("node.connectorStartY") &&
     fullPlanSource.includes("node.descriptionX") &&
     fullPlanSource.includes("function descriptionCenterX"),
-  "Roadmap connectors should route from the owning node to its evenly spaced description lane.",
+  "Roadmap connectors should start below the owning node text and route to its evenly spaced description lane.",
 );
 assert(
   fullPlanSource.includes("Math.min(80, Math.max(-80") &&

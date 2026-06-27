@@ -2,35 +2,29 @@ import { ModalBlock } from "./DeepDiveModal";
 import { AnimatedPercent } from "./AnimatedPercent";
 import { motion, useReducedMotion } from "framer-motion";
 import { buildSkillRadarAxes, type SkillRadarAxis } from "@/lib/gapRadar";
-import type { GapReport, SeniorityDimension, SkillGap } from "@/lib/api";
+import { skillGapCopy } from "@/lib/skillGapCoverage";
+import type { CareerPathMilestone, GapReport, SeniorityDimension, SkillGap } from "@/lib/api";
 
-export function SkillGapSection({ report }: { report: GapReport }) {
+export function SkillGapSection({
+  report,
+  milestones = [],
+}: {
+  report: GapReport;
+  milestones?: CareerPathMilestone[];
+}) {
   const topGaps = sortSkillGaps(report.skills.skill_gaps).slice(0, 3);
 
   return (
     <>
       <SkillRadar report={report} />
-      <GapList title="Top skill gaps" gaps={topGaps} />
+      <GapList title="Top skill gaps" gaps={topGaps} milestones={milestones} />
       <SeniorityGap seniority={report.seniority} />
     </>
   );
 }
 
-const DOMAIN_LABELS: Record<string, string> = {
-  ai_ml: "AI/ML",
-  automation_scripting: "Automation",
-  data_analytics: "Data",
-  data_engineering: "Data",
-  devops: "DevOps",
-  qa_testing: "QA",
-  role_requirements: "Role requirements",
-  software_engineering: "Software",
-  ux_ui: "UX/UI",
-};
-
 function SkillRadar({ report }: { report: GapReport }) {
   const axes = buildSkillRadarAxes(report);
-  const domains = domainLabels(report.domain_tags);
   const reduceMotion = useReducedMotion();
   const progressTransition = reduceMotion
     ? { duration: 0 }
@@ -42,47 +36,35 @@ function SkillRadar({ report }: { report: GapReport }) {
       {axes.length > 0 ? (
         <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-center">
           <RadarSvg axes={axes} />
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-1.5">
-              {domains.map((domain) => (
-                <span
-                  key={domain}
-                  className="rounded-full bg-[color:var(--brand)]/10 px-2.5 py-1 text-[12px] text-[color:var(--brand-deep)]"
-                >
-                  {domain}
-                </span>
-              ))}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {axes.map((axis) => {
-                const axisPercent = percent(axis.value);
+          <div className="grid gap-2 sm:grid-cols-2">
+            {axes.map((axis) => {
+              const axisPercent = percent(axis.value);
 
-                return (
-                  <div
-                    key={axis.label}
-                    className="rounded-2xl border border-foreground/10 bg-white/60 p-3"
-                  >
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <p className="text-[12.5px] font-medium leading-snug text-foreground/80">
-                        {axis.label}
-                      </p>
-                      <AnimatedPercent
-                        value={axisPercent}
-                        className="text-[11px] text-foreground/45"
-                      />
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]">
-                      <motion.div
-                        className="h-full rounded-full bg-[color:var(--brand)]"
-                        initial={{ width: "0%" }}
-                        animate={{ width: `${axisPercent}%` }}
-                        transition={progressTransition}
-                      />
-                    </div>
+              return (
+                <div
+                  key={axis.label}
+                  className="rounded-2xl border border-foreground/10 bg-white/60 p-3"
+                >
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="text-[12.5px] font-medium leading-snug text-foreground/80">
+                      {axis.label}
+                    </p>
+                    <AnimatedPercent
+                      value={axisPercent}
+                      className="text-[11px] text-foreground/45"
+                    />
                   </div>
-                );
-              })}
-            </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]">
+                    <motion.div
+                      className="h-full rounded-full bg-[color:var(--brand)]"
+                      initial={{ width: "0%" }}
+                      animate={{ width: `${axisPercent}%` }}
+                      transition={progressTransition}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : (
@@ -157,9 +139,7 @@ function RadarSvg({ axes }: { axes: SkillRadarAxis[] }) {
         points={valuePoints}
         initial={{ points: centerPoints }}
         animate={{ points: valuePoints }}
-        transition={
-          reduceMotion ? { duration: 0 } : { duration: 0.85, ease: [0.22, 1, 0.36, 1] }
-        }
+        transition={reduceMotion ? { duration: 0 } : { duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
         fill="color-mix(in oklab, var(--brand) 22%, transparent)"
         stroke="var(--brand)"
         strokeWidth="2"
@@ -168,7 +148,15 @@ function RadarSvg({ axes }: { axes: SkillRadarAxis[] }) {
   );
 }
 
-function GapList({ title, gaps }: { title: string; gaps: SkillGap[] }) {
+function GapList({
+  title,
+  gaps,
+  milestones,
+}: {
+  title: string;
+  gaps: SkillGap[];
+  milestones: CareerPathMilestone[];
+}) {
   if (gaps.length === 0) return null;
   return (
     <ModalBlock className="mb-5">
@@ -179,7 +167,7 @@ function GapList({ title, gaps }: { title: string; gaps: SkillGap[] }) {
             key={`${gap.required_skill}-${gap.user_closest_skill ?? ""}`}
             title={gap.required_skill}
             meta={`${gap.severity} priority - ${effortLabel(gap)}`}
-            body={skillGapCopy(gap)}
+            body={skillGapCopy(gap, milestones)}
           />
         ))}
       </div>
@@ -214,7 +202,9 @@ function GapRow({ title, meta, body }: { title: string; meta: string; body: stri
           {meta}
         </span>
       </div>
-      <p className="mt-1 text-[12.5px] leading-relaxed text-foreground/65">{body}</p>
+      <p className="mt-1 whitespace-pre-line text-[12.5px] leading-relaxed text-foreground/65">
+        {body}
+      </p>
     </div>
   );
 }
@@ -242,36 +232,12 @@ function effortLabel(gap: SkillGap): string {
   return "high effort";
 }
 
-function skillGapCopy(gap: SkillGap): string {
-  if (gap.transferability > 0 && gap.user_closest_skill) {
-    return `${gap.required_skill} is partly covered by ${gap.user_closest_skill}; build direct proof around ${gap.required_skill}.`;
-  }
-  return `${gap.required_skill} is not visible in your profile yet. Add evidence through work, a project, or training.`;
-}
-
 function seniorityCopy(seniority: SeniorityDimension): string {
   if (seniority.gap === "match") return "Your current level appears aligned with this role.";
   if (seniority.gap === "over") return "Your profile may be above the level implied by this role.";
   if (seniority.gap === "under")
     return "This role appears to require more seniority than your profile shows.";
   return "There is not enough seniority signal to compare levels confidently.";
-}
-
-function domainLabels(tags: string[]): string[] {
-  const source = tags.length > 0 ? tags : ["role_requirements"];
-  const labels = source.map(formatDomainTag).filter(Boolean);
-  return [...new Set(labels)];
-}
-
-function formatDomainTag(tag: string): string {
-  const key = tag.trim().toLowerCase().replace(/\s+/g, "_");
-  if (!key) return "Role requirements";
-  if (DOMAIN_LABELS[key]) return DOMAIN_LABELS[key];
-  return key
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 function radarPoints(count: number, radius: number, center: number): string {

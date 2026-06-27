@@ -456,7 +456,7 @@ export const DEMO_GAP_REPORTS = {
 export const DEMO_CAREER_PATH_REPORTS = {
   "demo-platform-engineer": pathReport(
     "demo-platform-engineer",
-    "3-4 months",
+    "3 months",
     [
       milestone(1, "skill", "Ship one Kubernetes-backed service", "3 weeks", [
         "Kubernetes",
@@ -474,7 +474,7 @@ export const DEMO_CAREER_PATH_REPORTS = {
   ),
   "demo-backend-engineer": pathReport(
     "demo-backend-engineer",
-    "1-2 months",
+    "2 months",
     [
       milestone(1, "project", "Document service boundaries for a core API", "2 weeks", [
         "Domain-driven design",
@@ -506,9 +506,9 @@ export const DEMO_CAREER_PATH_REPORTS = {
   ),
   "demo-cloud-solutions-architect": pathReport(
     "demo-cloud-solutions-architect",
-    "5-6 months",
+    "5 months",
     [
-      milestone(1, "certification", "AWS Solutions Architect Associate", "6 weeks", [
+      milestone(1, "certification", "AWS Solutions Architect Associate", "2 months", [
         "AWS Well-Architected",
       ]),
       milestone(2, "project", "Design a reference architecture for one product area", "4 weeks", [
@@ -526,7 +526,7 @@ export const DEMO_CAREER_PATH_REPORTS = {
   ),
   "demo-devops-engineer": pathReport(
     "demo-devops-engineer",
-    "4-5 months",
+    "4 months",
     [
       milestone(1, "skill", "Build a Terraform module for service infrastructure", "4 weeks", [
         "Terraform",
@@ -542,7 +542,7 @@ export const DEMO_CAREER_PATH_REPORTS = {
   ),
   "demo-sre": pathReport(
     "demo-sre",
-    "4 months",
+    "3 months",
     [
       milestone(1, "skill", "Define SLOs for a high-traffic API", "3 weeks", ["SLO design"]),
       milestone(2, "project", "Add error budget reporting", "4 weeks", ["Error budget policy"]),
@@ -558,15 +558,15 @@ export const DEMO_CAREER_PATH_REPORTS = {
   ),
   "demo-engineering-manager": pathReport(
     "demo-engineering-manager",
-    "9-12 months",
+    "9 months",
     [
-      milestone(1, "experience", "Mentor two engineers with explicit growth goals", "8 weeks", [
+      milestone(1, "experience", "Mentor two engineers with explicit growth goals", "2 months", [
         "Coaching",
       ]),
-      milestone(2, "skill", "Own quarterly planning for a small platform stream", "6 weeks", [
+      milestone(2, "skill", "Own quarterly planning for a small platform stream", "2 months", [
         "Team planning",
       ]),
-      milestone(3, "experience", "Shadow hiring and performance calibration", "8 weeks", [
+      milestone(3, "experience", "Shadow hiring and performance calibration", "2 months", [
         "Hiring",
         "Performance management",
       ]),
@@ -577,11 +577,11 @@ export const DEMO_CAREER_PATH_REPORTS = {
   ),
   "demo-security-engineer": pathReport(
     "demo-security-engineer",
-    "6-8 months",
+    "5 months",
     [
       milestone(1, "skill", "Complete OWASP ASVS fundamentals", "4 weeks", ["OWASP ASVS"]),
       milestone(2, "project", "Threat-model a production API", "3 weeks", ["Threat modeling"]),
-      milestone(3, "project", "Add secure defaults to service templates", "5 weeks", [
+      milestone(3, "project", "Add secure defaults to service templates", "2 months", [
         "Security testing",
       ]),
       milestone(4, "experience", "Partner with security on one review", "4 weeks", [
@@ -593,7 +593,7 @@ export const DEMO_CAREER_PATH_REPORTS = {
   ),
   "demo-data-platform-engineer": pathReport(
     "demo-data-platform-engineer",
-    "6 months",
+    "5 months",
     [
       milestone(1, "skill", "Build an Airflow DAG for a small data product", "4 weeks", [
         "Airflow",
@@ -604,7 +604,7 @@ export const DEMO_CAREER_PATH_REPORTS = {
       milestone(3, "project", "Add data quality checks and alerting", "4 weeks", [
         "Data quality checks",
       ]),
-      milestone(4, "experience", "Pair with analytics on a production data pipeline", "6 weeks", [
+      milestone(4, "experience", "Pair with analytics on a production data pipeline", "2 months", [
         "Data engineering",
       ]),
     ],
@@ -789,8 +789,18 @@ function pathReport(
 ): CareerPathReport {
   const gap = DEMO_GAP_REPORTS[roleId];
   const topGaps = gap.skills.skill_gaps.map((item) => item.required_skill).slice(0, 3);
+  const milestoneText = milestones
+    .slice(0, 2)
+    .map((item) => item.title)
+    .join(" and ");
+  const certificationText = certifications.length
+    ? ` Certification work stays focused on ${certifications.slice(0, 2).join(", ")}.`
+    : " Projects and work artifacts carry the proof without extra credentials.";
   return {
     role_id: roleId,
+    plan_summary: `${gap.job_title} is reachable by turning ${topGaps.join(
+      ", ",
+    )} into direct evidence. The roadmap starts with ${milestoneText} and then builds the remaining proof around the role gaps.${certificationText}`,
     current_profile_summary: `${DEMO_IDENTITY.archetype}: ${DEMO_IDENTITY.lead}`,
     target_role: gap.job_title,
     readiness_score: gap.readiness_score,

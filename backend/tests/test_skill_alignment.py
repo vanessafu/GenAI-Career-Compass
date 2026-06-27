@@ -220,7 +220,7 @@ def test_gap_analysis_uses_shared_alignment_for_niche_variants(monkeypatch) -> N
 
 
 def test_roadmap_timeline_is_bounded_by_readiness() -> None:
-    assert timeline_from_readiness(0.80) == "1-3 months"
-    assert timeline_from_readiness(0.60) == "3-6 months"
-    assert timeline_from_readiness(0.45) == "6-9 months"
-    assert timeline_from_readiness(0.26) == "9-12+ months"
+    assert timeline_from_readiness(0.80) == "3 months"
+    assert timeline_from_readiness(0.60) == "6 months"
+    assert timeline_from_readiness(0.45) == "9 months"
+    assert timeline_from_readiness(0.26) == "12 months"

@@ -366,13 +366,27 @@ class CareerPathMilestone(BaseModel):
     order: int = Field(ge=1)
     kind: MilestoneKind = "skill"
     title: str
-    timeline: str = ""
+    timeline: str = Field(
+        default="",
+        pattern=r"^$|^\s*\d+\s+(weeks?|months?)\s*$",
+        description=(
+            "Exact milestone duration only, for example '3 weeks' or '2 months'. "
+            "No ranges, cumulative windows, plus signs, or vague text."
+        ),
+    )
     rationale: str = ""
     skills: list[str] = Field(default_factory=list)
     projects: list[str] = Field(default_factory=list)
 
 
 class CareerPathDraft(BaseModel):
+    plan_summary: str = Field(
+        default="",
+        description=(
+            "Three to four concise sentences summarizing the whole plan: readiness, main gaps, "
+            "roadmap focus, projects, and certifications. Do not relist the profile."
+        ),
+    )
     milestones: list[CareerPathMilestone] = Field(default_factory=list)
     recommended_projects: list[str] = Field(default_factory=list)
     estimated_timeline: str = ""
