@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ArrowLeft, ChevronRight, Clock, Wallet } from "lucide-react";
 import { buildRoadmapPreviewNodes, type RoadmapPreviewNode } from "@/lib/roadmapPreview";
-import { roleMatchesToViews } from "@/lib/roleView";
+import { bucketTone, roleMatchesToViews } from "@/lib/roleView";
 import { useStageStore } from "@/state/useStageStore";
 import type { CareerPathReport } from "@/lib/api";
 import type { RoleView } from "@/types";
@@ -67,7 +67,6 @@ export function FocusStage() {
               </span>
             </h2>
             <p className="mt-1 max-w-[76ch] text-[13px] leading-relaxed text-foreground/65">
-              Starting from <span className="font-medium text-foreground/85">{startRole}</span>.
               Open a role for the roadmap and skills gap.
             </p>
           </div>
@@ -138,6 +137,7 @@ function PathCard({
     targetRole: report?.target_role ?? role.title,
     milestones: report?.milestones ?? [],
   });
+  const tone = bucketTone(role.bucket);
 
   return (
     <motion.div
@@ -147,8 +147,11 @@ function PathCard({
       className="liquid-glass relative grid grid-cols-1 gap-4 overflow-hidden rounded-3xl p-5 lg:grid-cols-[250px_minmax(0,1fr)_auto] lg:items-center lg:gap-7 lg:p-6"
     >
       <div className="flex min-w-0 flex-col gap-2">
-        <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[color:var(--brand)]/10 px-2 py-0.5 text-[10.5px] font-medium uppercase tracking-[0.16em] text-[color:var(--brand-deep)]">
-          <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--brand)]" />
+        <span
+          className="inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-[10.5px] font-medium uppercase tracking-[0.16em]"
+          style={{ backgroundColor: tone.background, color: tone.text }}
+        >
+          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tone.dot }} />
           {role.trackLabel}
         </span>
         <h3

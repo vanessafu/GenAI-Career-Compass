@@ -223,7 +223,7 @@ export function RecapStage() {
                           damping: 24,
                         }}
                         whileHover={{ y: -2 }}
-                        className="group inline-flex items-center gap-1.5 rounded-full border border-[color:var(--brand)]/15 bg-white/80 px-3 py-1.5 text-[13.5px] text-foreground/85"
+                        className="group removable-chip removable-chip--white inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:var(--brand)]/15 bg-white/80 px-3 py-1.5 text-[13.5px] text-foreground/85"
                       >
                         <span
                           className="grid h-6 w-6 place-items-center rounded-full text-white"
@@ -232,12 +232,14 @@ export function RecapStage() {
                           <Icon size={11} />
                         </span>
 
-                        {s.name}
+                        <span className="removable-chip-label">{s.name}</span>
                         <button
+                          type="button"
                           onClick={() => removeSkill(s.name)}
-                          className="opacity-0 transition group-hover:opacity-100"
+                          className="removable-chip-remove"
+                          aria-label={`Remove ${s.name}`}
                         >
-                          <X size={10} className="text-foreground/55 hover:text-foreground" />
+                          <X size={10} />
                         </button>
                       </motion.div>
                     );
@@ -271,14 +273,16 @@ export function RecapStage() {
                       exit={{ opacity: 0, scale: 0.85 }}
                       transition={{ delay: i * 0.02, type: "spring", stiffness: 400, damping: 24 }}
                       whileHover={{ y: -1 }}
-                      className="group inline-flex max-w-full items-start gap-1.5 rounded-xl bg-[color:var(--brand)]/10 px-3 py-1.5 text-[13.5px] text-[color:var(--brand-deep)]"
+                      className="group removable-chip removable-chip--brand inline-flex max-w-full items-center rounded-xl bg-[color:var(--brand)]/10 px-3 py-1.5 text-[13.5px] text-[color:var(--brand-deep)]"
                     >
-                      <span className="min-w-0 break-words leading-snug">{it}</span>
+                      <span className="removable-chip-label leading-snug">{it}</span>
                       <button
+                        type="button"
                         onClick={() => removeInterest(it)}
-                        className="shrink-0 opacity-0 transition group-hover:opacity-100"
+                        className="removable-chip-remove"
+                        aria-label={`Remove ${it}`}
                       >
-                        <X size={10} className="hover:text-foreground" />
+                        <X size={10} />
                       </button>
                     </motion.div>
                   ))}

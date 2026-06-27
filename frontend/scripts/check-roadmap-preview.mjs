@@ -10,17 +10,30 @@ const iconSource = await readFile(
   new URL("../src/components/compass/RoadmapNodeIcon.tsx", import.meta.url),
   "utf8",
 );
-const compiled = ts.transpileModule(source, {
-  compilerOptions: {
-    module: ts.ModuleKind.CommonJS,
-    target: ts.ScriptTarget.ES2022,
-  },
-});
+const modalSource = await readFile(
+  new URL("../src/components/compass/modals/DeepDiveModal.tsx", import.meta.url),
+  "utf8",
+);
+const fullPlanSource = await readFile(
+  new URL("../src/components/compass/modals/FullPlanModal.tsx", import.meta.url),
+  "utf8",
+);
+const roleViewSource = await readFile(new URL("../src/lib/roleView.ts", import.meta.url), "utf8");
 
-const module = { exports: {} };
-vm.runInNewContext(compiled.outputText, { module, exports: module.exports });
+function loadCommonJs(sourceText) {
+  const compiled = ts.transpileModule(sourceText, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+    },
+  });
+  const module = { exports: {} };
+  vm.runInNewContext(compiled.outputText, { module, exports: module.exports });
+  return module.exports;
+}
 
-const { buildRoadmapPreviewNodes } = module.exports;
+const { buildRoadmapPreviewNodes } = loadCommonJs(source);
+const { roleMatchToView } = loadCommonJs(roleViewSource);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -29,6 +42,106 @@ function assert(condition, message) {
 assert(
   !iconSource.includes("title.toLowerCase") && !iconSource.includes("RegExp"),
   "Roadmap icons should be selected by node kind only, not title keywords.",
+);
+assert(
+  modalSource.includes("headerDescription"),
+  "DeepDiveModal should support headerDescription for wide modal intro text.",
+);
+assert(
+  fullPlanSource.includes("headerDescription={") &&
+    fullPlanSource.includes("PlanHeaderDescription"),
+  "FullPlanModal should move the profile summary into the modal header.",
+);
+assert(
+  fullPlanSource.includes("function RoadmapCanvas"),
+  "FullPlanModal should render desktop roadmap items in one relative canvas.",
+);
+assert(
+  fullPlanSource.includes("canvasX(index, roadmapNodes.length)"),
+  "Roadmap canvas positions should come from one x-coordinate helper.",
+);
+assert(
+  fullPlanSource.includes('viewBox="0 0 1000 280"') &&
+    fullPlanSource.includes('className="relative h-[280px] overflow-x-hidden"'),
+  "Roadmap canvas should be tight enough to avoid dead space around descriptions.",
+);
+assert(
+  fullPlanSource.includes('ModalBlock className="mb-1 border-t border-foreground/10 pt-6"') &&
+    fullPlanSource.includes('ModalBlock className="mb-4 mt-1 border-t border-foreground/10 pt-4"'),
+  "Roadmap and skills-gap section margins should keep the separator close to descriptions.",
+);
+assert(
+  fullPlanSource.includes("const durationTop = 178") &&
+    fullPlanSource.includes("const descriptionTop = 222"),
+  "Roadmap canvas should use tighter fixed vertical bands for description content.",
+);
+assert(
+  fullPlanSource.includes('className="min-w-0 px-4 text-center"') &&
+    fullPlanSource.includes("break-words text-[13px] leading-relaxed"),
+  "Roadmap description text should be centered and compact.",
+);
+assert(
+  fullPlanSource.includes("descriptionCenterX(detailIndex, rawDetailNodes.length)") &&
+    fullPlanSource.includes("gridTemplateColumns: `repeat(${detailNodes.length}, minmax(0, 1fr))`"),
+  "Roadmap descriptions should share the available horizontal space independent of node positions.",
+);
+assert(
+  fullPlanSource.includes("d={canvasConnectorPath(") &&
+    fullPlanSource.includes("node.x") &&
+    fullPlanSource.includes("node.descriptionX") &&
+    fullPlanSource.includes("function descriptionCenterX"),
+  "Roadmap connectors should route from the owning node to its evenly spaced description lane.",
+);
+assert(
+  fullPlanSource.includes("Math.min(80, Math.max(-80") &&
+    fullPlanSource.includes("`L ${toX} ${endY}`"),
+  "Roadmap connectors should use a calm curve and finish vertically into the description lane.",
+);
+assert(
+  fullPlanSource.includes('vectorEffect="non-scaling-stroke"') &&
+    fullPlanSource.includes('strokeDasharray="4 7"') &&
+    fullPlanSource.includes("border-dashed"),
+  "Roadmap lines should render as thin, non-scaling dashed lines.",
+);
+assert(
+  fullPlanSource.includes("const inset = 8"),
+  "Roadmap node positions should stay inset enough to avoid horizontal overflow.",
+);
+assert(
+  !fullPlanSource.includes("laneWidth") && !fullPlanSource.includes("overflow-visible"),
+  "Roadmap canvas should avoid edge-overflowing lanes and SVGs that create horizontal scroll.",
+);
+assert(
+  !fullPlanSource.includes("gridColumn: node.index + 1") &&
+    !fullPlanSource.includes("connectorSide("),
+  "Roadmap canvas should replace the old lane-grid connector routing.",
+);
+
+const demoUriRole = roleMatchToView({
+  role_id: "demo-role",
+  bucket: "next_step",
+  title: "Platform Engineer",
+  matching_score: 86,
+  salary: "",
+  description: "",
+  esco_title: "Platform Engineer",
+  esco_uri: "demo:demo-role",
+  matched_skills: [],
+  missing_skills: [],
+  matched_domains: [],
+  matched_certifications: [],
+});
+assert(demoUriRole.escoUri === "", "Demo ESCO URIs should not render as broken links.");
+
+const realUriRole = roleMatchToView({
+  ...demoUriRole,
+  role_id: "real-role",
+  esco_uri: "http://data.europa.eu/esco/occupation/528f90ed-e250-48bd-aacc-ffb7b1de5654",
+});
+assert(
+  realUriRole.escoUri ===
+    "http://data.europa.eu/esco/occupation/528f90ed-e250-48bd-aacc-ffb7b1de5654",
+  "HTTP ESCO URIs should remain clickable.",
 );
 
 const nodes = buildRoadmapPreviewNodes({
@@ -80,7 +193,4 @@ assert(
   mixedNodes[2].label === "Experience",
   `Expected Experience label, got ${mixedNodes[2].label}`,
 );
-assert(
-  mixedNodes[2].kind === "experience",
-  `Expected experience kind, got ${mixedNodes[2].kind}`,
-);
+assert(mixedNodes[2].kind === "experience", `Expected experience kind, got ${mixedNodes[2].kind}`);

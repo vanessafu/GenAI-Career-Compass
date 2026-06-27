@@ -25,7 +25,7 @@ export function TopBar() {
       <div className="soft-card-elevated pill pointer-events-auto flex items-center gap-2 px-2 py-1.5 pr-3 sm:gap-3">
         <button
           onClick={reset}
-          className="flex items-center gap-2 rounded-full px-2 py-1 transition hover:bg-foreground/[0.04]"
+          className="group flex items-center gap-2 rounded-full px-2 py-1 transition hover:bg-foreground/[0.04]"
           aria-label="Career Compass home"
         >
           <CompassMark size={22} />

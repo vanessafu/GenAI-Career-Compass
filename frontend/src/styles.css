@@ -150,6 +150,18 @@
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
   }
+  button:not(:disabled),
+  a[href],
+  select:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  label:has(input[type="file"]:not(:disabled)) {
+    cursor: pointer;
+  }
+  button:disabled,
+  select:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 @layer utilities {
@@ -238,6 +250,72 @@
 
   .pill {
     border-radius: 999px;
+  }
+
+  .removable-chip {
+    --removable-chip-fade: color-mix(in oklab, var(--brand) 10%, white 90%);
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .removable-chip--brand {
+    --removable-chip-fade: color-mix(in oklab, var(--brand) 10%, white 90%);
+  }
+  .removable-chip--white {
+    --removable-chip-fade: rgba(255, 255, 255, 0.94);
+  }
+  .removable-chip::after {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    right: 0;
+    z-index: 1;
+    width: 2.35rem;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--removable-chip-fade) 58%,
+      var(--removable-chip-fade) 100%
+    );
+    opacity: 0;
+    transition: opacity 160ms ease;
+  }
+  .removable-chip:hover::after,
+  .removable-chip:focus-within::after {
+    opacity: 1;
+  }
+  .removable-chip-label {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .removable-chip-remove {
+    position: absolute;
+    top: 50%;
+    right: 0.42rem;
+    z-index: 2;
+    display: grid;
+    width: 1rem;
+    height: 1rem;
+    place-items: center;
+    border-radius: 999px;
+    color: color-mix(in oklab, var(--ink) 58%, transparent);
+    opacity: 0;
+    transform: translateY(-50%);
+    transition:
+      color 160ms ease,
+      opacity 160ms ease;
+  }
+  .removable-chip:hover .removable-chip-remove,
+  .removable-chip:focus-within .removable-chip-remove {
+    opacity: 1;
+  }
+  .removable-chip-remove:hover,
+  .removable-chip-remove:focus-visible {
+    color: var(--ink);
   }
 
   .grain::after {

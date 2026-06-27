@@ -7,6 +7,8 @@ export function DeepDiveModal({
   onClose,
   title,
   subtitle,
+  headerAside,
+  headerDescription,
   wide = false,
   children,
 }: {
@@ -14,6 +16,8 @@ export function DeepDiveModal({
   onClose: () => void;
   title: React.ReactNode;
   subtitle?: string;
+  headerAside?: React.ReactNode;
+  headerDescription?: React.ReactNode;
   wide?: boolean;
   children: React.ReactNode;
 }) {
@@ -63,24 +67,28 @@ export function DeepDiveModal({
               {!desktop && (
                 <div className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-foreground/15" />
               )}
-              <div className="flex shrink-0 items-start justify-between gap-3 p-6 pb-3 sm:p-7 sm:pb-4">
-                <div className="min-w-0">
+              <div className="flex shrink-0 items-start justify-between gap-3 p-6 pb-4 sm:p-8 sm:pb-5">
+                <div className="min-w-0 flex-1">
                   {subtitle && (
                     <p className="text-[10px] uppercase tracking-[0.18em] text-foreground/45">
                       {subtitle}
                     </p>
                   )}
-                  <h3 className="mt-1 text-balance font-display text-2xl leading-tight tracking-tight sm:text-3xl">
+                  <h3 className="mt-1 text-balance font-display text-2xl leading-[1.12] tracking-tight sm:text-3xl">
                     {title}
                   </h3>
+                  {headerDescription && <div className="mt-7">{headerDescription}</div>}
                 </div>
-                <button
-                  onClick={onClose}
-                  aria-label="Close"
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-foreground/55 hover:bg-foreground/[0.06] hover:text-foreground"
-                >
-                  <X size={16} />
-                </button>
+                <div className="flex shrink-0 items-start gap-3">
+                  {headerAside}
+                  <button
+                    onClick={onClose}
+                    aria-label="Close"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-foreground/55 hover:bg-foreground/[0.06] hover:text-foreground"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
               <motion.div
                 initial="hidden"

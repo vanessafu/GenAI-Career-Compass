@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useMemo } from "react";
 import { useStageStore, MAX_PICKS } from "@/state/useStageStore";
-import { roleMatchesToViews } from "@/lib/roleView";
+import { bucketTone, roleMatchesToViews } from "@/lib/roleView";
 import type { RoleView } from "@/types";
 import { ArrowLeft, ArrowRight, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -217,21 +217,4 @@ function RoleCard({
       )}
     </motion.button>
   );
-}
-
-function bucketTone(bucket: string) {
-  switch (bucket) {
-    case "ready_now":
-      return { background: "#e7f6ee", text: "#17633f", dot: "#20a162" };
-    case "next_step":
-      return { background: "#e8f0fb", text: "#225a9d", dot: "#2f79d1" };
-    case "aspirational":
-      return { background: "#fff1d6", text: "#875400", dot: "#d99000" };
-    default:
-      return {
-        background: "color-mix(in oklab, var(--brand) 10%, white)",
-        text: "var(--brand-deep)",
-        dot: "var(--brand)",
-      };
-  }
 }

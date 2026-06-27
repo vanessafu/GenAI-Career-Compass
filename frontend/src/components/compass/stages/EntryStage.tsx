@@ -68,6 +68,8 @@ export function EntryStage() {
   const [drag, setDrag] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const fileName = file?.name ?? null;
+  const [manualOpen, setManualOpen] = useState(false);
+  const manualCardRef = useRef<HTMLDivElement | null>(null);
 
   // Tier 1 — quick start
   const [role, setRole] = useState("");
@@ -153,6 +155,14 @@ export function EntryStage() {
       if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!manualOpen) return;
+    const id = window.setTimeout(() => {
+      manualCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 40);
+    return () => window.clearTimeout(id);
+  }, [manualOpen]);
 
   const clearLoadingTimers = () => {
     timersRef.current.forEach(clearTimeout);
@@ -363,19 +373,31 @@ export function EntryStage() {
   };
 
   return (
-    <div className="relative flex w-full flex-col items-stretch px-6 pb-10 pt-[max(4.75rem,calc(env(safe-area-inset-top)+4.25rem))] sm:px-10 sm:pt-20 lg:px-16 lg:pt-[5.5rem]">
-      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-5 sm:gap-6">
+    <div
+      className={cn(
+        "relative flex w-full flex-col items-stretch px-6 sm:px-10 lg:px-16",
+        manualOpen
+          ? "min-h-dvh overflow-x-hidden pb-10 pt-[max(5rem,calc(env(safe-area-inset-top)+4.5rem))] sm:pt-[5.5rem]"
+          : "h-dvh overflow-hidden pb-7 pt-[max(5rem,calc(env(safe-area-inset-top)+4.5rem))] sm:pt-[5.25rem]",
+      )}
+    >
+      <div
+        className={cn(
+          "mx-auto flex w-full max-w-[1180px] flex-col gap-5",
+          manualOpen ? "min-h-0" : "min-h-0 flex-1",
+        )}
+      >
         {/* Headline — transform-only animation, glides centered when loading appears. */}
         <motion.div
           animate={{ scale: parsing ? 0.86 : 1, y: parsing ? 4 : 0 }}
           transition={{ type: "spring", stiffness: 180, damping: 30, mass: 0.9 }}
           style={{ transformOrigin: parsing ? "center top" : "left top", willChange: "transform" }}
           className={cn(
-            "flex flex-col transition-[align-items,text-align] duration-500",
+            "flex shrink-0 flex-col transition-[align-items,text-align] duration-500",
             parsing ? "items-center text-center" : "items-start max-w-4xl",
           )}
         >
-          <h1 className="h-hero">
+          <h1 className="font-display text-balance text-[clamp(2.1rem,5.3vw,3.55rem)] leading-[0.98] tracking-[-0.01em]">
             Let us map your expertise to{" "}
             <span
               className="italic"
@@ -433,7 +455,10 @@ export function EntryStage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6, scale: 0.98 }}
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              className="grid w-full items-start gap-5 md:grid-cols-2"
+              className={cn(
+                "grid w-full gap-5 md:grid-cols-2",
+                manualOpen ? "items-start" : "min-h-0 flex-1 items-stretch",
+              )}
             >
               {/* ── Upload CV ── */}
               <motion.div
@@ -454,7 +479,8 @@ export function EntryStage() {
                   }
                 }}
                 className={cn(
-                  "liquid-glass flex flex-col rounded-3xl p-6 transition-colors",
+                  "liquid-glass flex flex-col rounded-3xl p-7 transition-colors",
+                  manualOpen ? "min-h-[520px]" : "h-full min-h-0",
                   drag && "ring-2 ring-[color:var(--brand)]/50",
                 )}
               >
@@ -526,16 +552,48 @@ export function EntryStage() {
 
               {/* ── Manual entry ── */}
               <motion.div
+                ref={manualCardRef}
+                layout
                 transition={{ type: "spring", stiffness: 260, damping: 22 }}
-                className="liquid-glass flex flex-col gap-3.5 rounded-3xl p-6"
+                onClick={() => {
+                  if (!manualOpen) setManualOpen(true);
+                }}
+                className={cn(
+                  "liquid-glass flex flex-col rounded-3xl p-7",
+                  manualOpen ? "gap-3.5" : "h-full min-h-0 cursor-pointer gap-3.5 overflow-hidden",
+                )}
+                aria-expanded={manualOpen}
               >
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-[22px] tracking-tight">Fill it in manually</h3>
-                  <span className="rounded-full bg-[color:var(--brand)]/10 px-2 py-0.5 text-[10.5px] font-medium text-[color:var(--brand)]">
-                    Quick form
-                  </span>
+                <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-display text-[22px] tracking-tight">
+                      Fill it in manually
+                    </h3>
+                    <span className="inline-flex shrink-0 items-center rounded-full bg-[color:var(--brand)]/10 px-2 py-0.5 text-[10.5px] font-medium text-[color:var(--brand)]">
+                      Quick form
+                    </span>
+                  </div>
+                  {!manualOpen && (
+                    <p className="mt-1 max-w-sm text-[13.5px] leading-relaxed text-foreground/60">
+                      Answer a few fields yourself instead of uploading a CV.
+                    </p>
+                  )}
                 </div>
 
+                <motion.div
+                  animate={{ height: manualOpen ? "auto" : "100%" }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  onFocusCapture={() => {
+                    if (!manualOpen) setManualOpen(true);
+                  }}
+                  onClickCapture={() => {
+                    if (!manualOpen) setManualOpen(true);
+                  }}
+                  className={cn(
+                    "relative flex flex-col gap-3.5",
+                    manualOpen ? "overflow-visible" : "min-h-0 flex-1 overflow-hidden",
+                  )}
+                >
                 <div className="grid gap-2.5">
                   <AutocompleteInput
                     label="Current role"
@@ -940,6 +998,10 @@ export function EntryStage() {
                     className="transition-transform group-hover:translate-x-0.5"
                   />
                 </motion.button>
+                  {!manualOpen && (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/5 bg-gradient-to-b from-white/0 via-white/45 to-white/95" />
+                  )}
+                </motion.div>
               </motion.div>
             </motion.div>
           )}
@@ -1167,12 +1229,13 @@ function TagField({
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.6, opacity: 0 }}
             transition={{ type: "spring", stiffness: 380, damping: 22 }}
-            className="inline-flex items-center gap-1 rounded-full bg-[color:var(--brand)]/10 px-2.5 py-0.5 text-[12px] text-[color:var(--brand)]"
+            className="removable-chip removable-chip--brand inline-flex max-w-full items-center rounded-full bg-[color:var(--brand)]/10 px-2.5 py-0.5 text-[12px] text-[color:var(--brand)]"
           >
-            {t}
+            <span className="removable-chip-label">{t}</span>
             <button
+              type="button"
               onClick={() => onRemove(t)}
-              className="opacity-60 hover:opacity-100"
+              className="removable-chip-remove"
               aria-label={`remove ${t}`}
             >
               <X size={11} />
