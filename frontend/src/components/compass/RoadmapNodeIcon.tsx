@@ -1,23 +1,8 @@
 import type { LucideIcon } from "lucide-react";
-import {
-  Award,
-  Briefcase,
-  Flag,
-  Folder,
-  Network,
-  Rocket,
-  Terminal,
-  Trophy,
-} from "lucide-react";
+import { Award, Briefcase, Flag, Folder, Network, Rocket, Terminal, Trophy } from "lucide-react";
 import type { RoadmapNodeKind } from "@/lib/roadmapPreview";
 
-export function RoadmapNodeIcon({
-  kind,
-  size = 16,
-}: {
-  kind: RoadmapNodeKind;
-  size?: number;
-}) {
+export function RoadmapNodeIcon({ kind, size = 16 }: { kind: RoadmapNodeKind; size?: number }) {
   const Icon = iconForRoadmapNode(kind);
   return <Icon aria-hidden size={size} strokeWidth={1.9} />;
 }

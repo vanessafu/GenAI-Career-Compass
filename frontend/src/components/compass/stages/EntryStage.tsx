@@ -526,9 +526,7 @@ export function EntryStage() {
                   >
                     <Upload size={20} />
                   </motion.div>
-                  <p className="text-[14.5px] font-medium">
-                    {fileName ?? "Drag & drop your CV"}
-                  </p>
+                  <p className="text-[14.5px] font-medium">{fileName ?? "Drag & drop your CV"}</p>
                 </motion.label>
 
                 <motion.button
@@ -566,9 +564,7 @@ export function EntryStage() {
               >
                 <div>
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="font-display text-[22px] tracking-tight">
-                      Fill it in manually
-                    </h3>
+                    <h3 className="font-display text-[22px] tracking-tight">Fill it in manually</h3>
                     <span className="inline-flex shrink-0 items-center rounded-full bg-[color:var(--brand)]/10 px-2 py-0.5 text-[10.5px] font-medium text-[color:var(--brand)]">
                       Quick form
                     </span>
@@ -594,410 +590,414 @@ export function EntryStage() {
                     manualOpen ? "overflow-visible" : "min-h-0 flex-1 overflow-hidden",
                   )}
                 >
-                <div className="grid gap-2.5">
-                  <AutocompleteInput
-                    label="Current role"
-                    value={role}
-                    onChange={setRole}
-                    presets={ROLE_PRESETS}
-                    placeholder="e.g. Senior Backend Developer"
-                  />
-                  <div className="grid gap-2.5 sm:grid-cols-2">
-                    <label className="block">
-                      <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                        Seniority
-                      </span>
-                      <select
-                        value={seniority}
-                        onChange={(e) => setSeniority(e.target.value)}
-                        className="manual-input"
-                      >
-                        <option value="">Select…</option>
-                        {SENIORITY_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="block">
-                      <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                        Years of experience
-                      </span>
+                  <div className="grid gap-2.5">
+                    <AutocompleteInput
+                      label="Current role"
+                      value={role}
+                      onChange={setRole}
+                      presets={ROLE_PRESETS}
+                      placeholder="e.g. Senior Backend Developer"
+                    />
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+                          Seniority
+                        </span>
+                        <select
+                          value={seniority}
+                          onChange={(e) => setSeniority(e.target.value)}
+                          className="manual-input"
+                        >
+                          <option value="">Select…</option>
+                          {SENIORITY_OPTIONS.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+                          Years of experience
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={80}
+                          value={yearsOfExperience}
+                          onChange={(e) => setYearsOfExperience(e.target.value)}
+                          placeholder="e.g. 5"
+                          className="manual-input"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <RepeatableSection
+                    title="Education"
+                    items={education.map((item) => ({
+                      title: item.degree,
+                      subtitle: [item.fieldOfStudy, item.institution].filter(Boolean).join(" · "),
+                      meta: [item.startDate, item.endDate].filter(Boolean).join("-"),
+                    }))}
+                    onRemove={(idx) => setEducation(education.filter((_, i) => i !== idx))}
+                  >
+                    <div className="grid gap-2.5 sm:grid-cols-2">
+                      <AutocompleteInput
+                        label="Degree"
+                        value={educationDraft.degree}
+                        onChange={(value) =>
+                          setEducationDraft({ ...educationDraft, degree: value })
+                        }
+                        presets={EDU_PRESETS}
+                        placeholder="e.g. MSc Robotics"
+                      />
                       <input
-                        type="number"
-                        min={0}
-                        max={80}
-                        value={yearsOfExperience}
-                        onChange={(e) => setYearsOfExperience(e.target.value)}
-                        placeholder="e.g. 5"
+                        value={educationDraft.institution}
+                        onChange={(e) =>
+                          setEducationDraft({ ...educationDraft, institution: e.target.value })
+                        }
+                        placeholder="Institution"
+                        className="manual-input self-end"
+                      />
+                      <input
+                        value={educationDraft.fieldOfStudy}
+                        onChange={(e) =>
+                          setEducationDraft({ ...educationDraft, fieldOfStudy: e.target.value })
+                        }
+                        placeholder="Field of study"
                         className="manual-input"
                       />
-                    </label>
-                  </div>
-                </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <input
+                          value={educationDraft.startDate}
+                          onChange={(e) =>
+                            setEducationDraft({ ...educationDraft, startDate: e.target.value })
+                          }
+                          placeholder="From"
+                          className="manual-input"
+                        />
+                        <input
+                          value={educationDraft.endDate}
+                          onChange={(e) =>
+                            setEducationDraft({ ...educationDraft, endDate: e.target.value })
+                          }
+                          placeholder="To"
+                          className="manual-input"
+                        />
+                      </div>
+                    </div>
+                    <AddRowButton onClick={addEducation} label="Add education" />
+                  </RepeatableSection>
 
-                <RepeatableSection
-                  title="Education"
-                  items={education.map((item) => ({
-                    title: item.degree,
-                    subtitle: [item.fieldOfStudy, item.institution].filter(Boolean).join(" · "),
-                    meta: [item.startDate, item.endDate].filter(Boolean).join("-"),
-                  }))}
-                  onRemove={(idx) => setEducation(education.filter((_, i) => i !== idx))}
-                >
-                  <div className="grid gap-2.5 sm:grid-cols-2">
-                    <AutocompleteInput
-                      label="Degree"
-                      value={educationDraft.degree}
-                      onChange={(value) => setEducationDraft({ ...educationDraft, degree: value })}
-                      presets={EDU_PRESETS}
-                      placeholder="e.g. MSc Robotics"
-                    />
-                    <input
-                      value={educationDraft.institution}
-                      onChange={(e) =>
-                        setEducationDraft({ ...educationDraft, institution: e.target.value })
-                      }
-                      placeholder="Institution"
-                      className="manual-input self-end"
-                    />
-                    <input
-                      value={educationDraft.fieldOfStudy}
-                      onChange={(e) =>
-                        setEducationDraft({ ...educationDraft, fieldOfStudy: e.target.value })
-                      }
-                      placeholder="Field of study"
-                      className="manual-input"
-                    />
-                    <div className="grid grid-cols-2 gap-2.5">
+                  <RepeatableSection
+                    title="Experience"
+                    items={experience.map((item) => ({
+                      title: item.role,
+                      subtitle: item.organization,
+                      meta: [item.startDate, item.endDate || "Present"].filter(Boolean).join("-"),
+                    }))}
+                    onRemove={(idx) => setExperience(experience.filter((_, i) => i !== idx))}
+                  >
+                    <div className="grid gap-2.5 sm:grid-cols-2">
                       <input
-                        value={educationDraft.startDate}
+                        value={experienceDraft.role}
                         onChange={(e) =>
-                          setEducationDraft({ ...educationDraft, startDate: e.target.value })
+                          setExperienceDraft({ ...experienceDraft, role: e.target.value })
+                        }
+                        placeholder="Role"
+                        className="manual-input"
+                      />
+                      <input
+                        value={experienceDraft.organization}
+                        onChange={(e) =>
+                          setExperienceDraft({ ...experienceDraft, organization: e.target.value })
+                        }
+                        placeholder="Organization"
+                        className="manual-input"
+                      />
+                      <input
+                        value={experienceDraft.startDate}
+                        onChange={(e) =>
+                          setExperienceDraft({ ...experienceDraft, startDate: e.target.value })
                         }
                         placeholder="From"
                         className="manual-input"
                       />
                       <input
-                        value={educationDraft.endDate}
+                        value={experienceDraft.endDate}
                         onChange={(e) =>
-                          setEducationDraft({ ...educationDraft, endDate: e.target.value })
+                          setExperienceDraft({ ...experienceDraft, endDate: e.target.value })
                         }
                         placeholder="To"
                         className="manual-input"
                       />
                     </div>
-                  </div>
-                  <AddRowButton onClick={addEducation} label="Add education" />
-                </RepeatableSection>
+                    <AddRowButton onClick={addExperience} label="Add experience" />
+                  </RepeatableSection>
 
-                <RepeatableSection
-                  title="Experience"
-                  items={experience.map((item) => ({
-                    title: item.role,
-                    subtitle: item.organization,
-                    meta: [item.startDate, item.endDate || "Present"].filter(Boolean).join("-"),
-                  }))}
-                  onRemove={(idx) => setExperience(experience.filter((_, i) => i !== idx))}
-                >
-                  <div className="grid gap-2.5 sm:grid-cols-2">
-                    <input
-                      value={experienceDraft.role}
-                      onChange={(e) =>
-                        setExperienceDraft({ ...experienceDraft, role: e.target.value })
+                  <div>
+                    <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+                      Technical skills
+                    </p>
+                    <TagField
+                      tags={skills}
+                      onRemove={(t) => setSkills(skills.filter((x) => x !== t))}
+                      typeahead={
+                        <SkillTypeahead
+                          draft={skillDraft}
+                          setDraft={setSkillDraft}
+                          onAdd={addSkill}
+                          existing={skills}
+                        />
                       }
-                      placeholder="Role"
-                      className="manual-input"
-                    />
-                    <input
-                      value={experienceDraft.organization}
-                      onChange={(e) =>
-                        setExperienceDraft({ ...experienceDraft, organization: e.target.value })
-                      }
-                      placeholder="Organization"
-                      className="manual-input"
-                    />
-                    <input
-                      value={experienceDraft.startDate}
-                      onChange={(e) =>
-                        setExperienceDraft({ ...experienceDraft, startDate: e.target.value })
-                      }
-                      placeholder="From"
-                      className="manual-input"
-                    />
-                    <input
-                      value={experienceDraft.endDate}
-                      onChange={(e) =>
-                        setExperienceDraft({ ...experienceDraft, endDate: e.target.value })
-                      }
-                      placeholder="To"
-                      className="manual-input"
                     />
                   </div>
-                  <AddRowButton onClick={addExperience} label="Add experience" />
-                </RepeatableSection>
 
-                <div>
-                  <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                    Technical skills
-                  </p>
-                  <TagField
-                    tags={skills}
-                    onRemove={(t) => setSkills(skills.filter((x) => x !== t))}
-                    typeahead={
-                      <SkillTypeahead
-                        draft={skillDraft}
-                        setDraft={setSkillDraft}
-                        onAdd={addSkill}
-                        existing={skills}
-                      />
-                    }
-                  />
-                </div>
+                  <div>
+                    <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+                      What are you drawn to?
+                    </p>
+                    <TagField
+                      tags={interests}
+                      onRemove={(t) => setInterests(interests.filter((x) => x !== t))}
+                      typeahead={
+                        <PlainTagInput
+                          draft={interestDraft}
+                          setDraft={setInterestDraft}
+                          onAdd={addInterest}
+                          placeholder="Add interest"
+                        />
+                      }
+                    />
+                  </div>
 
-                <div>
-                  <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                    What are you drawn to?
-                  </p>
-                  <TagField
-                    tags={interests}
-                    onRemove={(t) => setInterests(interests.filter((x) => x !== t))}
-                    typeahead={
-                      <PlainTagInput
-                        draft={interestDraft}
-                        setDraft={setInterestDraft}
-                        onAdd={addInterest}
-                        placeholder="Add interest"
-                      />
-                    }
-                  />
-                </div>
+                  <div>
+                    <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+                      Target constraints
+                    </p>
+                    <TagField
+                      tags={targetConstraints}
+                      onRemove={(t) =>
+                        setTargetConstraints(targetConstraints.filter((x) => x !== t))
+                      }
+                      typeahead={
+                        <PlainTagInput
+                          draft={targetConstraintDraft}
+                          setDraft={setTargetConstraintDraft}
+                          onAdd={addTargetConstraint}
+                          placeholder="Add constraint"
+                        />
+                      }
+                    />
+                  </div>
 
-                <div>
-                  <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                    Target constraints
-                  </p>
-                  <TagField
-                    tags={targetConstraints}
-                    onRemove={(t) => setTargetConstraints(targetConstraints.filter((x) => x !== t))}
-                    typeahead={
-                      <PlainTagInput
-                        draft={targetConstraintDraft}
-                        setDraft={setTargetConstraintDraft}
-                        onAdd={addTargetConstraint}
-                        placeholder="Add constraint"
-                      />
-                    }
-                  />
-                </div>
+                  {/* Collapsible Tier 2 — add more context */}
+                  <button
+                    type="button"
+                    onClick={() => setShowMore((v) => !v)}
+                    className="inline-flex w-fit items-center gap-1.5 text-[12.5px] font-medium text-[color:var(--brand-deep)] transition hover:opacity-80"
+                  >
+                    <ChevronDown
+                      size={14}
+                      className={cn("transition-transform", showMore && "rotate-180")}
+                    />
+                    {showMore ? "Hide extra details" : "Add more context (optional)"}
+                  </button>
 
-                {/* Collapsible Tier 2 — add more context */}
-                <button
-                  type="button"
-                  onClick={() => setShowMore((v) => !v)}
-                  className="inline-flex w-fit items-center gap-1.5 text-[12.5px] font-medium text-[color:var(--brand-deep)] transition hover:opacity-80"
-                >
-                  <ChevronDown
-                    size={14}
-                    className={cn("transition-transform", showMore && "rotate-180")}
-                  />
-                  {showMore ? "Hide extra details" : "Add more context (optional)"}
-                </button>
-
-                <AnimatePresence initial={false}>
-                  {showMore && (
-                    <motion.div
-                      key="more"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-                      className="overflow-hidden"
-                    >
-                      <div className="flex flex-col gap-3.5 pt-0.5">
-                        <div>
-                          <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                            Professional summary
-                          </p>
-                          <textarea
-                            value={summary}
-                            onChange={(e) => setSummary(e.target.value)}
-                            rows={2}
-                            maxLength={300}
-                            placeholder="A sentence or two about your focus and strengths…"
-                            className="manual-input resize-none"
-                          />
-                        </div>
-
-                        <div>
-                          <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                            Soft skills
-                          </p>
-                          <TagField
-                            tags={softSkills}
-                            onRemove={(t) => setSoftSkills(softSkills.filter((x) => x !== t))}
-                            typeahead={
-                              <PlainTagInput
-                                draft={softSkillDraft}
-                                setDraft={setSoftSkillDraft}
-                                onAdd={addSoftSkill}
-                                placeholder="Add soft skill"
-                              />
-                            }
-                          />
-                        </div>
-
-                        <div>
-                          <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                            Language
-                          </p>
-                          <div className="grid gap-2.5 sm:grid-cols-2">
-                            <input
-                              value={languageName}
-                              onChange={(e) => setLanguageName(e.target.value)}
-                              placeholder="e.g. English"
-                              className="manual-input"
-                            />
-                            <input
-                              value={languageLevel}
-                              onChange={(e) => setLanguageLevel(e.target.value)}
-                              placeholder="e.g. C2 / Native"
-                              className="manual-input"
+                  <AnimatePresence initial={false}>
+                    {showMore && (
+                      <motion.div
+                        key="more"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <div className="flex flex-col gap-3.5 pt-0.5">
+                          <div>
+                            <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+                              Professional summary
+                            </p>
+                            <textarea
+                              value={summary}
+                              onChange={(e) => setSummary(e.target.value)}
+                              rows={2}
+                              maxLength={300}
+                              placeholder="A sentence or two about your focus and strengths…"
+                              className="manual-input resize-none"
                             />
                           </div>
-                        </div>
 
-                        <RepeatableSection
-                          title="Projects"
-                          items={projects.map((item) => ({
-                            title: item.title,
-                            subtitle: item.description,
-                            meta: [item.startDate, item.endDate].filter(Boolean).join("-"),
-                          }))}
-                          onRemove={(idx) => setProjects(projects.filter((_, i) => i !== idx))}
-                        >
-                          <div className="grid gap-2.5 sm:grid-cols-2">
-                            <input
-                              value={projectDraft.title}
-                              onChange={(e) =>
-                                setProjectDraft({ ...projectDraft, title: e.target.value })
+                          <div>
+                            <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+                              Soft skills
+                            </p>
+                            <TagField
+                              tags={softSkills}
+                              onRemove={(t) => setSoftSkills(softSkills.filter((x) => x !== t))}
+                              typeahead={
+                                <PlainTagInput
+                                  draft={softSkillDraft}
+                                  setDraft={setSoftSkillDraft}
+                                  onAdd={addSoftSkill}
+                                  placeholder="Add soft skill"
+                                />
                               }
-                              placeholder="Project title"
-                              className="manual-input"
                             />
-                            <input
-                              value={projectDraft.technologies}
-                              onChange={(e) =>
-                                setProjectDraft({ ...projectDraft, technologies: e.target.value })
-                              }
-                              placeholder="Technologies, comma-separated"
-                              className="manual-input"
-                            />
-                            <input
-                              value={projectDraft.description}
-                              onChange={(e) =>
-                                setProjectDraft({ ...projectDraft, description: e.target.value })
-                              }
-                              placeholder="Short description"
-                              className="manual-input"
-                            />
-                            <div className="grid grid-cols-2 gap-2.5">
+                          </div>
+
+                          <div>
+                            <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+                              Language
+                            </p>
+                            <div className="grid gap-2.5 sm:grid-cols-2">
                               <input
-                                value={projectDraft.startDate}
-                                onChange={(e) =>
-                                  setProjectDraft({ ...projectDraft, startDate: e.target.value })
-                                }
-                                placeholder="From"
+                                value={languageName}
+                                onChange={(e) => setLanguageName(e.target.value)}
+                                placeholder="e.g. English"
                                 className="manual-input"
                               />
                               <input
-                                value={projectDraft.endDate}
-                                onChange={(e) =>
-                                  setProjectDraft({ ...projectDraft, endDate: e.target.value })
-                                }
-                                placeholder="To"
+                                value={languageLevel}
+                                onChange={(e) => setLanguageLevel(e.target.value)}
+                                placeholder="e.g. C2 / Native"
                                 className="manual-input"
                               />
                             </div>
                           </div>
-                          <AddRowButton onClick={addProject} label="Add project" />
-                        </RepeatableSection>
 
-                        <RepeatableSection
-                          title="Certifications"
-                          items={certifications.map((item) => ({
-                            title: item.name,
-                            subtitle: item.issuingOrganization,
-                            meta: item.issueDate,
-                          }))}
-                          onRemove={(idx) =>
-                            setCertifications(certifications.filter((_, i) => i !== idx))
-                          }
-                        >
-                          <div className="grid gap-2.5 sm:grid-cols-3">
-                            <input
-                              value={certificationDraft.name}
-                              onChange={(e) =>
-                                setCertificationDraft({
-                                  ...certificationDraft,
-                                  name: e.target.value,
-                                })
-                              }
-                              placeholder="Certification"
-                              className="manual-input"
-                            />
-                            <input
-                              value={certificationDraft.issuingOrganization}
-                              onChange={(e) =>
-                                setCertificationDraft({
-                                  ...certificationDraft,
-                                  issuingOrganization: e.target.value,
-                                })
-                              }
-                              placeholder="Issuer"
-                              className="manual-input"
-                            />
-                            <input
-                              value={certificationDraft.issueDate}
-                              onChange={(e) =>
-                                setCertificationDraft({
-                                  ...certificationDraft,
-                                  issueDate: e.target.value,
-                                })
-                              }
-                              placeholder="Year"
-                              className="manual-input"
-                            />
-                          </div>
-                          <AddRowButton onClick={addCertification} label="Add certification" />
-                        </RepeatableSection>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                          <RepeatableSection
+                            title="Projects"
+                            items={projects.map((item) => ({
+                              title: item.title,
+                              subtitle: item.description,
+                              meta: [item.startDate, item.endDate].filter(Boolean).join("-"),
+                            }))}
+                            onRemove={(idx) => setProjects(projects.filter((_, i) => i !== idx))}
+                          >
+                            <div className="grid gap-2.5 sm:grid-cols-2">
+                              <input
+                                value={projectDraft.title}
+                                onChange={(e) =>
+                                  setProjectDraft({ ...projectDraft, title: e.target.value })
+                                }
+                                placeholder="Project title"
+                                className="manual-input"
+                              />
+                              <input
+                                value={projectDraft.technologies}
+                                onChange={(e) =>
+                                  setProjectDraft({ ...projectDraft, technologies: e.target.value })
+                                }
+                                placeholder="Technologies, comma-separated"
+                                className="manual-input"
+                              />
+                              <input
+                                value={projectDraft.description}
+                                onChange={(e) =>
+                                  setProjectDraft({ ...projectDraft, description: e.target.value })
+                                }
+                                placeholder="Short description"
+                                className="manual-input"
+                              />
+                              <div className="grid grid-cols-2 gap-2.5">
+                                <input
+                                  value={projectDraft.startDate}
+                                  onChange={(e) =>
+                                    setProjectDraft({ ...projectDraft, startDate: e.target.value })
+                                  }
+                                  placeholder="From"
+                                  className="manual-input"
+                                />
+                                <input
+                                  value={projectDraft.endDate}
+                                  onChange={(e) =>
+                                    setProjectDraft({ ...projectDraft, endDate: e.target.value })
+                                  }
+                                  placeholder="To"
+                                  className="manual-input"
+                                />
+                              </div>
+                            </div>
+                            <AddRowButton onClick={addProject} label="Add project" />
+                          </RepeatableSection>
 
-                <p className="text-[11.5px] leading-snug text-foreground/50">
-                  You can review and edit everything on the next screen.
-                </p>
+                          <RepeatableSection
+                            title="Certifications"
+                            items={certifications.map((item) => ({
+                              title: item.name,
+                              subtitle: item.issuingOrganization,
+                              meta: item.issueDate,
+                            }))}
+                            onRemove={(idx) =>
+                              setCertifications(certifications.filter((_, i) => i !== idx))
+                            }
+                          >
+                            <div className="grid gap-2.5 sm:grid-cols-3">
+                              <input
+                                value={certificationDraft.name}
+                                onChange={(e) =>
+                                  setCertificationDraft({
+                                    ...certificationDraft,
+                                    name: e.target.value,
+                                  })
+                                }
+                                placeholder="Certification"
+                                className="manual-input"
+                              />
+                              <input
+                                value={certificationDraft.issuingOrganization}
+                                onChange={(e) =>
+                                  setCertificationDraft({
+                                    ...certificationDraft,
+                                    issuingOrganization: e.target.value,
+                                  })
+                                }
+                                placeholder="Issuer"
+                                className="manual-input"
+                              />
+                              <input
+                                value={certificationDraft.issueDate}
+                                onChange={(e) =>
+                                  setCertificationDraft({
+                                    ...certificationDraft,
+                                    issueDate: e.target.value,
+                                  })
+                                }
+                                placeholder="Year"
+                                className="manual-input"
+                              />
+                            </div>
+                            <AddRowButton onClick={addCertification} label="Add certification" />
+                          </RepeatableSection>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                <motion.button
-                  whileHover={{ y: -1 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={buildManualProfile}
-                  className="group mt-1 inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[14px] font-medium text-white"
-                  style={{
-                    background: "var(--gradient-warm)",
-                    boxShadow:
-                      "0 10px 24px -12px color-mix(in oklab, var(--brand-deep) 60%, transparent)",
-                  }}
-                >
-                  Build my profile
-                  <ArrowRight
-                    size={14}
-                    className="transition-transform group-hover:translate-x-0.5"
-                  />
-                </motion.button>
+                  <p className="text-[11.5px] leading-snug text-foreground/50">
+                    You can review and edit everything on the next screen.
+                  </p>
+
+                  <motion.button
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={buildManualProfile}
+                    className="group mt-1 inline-flex items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-[14px] font-medium text-white"
+                    style={{
+                      background: "var(--gradient-warm)",
+                      boxShadow:
+                        "0 10px 24px -12px color-mix(in oklab, var(--brand-deep) 60%, transparent)",
+                    }}
+                  >
+                    Build my profile
+                    <ArrowRight
+                      size={14}
+                      className="transition-transform group-hover:translate-x-0.5"
+                    />
+                  </motion.button>
                   {!manualOpen && (
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/5 bg-gradient-to-b from-white/0 via-white/45 to-white/95" />
                   )}
