@@ -15,6 +15,7 @@ export function FocusStage() {
   const selectedIds = useStageStore((s) => s.selectedRoleIds);
   const roleMatches = useStageStore((s) => s.roleMatches);
   const cvData = useStageStore((s) => s.cvData);
+  const identity = useStageStore((s) => s.identity);
   const roleGapReports = useStageStore((s) => s.roleGapReports);
   const roleGapLoading = useStageStore((s) => s.roleGapLoading);
   const roleGapErrors = useStageStore((s) => s.roleGapErrors);
@@ -26,7 +27,8 @@ export function FocusStage() {
   const [planRole, setPlanRole] = useState<RoleView | null>(null);
   const [showPlanStepDetails, setShowPlanStepDetails] = useState(false);
 
-  const startRole = cvData?.personal_info.current_role?.trim() || "Current profile";
+  const startRole =
+    identity?.archetype?.trim() || cvData?.personal_info.current_role?.trim() || "Current profile";
 
   const paths = useMemo(() => {
     const views = roleMatchesToViews(roleMatches);

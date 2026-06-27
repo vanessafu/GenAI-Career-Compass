@@ -138,6 +138,16 @@ npm run dev
 
 The dev server runs on `http://localhost:5173` and talks to the backend at `http://localhost:8000`.
 
+### Demo Data
+
+For frontend-only demo data, start the Vite dev server and open one of:
+
+- `http://localhost:5173/?demo=recap`
+- `http://localhost:5173/?demo=roles`
+- `http://localhost:5173/?demo=focus`
+
+These fixture screens are useful for layout/demo work and do not require the backend flow.
+
 See [frontend/README.md](frontend/README.md) for more details.
 
 ## License

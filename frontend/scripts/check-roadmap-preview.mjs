@@ -14,6 +14,10 @@ const modalSource = await readFile(
   new URL("../src/components/compass/modals/DeepDiveModal.tsx", import.meta.url),
   "utf8",
 );
+const focusStageSource = await readFile(
+  new URL("../src/components/compass/stages/FocusStage.tsx", import.meta.url),
+  "utf8",
+);
 const fullPlanSource = await readFile(
   new URL("../src/components/compass/modals/FullPlanModal.tsx", import.meta.url),
   "utf8",
@@ -46,6 +50,13 @@ function assert(condition, message) {
 assert(
   !iconSource.includes("title.toLowerCase") && !iconSource.includes("RegExp"),
   "Roadmap icons should be selected by node kind only, not title keywords.",
+);
+assert(
+  focusStageSource.includes("const identity = useStageStore((s) => s.identity);") &&
+    focusStageSource.includes("identity?.archetype?.trim()") &&
+    focusStageSource.indexOf("identity?.archetype?.trim()") <
+      focusStageSource.indexOf("cvData?.personal_info.current_role?.trim()"),
+  "Paths page should use career identity before falling back to current role.",
 );
 assert(
   modalSource.includes("headerDescription"),
