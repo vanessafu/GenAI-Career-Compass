@@ -24,6 +24,7 @@ export function FocusStage() {
   const loadRoleGapAnalysis = useStageStore((s) => s.loadRoleGapAnalysis);
   const loadCareerPath = useStageStore((s) => s.loadCareerPath);
   const [planRole, setPlanRole] = useState<RoleView | null>(null);
+  const [showPlanStepDetails, setShowPlanStepDetails] = useState(false);
 
   const startRole = cvData?.personal_info.current_role?.trim() || "Current profile";
 
@@ -108,6 +109,8 @@ export function FocusStage() {
           gapLoading={!!roleGapLoading[planRole.id]}
           gapError={roleGapErrors[planRole.id] ?? null}
           open={!!planRole}
+          showStepDetails={showPlanStepDetails}
+          onToggleStepDetails={() => setShowPlanStepDetails((shown) => !shown)}
           onClose={() => setPlanRole(null)}
         />
       )}

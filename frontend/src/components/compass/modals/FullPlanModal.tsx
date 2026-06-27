@@ -1,6 +1,8 @@
 import { DeepDiveModal, ModalBlock } from "./DeepDiveModal";
 import { SkillGapSection } from "./SkillGapSection";
-import { ArrowRight } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ArrowRight, ChevronDown } from "lucide-react";
+import { useId } from "react";
 import type { CareerPathMilestone, CareerPathReport, GapReport } from "@/lib/api";
 import type { RoadmapNodeKind } from "@/lib/roadmapPreview";
 import type { RoleView } from "@/types";
@@ -15,6 +17,14 @@ type PlanNode = {
   active?: boolean;
 };
 
+type RoadmapDetailNode = PlanNode & {
+  index: number;
+  x: number;
+  detail: string;
+  detailIndex: number;
+  descriptionX: number;
+};
+
 export function FullPlanModal({
   role,
   currentRole,
@@ -25,6 +35,8 @@ export function FullPlanModal({
   gapLoading,
   gapError,
   open,
+  showStepDetails,
+  onToggleStepDetails,
   onClose,
 }: {
   role: RoleView;
@@ -36,6 +48,8 @@ export function FullPlanModal({
   gapLoading: boolean;
   gapError: string | null;
   open: boolean;
+  showStepDetails: boolean;
+  onToggleStepDetails: () => void;
   onClose: () => void;
 }) {
   const fallbackGapReport = gapReport ?? report?.requirement_breakdown ?? null;
@@ -73,7 +87,14 @@ export function FullPlanModal({
         </ModalBlock>
       )}
 
-      {report && <FullPlanContent report={report} currentRole={currentRole} />}
+      {report && (
+        <FullPlanContent
+          report={report}
+          currentRole={currentRole}
+          showStepDetails={showStepDetails}
+          onToggleStepDetails={onToggleStepDetails}
+        />
+      )}
 
       <ModalBlock className="mb-4 mt-1 border-t border-foreground/10 pt-4">
         <p className="mb-3 text-[10px] uppercase tracking-[0.18em] text-foreground/45">
@@ -144,9 +165,13 @@ function PlanHeaderDescription({ summary, role }: { summary: string; role: RoleV
 function FullPlanContent({
   report,
   currentRole,
+  showStepDetails,
+  onToggleStepDetails,
 }: {
   report: CareerPathReport;
   currentRole: string;
+  showStepDetails: boolean;
+  onToggleStepDetails: () => void;
 }) {
   const milestones = [...report.milestones].sort((a, b) => a.order - b.order);
   const roadmapNodes: PlanNode[] = [
@@ -166,7 +191,7 @@ function FullPlanContent({
       <ModalBlock className="mb-1 border-t border-foreground/10 pt-6">
         <p className="mb-3 text-[10px] uppercase tracking-[0.18em] text-foreground/45">Roadmap</p>
         <div className="hidden md:block">
-          <RoadmapCanvas roadmapNodes={roadmapNodes} />
+          <RoadmapCanvas roadmapNodes={roadmapNodes} showStepDetails={showStepDetails} />
         </div>
         <div className="flex flex-col gap-4 md:hidden">
           {roadmapNodes.map((node, index) => (
@@ -174,21 +199,29 @@ function FullPlanContent({
               key={`${node.label}-${node.title}-${index}`}
               node={node}
               terminal={index === roadmapNodes.length - 1}
+              showStepDetails={showStepDetails}
             />
           ))}
         </div>
+        <RoadmapDetailsToggle expanded={showStepDetails} onToggle={onToggleStepDetails} />
       </ModalBlock>
     </>
   );
 }
 
-function RoadmapCanvas({ roadmapNodes }: { roadmapNodes: PlanNode[] }) {
+function RoadmapCanvas({
+  roadmapNodes,
+  showStepDetails,
+}: {
+  roadmapNodes: PlanNode[];
+  showStepDetails: boolean;
+}) {
+  const reduceMotion = useReducedMotion();
   const canvasWidth = 1000;
   const lineTop = 38;
   const iconTop = 18;
-  const connectorTop = 126;
-  const durationTop = 178;
-  const descriptionTop = 222;
+  const detailLayerTop = 132;
+  const detailLayerHeight = 148;
   const nodeRemWidth = Math.max(7.5, Math.min(13, 74 / roadmapNodes.length));
   const nodePercentWidth = Math.min(16, (84 / Math.max(roadmapNodes.length - 1, 1)) * 0.9);
   const nodeWidth = `min(${nodeRemWidth}rem, ${nodePercentWidth}%)`;
@@ -207,9 +240,16 @@ function RoadmapCanvas({ roadmapNodes }: { roadmapNodes: PlanNode[] }) {
   }));
   const startX = canvasX(0, roadmapNodes.length);
   const endX = canvasX(roadmapNodes.length - 1, roadmapNodes.length);
+  const heightTransition = reduceMotion
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 220, damping: 30, mass: 0.8 };
 
   return (
-    <div className="relative h-[280px] overflow-x-hidden">
+    <motion.div
+      className="relative overflow-hidden"
+      animate={{ height: showStepDetails ? 280 : 148 }}
+      transition={heightTransition}
+    >
       <span
         className="absolute h-px border-t border-dashed border-[color:var(--brand)]/45"
         style={{
@@ -218,32 +258,14 @@ function RoadmapCanvas({ roadmapNodes }: { roadmapNodes: PlanNode[] }) {
           right: `${100 - (endX / canvasWidth) * 100}%`,
         }}
       />
-      <svg
-        className="pointer-events-none absolute inset-0 h-full w-full"
-        viewBox="0 0 1000 280"
-        preserveAspectRatio="none"
-        aria-hidden
-      >
-        {detailNodes.map((node) => (
-          <path
-            key={`${node.title}-connector-${node.index}`}
-            d={canvasConnectorPath(
-              node.x,
-              node.descriptionX,
-              connectorTop,
-              durationTop,
-              descriptionTop,
-            )}
-            fill="none"
-            stroke="var(--brand)"
-            strokeDasharray="4 7"
-            strokeLinecap="butt"
-            strokeOpacity="0.55"
-            strokeWidth="1"
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
-      </svg>
+      <RoadmapDetailLayer
+        canvasWidth={canvasWidth}
+        detailLayerHeight={detailLayerHeight}
+        detailLayerTop={detailLayerTop}
+        detailNodes={detailNodes}
+        reduceMotion={reduceMotion}
+        showStepDetails={showStepDetails}
+      />
       {positionedNodes.map((node, index) => (
         <PathNode
           key={`${node.label}-${node.title}-${index}`}
@@ -256,15 +278,98 @@ function RoadmapCanvas({ roadmapNodes }: { roadmapNodes: PlanNode[] }) {
           }}
         />
       ))}
-      {detailNodes.map((node) => (
-        <div
-          key={`${node.title}-meta-${node.index}`}
-          className="absolute -translate-x-1/2 whitespace-nowrap rounded-full bg-white/85 px-2 py-0.5 text-[11px] font-medium text-foreground/45"
-          style={{ left: `${(node.descriptionX / canvasWidth) * 100}%`, top: durationTop - 14 }}
-        >
-          {node.meta}
-        </div>
-      ))}
+    </motion.div>
+  );
+}
+
+function RoadmapDetailLayer({
+  canvasWidth,
+  detailLayerHeight,
+  detailLayerTop,
+  detailNodes,
+  reduceMotion,
+  showStepDetails,
+}: {
+  canvasWidth: number;
+  detailLayerHeight: number;
+  detailLayerTop: number;
+  detailNodes: RoadmapDetailNode[];
+  reduceMotion: boolean | null;
+  showStepDetails: boolean;
+}) {
+  const clipBaseId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const pillTop = 58;
+  const descriptionTop = 102;
+  const lineEndTop = 94;
+  const detailStepDelay = 0.18;
+  const layerTransition = reduceMotion
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 220, damping: 30, mass: 0.8 };
+  const drawTransition = (delay: number) =>
+    reduceMotion
+      ? { duration: 0 }
+      : showStepDetails
+        ? { duration: 0.42, ease: [0.22, 1, 0.36, 1] as const, delay }
+        : { duration: 0.14, ease: [0.4, 0, 1, 1] as const };
+  const fadeTransition = (delay: number) =>
+    reduceMotion
+      ? { duration: 0 }
+      : showStepDetails
+        ? { type: "spring" as const, stiffness: 260, damping: 28, mass: 0.72, delay }
+        : { duration: 0.1, ease: [0.4, 0, 1, 1] as const };
+
+  return (
+    <motion.div
+      className="absolute left-0 right-0 overflow-hidden"
+      aria-hidden={!showStepDetails}
+      style={{ top: detailLayerTop }}
+      initial={false}
+      animate={{ height: showStepDetails ? detailLayerHeight : 0 }}
+      transition={layerTransition}
+    >
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 1000 148"
+        preserveAspectRatio="none"
+        aria-hidden
+      >
+        <defs>
+          {detailNodes.map((node) => {
+            const lineDelay = showStepDetails ? node.detailIndex * detailStepDelay + 0.06 : 0;
+
+            return (
+              <clipPath
+                key={`${node.title}-clip-${node.index}`}
+                id={`${clipBaseId}-${node.index}`}
+                clipPathUnits="userSpaceOnUse"
+              >
+                <motion.rect
+                  x={0}
+                  y={0}
+                  width={canvasWidth}
+                  initial={false}
+                  animate={{ height: showStepDetails ? detailLayerHeight : 0 }}
+                  transition={drawTransition(lineDelay)}
+                />
+              </clipPath>
+            );
+          })}
+        </defs>
+        {detailNodes.map((node) => (
+          <path
+            key={`${node.title}-connector-${node.index}`}
+            clipPath={`url(#${clipBaseId}-${node.index})`}
+            d={canvasConnectorPath(node.x, node.descriptionX, 0, pillTop, lineEndTop)}
+            fill="none"
+            stroke="var(--brand)"
+            strokeDasharray="4 7"
+            strokeLinecap="butt"
+            strokeOpacity="0.55"
+            strokeWidth="1"
+            vectorEffect="non-scaling-stroke"
+          />
+        ))}
+      </svg>
       {detailNodes.length > 0 && (
         <div className="absolute left-0 right-0" style={{ top: descriptionTop }}>
           <div
@@ -273,17 +378,48 @@ function RoadmapCanvas({ roadmapNodes }: { roadmapNodes: PlanNode[] }) {
               gridTemplateColumns: `repeat(${detailNodes.length}, minmax(0, 1fr))`,
             }}
           >
-            {detailNodes.map((node) => (
-              <div key={`${node.title}-detail-${node.index}`} className="min-w-0 px-4 text-center">
-                <p className="break-words text-[13px] leading-relaxed text-foreground/65">
-                  {node.detail}
-                </p>
-              </div>
-            ))}
+            {detailNodes.map((node) => {
+              const lineDelay = showStepDetails ? node.detailIndex * detailStepDelay + 0.06 : 0;
+              const descriptionDelay = lineDelay + 0.3;
+
+              return (
+                <motion.div
+                  key={`${node.title}-detail-${node.index}`}
+                  className="min-w-0 px-4 text-center"
+                  initial={false}
+                  animate={{ opacity: showStepDetails ? 1 : 0, y: showStepDetails ? 0 : -5 }}
+                  transition={fadeTransition(descriptionDelay)}
+                >
+                  <p className="break-words text-[13px] leading-relaxed text-foreground/65">
+                    {node.detail}
+                  </p>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       )}
-    </div>
+      {detailNodes.map((node) => {
+        const lineDelay = showStepDetails ? node.detailIndex * detailStepDelay + 0.06 : 0;
+        const pillDelay = lineDelay + 0.44;
+
+        return (
+          <motion.div
+            key={`${node.title}-meta-${node.index}`}
+            className="absolute -translate-x-1/2 whitespace-nowrap rounded-full bg-white/85 px-2 py-0.5 text-[11px] font-medium text-foreground/45"
+            initial={false}
+            animate={{ opacity: showStepDetails ? 1 : 0, scale: showStepDetails ? 1 : 0.96 }}
+            transition={fadeTransition(pillDelay)}
+            style={{
+              left: `${(node.descriptionX / canvasWidth) * 100}%`,
+              top: pillTop - 14,
+            }}
+          >
+            {node.meta}
+          </motion.div>
+        );
+      })}
+    </motion.div>
   );
 }
 
@@ -399,7 +535,38 @@ function PathNode({
   );
 }
 
-function StackedPathNode({ node, terminal }: { node: PlanNode; terminal: boolean }) {
+function RoadmapDetailsToggle({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      className="mx-auto mt-3 flex w-fit items-center gap-1.5 text-[12px] font-medium text-[color:var(--brand-deep)] outline-none transition hover:text-[color:var(--brand)] focus-visible:text-[color:var(--brand)] focus-visible:underline focus-visible:underline-offset-4"
+    >
+      {expanded ? "Hide details" : "Show details"}
+      <ChevronDown
+        aria-hidden
+        size={13}
+        className={expanded ? "rotate-180 transition-transform" : "transition-transform"}
+      />
+    </button>
+  );
+}
+
+function StackedPathNode({
+  node,
+  terminal,
+  showStepDetails,
+}: {
+  node: PlanNode;
+  terminal: boolean;
+  showStepDetails: boolean;
+}) {
+  const reduceMotion = useReducedMotion();
+  const transition = reduceMotion
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 240, damping: 28, mass: 0.75 };
+
   return (
     <div className="relative grid grid-cols-[44px_minmax(0,1fr)] gap-3">
       {!terminal && (
@@ -419,16 +586,27 @@ function StackedPathNode({ node, terminal }: { node: PlanNode; terminal: boolean
         <h4 className="mt-1 text-[13px] font-medium leading-snug text-foreground/85">
           {node.title}
         </h4>
-        {node.detail && (
-          <div className="mt-3 text-left">
-            {node.meta && (
-              <span className="mb-2 inline-flex rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-foreground/45">
-                {node.meta}
-              </span>
-            )}
-            <p className="text-[13px] leading-loose text-foreground/65">{node.detail}</p>
-          </div>
-        )}
+        <AnimatePresence initial={false}>
+          {showStepDetails && node.detail && (
+            <motion.div
+              key="mobile-step-details"
+              className="overflow-hidden"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={transition}
+            >
+              <div className="mt-3 text-left">
+                {node.meta && (
+                  <span className="mb-2 inline-flex rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-medium text-foreground/45">
+                    {node.meta}
+                  </span>
+                )}
+                <p className="text-[13px] leading-loose text-foreground/65">{node.detail}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

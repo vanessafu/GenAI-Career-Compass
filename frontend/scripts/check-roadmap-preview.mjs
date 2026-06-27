@@ -61,9 +61,9 @@ assert(
   "Roadmap canvas positions should come from one x-coordinate helper.",
 );
 assert(
-  fullPlanSource.includes('viewBox="0 0 1000 280"') &&
-    fullPlanSource.includes('className="relative h-[280px] overflow-x-hidden"'),
-  "Roadmap canvas should be tight enough to avoid dead space around descriptions.",
+  fullPlanSource.includes('viewBox="0 0 1000 148"') &&
+    fullPlanSource.includes("animate={{ height: showStepDetails ? 280 : 148 }}"),
+  "Roadmap canvas should animate between compact and detailed heights.",
 );
 assert(
   fullPlanSource.includes('ModalBlock className="mb-1 border-t border-foreground/10 pt-6"') &&
@@ -71,9 +71,10 @@ assert(
   "Roadmap and skills-gap section margins should keep the separator close to descriptions.",
 );
 assert(
-  fullPlanSource.includes("const durationTop = 178") &&
-    fullPlanSource.includes("const descriptionTop = 222"),
-  "Roadmap canvas should use tighter fixed vertical bands for description content.",
+  fullPlanSource.includes("const detailLayerTop = 132") &&
+    fullPlanSource.includes("const detailLayerHeight = 148") &&
+    fullPlanSource.includes("const descriptionTop = 102"),
+  "Roadmap canvas should keep detail content in a lower layer beneath the main path.",
 );
 assert(
   fullPlanSource.includes('className="min-w-0 px-4 text-center"') &&
