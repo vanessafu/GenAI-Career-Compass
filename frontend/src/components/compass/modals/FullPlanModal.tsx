@@ -1,5 +1,6 @@
 import { DeepDiveModal, ModalBlock } from "./DeepDiveModal";
 import { SkillGapSection } from "./SkillGapSection";
+import { AnimatedPercent } from "./AnimatedPercent";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import { useId } from "react";
@@ -67,7 +68,7 @@ export function FullPlanModal({
       subtitle="Full plan"
       headerAside={
         readiness !== null ? (
-          <PlanStats readiness={`${readiness}%`} timeline={report?.estimated_timeline} />
+          <PlanStats readiness={readiness} timeline={report?.estimated_timeline} />
         ) : undefined
       }
       headerDescription={
@@ -95,12 +96,6 @@ export function FullPlanModal({
           onToggleStepDetails={onToggleStepDetails}
         />
       )}
-
-      <ModalBlock className="mb-4 mt-1 border-t border-foreground/10 pt-4">
-        <p className="mb-3 text-[10px] uppercase tracking-[0.18em] text-foreground/45">
-          Skills gap
-        </p>
-      </ModalBlock>
 
       {gapError && !fallbackGapReport ? (
         <ModalBlock className="mb-6 border-l-2 border-red-300 pl-3">
@@ -144,10 +139,10 @@ function PlanTitle({ currentRole, targetRole }: { currentRole: string; targetRol
   );
 }
 
-function PlanStats({ readiness, timeline }: { readiness: string; timeline?: string }) {
+function PlanStats({ readiness, timeline }: { readiness: number; timeline?: string }) {
   return (
     <div className="flex min-w-[150px] flex-col items-end gap-3 pt-3 text-right">
-      <Stat label="Readiness" value={readiness} />
+      <Stat label="Readiness" value={<AnimatedPercent value={readiness} />} />
       {timeline && <Stat label="Timeline" value={timeline} />}
     </div>
   );
@@ -451,7 +446,7 @@ function canvasX(index: number, total: number): number {
   return (percent / 100) * canvasWidth;
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-[0.18em] text-foreground/45">{label}</p>
