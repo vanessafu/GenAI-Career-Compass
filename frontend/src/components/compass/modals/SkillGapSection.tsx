@@ -65,7 +65,7 @@ function SkillRadar({ report }: { report: GapReport }) {
                   className="rounded-2xl border border-foreground/10 bg-white/60 p-3"
                 >
                   <div className="mb-1 flex items-center justify-between gap-2">
-                    <p className="line-clamp-1 text-[12.5px] font-medium text-foreground/80">
+                    <p className="text-[12.5px] font-medium leading-snug text-foreground/80">
                       {axis.label}
                     </p>
                     <span className="text-[11px] text-foreground/45">{percent(axis.value)}%</span>
@@ -116,6 +116,7 @@ function RadarSvg({ axes }: { axes: SkillRadarAxis[] }) {
       {axes.map((axis, index) => {
         const edge = pointFor(index, axes.length, radius, center);
         const label = pointFor(index, axes.length, radius + 24, center);
+        const lines = labelLines(axis.label);
         return (
           <g key={axis.label}>
             <line
@@ -133,7 +134,15 @@ function RadarSvg({ axes }: { axes: SkillRadarAxis[] }) {
               dominantBaseline="middle"
               className="fill-foreground/60 text-[10px]"
             >
-              {shortLabel(axis.label)}
+              {lines.map((line, lineIndex) => (
+                <tspan
+                  key={line}
+                  x={label.x}
+                  dy={lines.length === 1 ? 0 : lineIndex === 0 ? "-0.45em" : "1.1em"}
+                >
+                  {line}
+                </tspan>
+              ))}
             </text>
           </g>
         );
@@ -288,6 +297,19 @@ function pointFor(index: number, count: number, radius: number, center: number) 
   };
 }
 
-function shortLabel(label: string): string {
-  return label.length > 16 ? `${label.slice(0, 14)}...` : label;
+function labelLines(label: string): string[] {
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [label];
+
+  const lines = [""];
+  for (const word of words) {
+    const last = lines.length - 1;
+    const next = lines[last] ? `${lines[last]} ${word}` : word;
+    if (next.length <= 16 || lines.length === 2) {
+      lines[last] = next;
+    } else {
+      lines.push(word);
+    }
+  }
+  return lines;
 }

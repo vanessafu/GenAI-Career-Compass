@@ -7,6 +7,7 @@ import { roleMatchesToViews } from "@/lib/roleView";
 import { useStageStore } from "@/state/useStageStore";
 import type { CareerPathReport } from "@/lib/api";
 import type { RoleView } from "@/types";
+import { RoadmapNodeIcon } from "../RoadmapNodeIcon";
 import { FullPlanModal } from "../modals/FullPlanModal";
 
 export function FocusStage() {
@@ -52,7 +53,7 @@ export function FocusStage() {
         >
           <div>
             <h2 className="h-stage">
-              Where you are, and{" "}
+              Your target roles, and{" "}
               <span
                 className="italic"
                 style={{
@@ -65,7 +66,7 @@ export function FocusStage() {
                 how to get there.
               </span>
             </h2>
-            <p className="mt-1 max-w-[60ch] text-[13px] leading-relaxed text-foreground/65">
+            <p className="mt-1 max-w-[76ch] text-[13px] leading-relaxed text-foreground/65">
               Starting from <span className="font-medium text-foreground/85">{startRole}</span>.
               Open a role for the roadmap and skills gap.
             </p>
@@ -100,6 +101,7 @@ export function FocusStage() {
       {planRole && (
         <FullPlanModal
           role={planRole}
+          currentRole={startRole}
           report={careerPathReports[planRole.id] ?? null}
           loading={!!careerPathLoading[planRole.id]}
           error={careerPathErrors[planRole.id] ?? null}
@@ -217,7 +219,7 @@ function RoadmapPreview({ nodes, loading }: { nodes: RoadmapPreviewNode[]; loadi
                   : "relative z-10 grid h-10 w-10 place-items-center rounded-full border border-[color:var(--brand)]/20 bg-white text-[color:var(--brand-deep)]"
               }
             >
-              <span className="h-2 w-2 rounded-full bg-current" />
+              <RoadmapNodeIcon kind={node.kind} size={15} />
             </span>
             <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-foreground/45">
               {node.label}

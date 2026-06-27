@@ -372,11 +372,11 @@ export function EntryStage() {
           style={{ transformOrigin: parsing ? "center top" : "left top", willChange: "transform" }}
           className={cn(
             "flex flex-col transition-[align-items,text-align] duration-500",
-            parsing ? "items-center text-center" : "items-start max-w-2xl",
+            parsing ? "items-center text-center" : "items-start max-w-4xl",
           )}
         >
           <h1 className="h-hero">
-            Mapping your expertise to{" "}
+            Let us map your expertise to{" "}
             <span
               className="italic"
               style={{
@@ -386,7 +386,7 @@ export function EntryStage() {
                 color: "transparent",
               }}
             >
-              future opportunities.
+              future opportunities
             </span>
           </h1>
           <motion.p
@@ -396,7 +396,7 @@ export function EntryStage() {
               marginTop: parsing ? 0 : 12,
             }}
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            className="max-w-[58ch] overflow-hidden text-[15px] leading-relaxed text-foreground/65"
+            className="max-w-[88ch] overflow-hidden text-[15px] leading-relaxed text-foreground/65"
           >
             Upload your CV or fill in a short profile. We map your strengths to realistic next
             roles.
@@ -471,16 +471,28 @@ export function EntryStage() {
                   We extract role, skills and interests automatically.
                 </p>
 
-                <motion.div
+                <motion.label
                   animate={drag ? { scale: 1.01 } : { scale: 1 }}
                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
                   className={cn(
-                    "mt-4 flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-6 text-center transition-colors",
+                    "mt-4 flex flex-1 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-6 text-center transition-colors",
                     drag
                       ? "border-[color:var(--brand)]/60 bg-[color:var(--brand)]/[0.06]"
                       : "border-foreground/15 bg-white/55",
                   )}
                 >
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        setFile(f);
+                        setFormError(null);
+                      }
+                    }}
+                  />
                   <motion.div
                     animate={drag ? { y: -2 } : { y: 0 }}
                     className="grid h-14 w-14 place-items-center rounded-2xl text-white"
@@ -489,24 +501,9 @@ export function EntryStage() {
                     <Upload size={20} />
                   </motion.div>
                   <p className="text-[14.5px] font-medium">
-                    {fileName ?? "Drag & drop, or click to browse"}
+                    {fileName ?? "Drag & drop your CV"}
                   </p>
-                  <label className="liquid-glass inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12.5px] text-foreground/80 transition hover:text-foreground">
-                    <input
-                      type="file"
-                      accept="application/pdf,.pdf"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) {
-                          setFile(f);
-                          setFormError(null);
-                        }
-                      }}
-                    />
-                    Browse files
-                  </label>
-                </motion.div>
+                </motion.label>
 
                 <motion.button
                   whileHover={{ y: -1 }}

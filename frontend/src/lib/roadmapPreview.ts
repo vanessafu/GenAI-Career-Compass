@@ -1,8 +1,11 @@
 import type { CareerPathMilestone } from "./api";
 
+export type RoadmapNodeKind = CareerPathMilestone["kind"] | "start" | "target" | "milestone";
+
 export type RoadmapPreviewNode = {
   label: string;
   title: string;
+  kind: RoadmapNodeKind;
 };
 
 type MilestonePreview = Pick<CareerPathMilestone, "order" | "title"> & {
@@ -36,10 +39,18 @@ export function buildRoadmapPreviewNodes({
     .sort((a, b) => a.order - b.order);
 
   return [
-    { label: "Start", title: clean(currentRole, "Current profile") },
-    { label: kindLabel(sorted[0]), title: clean(sorted[0]?.title, "Priority milestone") },
-    { label: kindLabel(sorted[1]), title: clean(sorted[1]?.title, "Proof milestone") },
-    { label: "Target role", title: clean(targetRole, "Target role") },
+    { label: "Start", title: clean(currentRole, "Current profile"), kind: "start" },
+    {
+      label: kindLabel(sorted[0]),
+      title: clean(sorted[0]?.title, "Priority milestone"),
+      kind: sorted[0]?.kind ?? "milestone",
+    },
+    {
+      label: kindLabel(sorted[1]),
+      title: clean(sorted[1]?.title, "Proof milestone"),
+      kind: sorted[1]?.kind ?? "milestone",
+    },
+    { label: "Target role", title: clean(targetRole, "Target role"), kind: "target" },
   ];
 }
 

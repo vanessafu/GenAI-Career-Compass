@@ -6,6 +6,10 @@ const require = createRequire(import.meta.url);
 const ts = require("typescript");
 
 const source = await readFile(new URL("../src/lib/roadmapPreview.ts", import.meta.url), "utf8");
+const iconSource = await readFile(
+  new URL("../src/components/compass/RoadmapNodeIcon.tsx", import.meta.url),
+  "utf8",
+);
 const compiled = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -22,6 +26,11 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+assert(
+  !iconSource.includes("title.toLowerCase") && !iconSource.includes("RegExp"),
+  "Roadmap icons should be selected by node kind only, not title keywords.",
+);
+
 const nodes = buildRoadmapPreviewNodes({
   currentRole: "Senior Backend Developer",
   targetRole: "Cloud Architect",
@@ -34,12 +43,16 @@ const nodes = buildRoadmapPreviewNodes({
 
 assert(nodes.length === 4, `Expected 4 nodes, got ${nodes.length}`);
 assert(nodes[0].label === "Start", `Expected first label Start, got ${nodes[0].label}`);
+assert(nodes[0].kind === "start", `Expected first kind start, got ${nodes[0].kind}`);
 assert(nodes[0].title === "Senior Backend Developer", `Unexpected start title ${nodes[0].title}`);
 assert(nodes[1].label === "Certification", `Expected certification label, got ${nodes[1].label}`);
+assert(nodes[1].kind === "certification", `Expected certification kind, got ${nodes[1].kind}`);
 assert(nodes[1].title === "AWS SA Pro exam", `Milestones should sort by order.`);
 assert(nodes[2].label === "Project", `Expected project label, got ${nodes[2].label}`);
+assert(nodes[2].kind === "project", `Expected project kind, got ${nodes[2].kind}`);
 assert(nodes[2].title === "Lead cloud migration", `Expected second milestone as third node.`);
 assert(nodes[3].label === "Target role", `Expected final label Target role.`);
+assert(nodes[3].kind === "target", `Expected final kind target, got ${nodes[3].kind}`);
 assert(nodes[3].title === "Cloud Architect", `Unexpected target title ${nodes[3].title}`);
 
 const fallbackNodes = buildRoadmapPreviewNodes({
@@ -62,7 +75,12 @@ const mixedNodes = buildRoadmapPreviewNodes({
 });
 
 assert(mixedNodes[1].label === "Skill", `Expected Skill label, got ${mixedNodes[1].label}`);
+assert(mixedNodes[1].kind === "skill", `Expected skill kind, got ${mixedNodes[1].kind}`);
 assert(
   mixedNodes[2].label === "Experience",
   `Expected Experience label, got ${mixedNodes[2].label}`,
+);
+assert(
+  mixedNodes[2].kind === "experience",
+  `Expected experience kind, got ${mixedNodes[2].kind}`,
 );

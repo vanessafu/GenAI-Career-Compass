@@ -12,7 +12,7 @@ export function DeepDiveModal({
 }: {
   open: boolean;
   onClose: () => void;
-  title: string;
+  title: React.ReactNode;
   subtitle?: string;
   wide?: boolean;
   children: React.ReactNode;
@@ -70,7 +70,7 @@ export function DeepDiveModal({
                       {subtitle}
                     </p>
                   )}
-                  <h3 className="mt-1 truncate font-display text-2xl tracking-tight sm:text-3xl">
+                  <h3 className="mt-1 text-balance font-display text-2xl leading-tight tracking-tight sm:text-3xl">
                     {title}
                   </h3>
                 </div>

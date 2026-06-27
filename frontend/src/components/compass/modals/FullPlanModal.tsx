@@ -1,10 +1,14 @@
 import { DeepDiveModal, ModalBlock } from "./DeepDiveModal";
 import { SkillGapSection } from "./SkillGapSection";
+import { ArrowRight } from "lucide-react";
 import type { CareerPathMilestone, CareerPathReport, GapReport } from "@/lib/api";
+import type { RoadmapNodeKind } from "@/lib/roadmapPreview";
 import type { RoleView } from "@/types";
+import { RoadmapNodeIcon } from "../RoadmapNodeIcon";
 
 export function FullPlanModal({
   role,
+  currentRole,
   report,
   loading,
   error,
@@ -15,6 +19,7 @@ export function FullPlanModal({
   onClose,
 }: {
   role: RoleView;
+  currentRole: string;
   report: CareerPathReport | null;
   loading: boolean;
   error: string | null;
@@ -25,9 +30,16 @@ export function FullPlanModal({
   onClose: () => void;
 }) {
   const fallbackGapReport = gapReport ?? report?.requirement_breakdown ?? null;
+  const targetRole = report?.target_role ?? role.title;
 
   return (
-    <DeepDiveModal open={open} onClose={onClose} title={role.title} subtitle="Full plan" wide>
+    <DeepDiveModal
+      open={open}
+      onClose={onClose}
+      title={<PlanTitle currentRole={currentRole} targetRole={targetRole} />}
+      subtitle="Full plan"
+      wide
+    >
       {loading && !report && (
         <ModalBlock className="mb-6">
           <p className="text-[13px] leading-relaxed text-foreground/60">Preparing full plan...</p>
@@ -40,7 +52,7 @@ export function FullPlanModal({
         </ModalBlock>
       )}
 
-      {report && <FullPlanContent report={report} />}
+      {report && <FullPlanContent report={report} currentRole={currentRole} />}
 
       <ModalBlock className="mb-4 mt-7 border-t border-foreground/10 pt-6">
         <p className="mb-3 text-[10px] uppercase tracking-[0.18em] text-foreground/45">
@@ -75,26 +87,49 @@ export function FullPlanModal({
   );
 }
 
-function FullPlanContent({ report }: { report: CareerPathReport }) {
+function PlanTitle({ currentRole, targetRole }: { currentRole: string; targetRole: string }) {
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span>{currentRole}</span>
+      <ArrowRight
+        aria-hidden
+        className="mt-1 shrink-0 text-[color:var(--brand)]"
+        size={22}
+        strokeWidth={1.8}
+      />
+      <span>{targetRole}</span>
+    </span>
+  );
+}
+
+function FullPlanContent({
+  report,
+  currentRole,
+}: {
+  report: CareerPathReport;
+  currentRole: string;
+}) {
   const readiness = percent(
     report.readiness_score || report.requirement_breakdown.overall_readiness,
   );
   const milestones = [...report.milestones].sort((a, b) => a.order - b.order);
+  const profileSummary = cleanProfileSummary(report.current_profile_summary);
 
   return (
     <>
       <ModalBlock className="mb-5">
-        <div className="grid gap-3 border-b border-foreground/10 pb-4 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+        <div className="grid gap-4 border-b border-foreground/10 pb-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-foreground/45">
-              Current profile {"->"} target role
-            </p>
             <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-foreground/70">
-              {report.current_profile_summary}
+              {profileSummary}
             </p>
           </div>
-          <Stat label="Readiness" value={`${readiness}%`} large />
-          {report.estimated_timeline && <Stat label="Timeline" value={report.estimated_timeline} />}
+          <div className="flex flex-wrap gap-6 sm:justify-end">
+            <Stat label="Readiness" value={`${readiness}%`} />
+            {report.estimated_timeline && (
+              <Stat label="Timeline" value={report.estimated_timeline} />
+            )}
+          </div>
         </div>
       </ModalBlock>
 
@@ -102,67 +137,36 @@ function FullPlanContent({ report }: { report: CareerPathReport }) {
         <p className="mb-3 text-[10px] uppercase tracking-[0.18em] text-foreground/45">Roadmap</p>
         <div className="overflow-x-auto pb-2">
           <div
-            className="grid min-w-[720px] gap-3"
-            style={{ gridTemplateColumns: `repeat(${milestones.length + 2}, minmax(140px, 1fr))` }}
+            className="grid gap-3"
+            style={{
+              gridTemplateColumns: `130px repeat(${milestones.length}, minmax(180px, 1fr)) 130px`,
+              minWidth: `${260 + milestones.length * 180}px`,
+            }}
           >
-            <PathNode label="Start" title="Current profile" active />
+            <PathNode label="Start" title={currentRole} kind="start" active />
             {milestones.map((milestone) => (
               <PathNode
                 key={`${milestone.order}-${milestone.title}`}
                 label={milestoneKindLabel(milestone.kind)}
                 title={milestone.title}
+                kind={milestone.kind}
                 meta={milestone.timeline}
+                detail={milestone.rationale}
               />
             ))}
-            <PathNode label="Target role" title={report.target_role} active terminal />
+            <PathNode label="Target role" title={report.target_role} kind="target" active terminal />
           </div>
         </div>
       </ModalBlock>
-
-      {milestones.length > 0 && (
-        <ModalBlock className="mb-6">
-          <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-foreground/45">
-            Step details
-          </p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {milestones.map((milestone) => (
-              <div
-                key={`detail-${milestone.order}-${milestone.title}`}
-                className="rounded-2xl border border-foreground/10 bg-white/60 p-3"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-[13px] font-medium leading-snug text-foreground/85">
-                    {milestone.title}
-                  </p>
-                  <span className="rounded-full bg-[color:var(--brand)]/10 px-2 py-0.5 text-[10.5px] uppercase tracking-[0.12em] text-[color:var(--brand-deep)]">
-                    {milestoneKindLabel(milestone.kind)}
-                  </span>
-                </div>
-                {milestone.rationale && (
-                  <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-foreground/60">
-                    {milestone.rationale}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        </ModalBlock>
-      )}
     </>
   );
 }
 
-function Stat({ label, value, large = false }: { label: string; value: string; large?: boolean }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="text-left sm:text-right">
+    <div className="min-w-[118px] text-left sm:text-right">
       <p className="text-[10px] uppercase tracking-[0.18em] text-foreground/45">{label}</p>
-      <p
-        className={
-          large
-            ? "font-display text-4xl tracking-tight text-[color:var(--brand-deep)]"
-            : "text-[13px] font-medium text-foreground/80"
-        }
-      >
+      <p className="mt-1 whitespace-nowrap font-display text-[2.3rem] leading-none tracking-tight text-[color:var(--brand-deep)]">
         {value}
       </p>
     </div>
@@ -172,13 +176,17 @@ function Stat({ label, value, large = false }: { label: string; value: string; l
 function PathNode({
   label,
   title,
+  kind,
   meta,
+  detail,
   active = false,
   terminal = false,
 }: {
   label: string;
   title: string;
+  kind: RoadmapNodeKind;
   meta?: string;
+  detail?: string;
   active?: boolean;
   terminal?: boolean;
 }) {
@@ -194,11 +202,31 @@ function PathNode({
             : "relative z-10 grid h-10 w-10 place-items-center rounded-full border border-[color:var(--brand)]/20 bg-white text-[color:var(--brand-deep)]"
         }
       >
-        <span className="h-2 w-2 rounded-full bg-current" />
+        <RoadmapNodeIcon kind={kind} size={16} />
       </span>
       <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-foreground/45">{label}</p>
       <h4 className="mt-1 text-[13px] font-medium leading-snug text-foreground/85">{title}</h4>
       {meta && <p className="mt-1 text-[11px] text-foreground/50">{meta}</p>}
+      {detail && (
+        <div className="relative mt-5 flex min-h-[124px] w-full flex-col justify-center rounded-2xl border border-foreground/10 bg-white/60 p-3 text-left">
+          <svg
+            className="pointer-events-none absolute -top-7 left-1/2 h-7 w-12 -translate-x-1/2 overflow-visible"
+            viewBox="0 0 48 28"
+            aria-hidden
+          >
+            <path
+              d="M24 0 C24 10 13 12 13 26"
+              fill="none"
+              stroke="var(--brand)"
+              strokeDasharray="2 4"
+              strokeLinecap="round"
+              strokeOpacity="0.45"
+              strokeWidth="1.2"
+            />
+          </svg>
+          <p className="text-[12.5px] leading-relaxed text-foreground/65">{detail}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -217,6 +245,11 @@ function milestoneKindLabel(kind: CareerPathMilestone["kind"]): string {
     default:
       return "Skill";
   }
+}
+
+function cleanProfileSummary(summary: string): string {
+  const cleaned = summary.trim();
+  return cleaned.replace(/^[^:\n]{1,80}:\s*/, "") || "Your confirmed profile starts this plan.";
 }
 
 function percent(value: number): number {
