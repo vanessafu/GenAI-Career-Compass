@@ -22,6 +22,15 @@ import {
   toConfirmedCvData,
   type RecapEdits,
 } from "@/lib/cvData";
+import {
+  DEMO_CAREER_PATH_REPORTS,
+  DEMO_CV_DATA,
+  DEMO_EMBEDDING_PROFILE,
+  DEMO_GAP_REPORTS,
+  DEMO_IDENTITY,
+  DEMO_ROLE_MATCHES,
+  DEMO_SELECTED_ROLE_IDS,
+} from "@/lib/demoData";
 import { areSelectedPathsPrepared } from "@/lib/pathPreparation";
 import type {
   AnalyzedSkill,
@@ -34,9 +43,15 @@ import type {
 } from "@/types";
 
 export type Stage = "entry" | "recap" | "matching" | "directions" | "preparing_paths" | "focus";
+export type DemoStage = "recap" | "roles" | "focus";
 
 export const MAX_PICKS = 3;
 const PATH_PREP_TIMEOUT_MS = 90000;
+const DEMO_STAGE_TO_STAGE: Record<DemoStage, Stage> = {
+  recap: "recap",
+  roles: "directions",
+  focus: "focus",
+};
 
 function errorMessage(err: unknown, fallback: string): string {
   if (err instanceof ApiError) return err.message;
@@ -97,11 +112,13 @@ type Store = {
   careerPathErrors: Record<string, string | null>;
 
   /** Async status for the current network action. */
+  demoMode: boolean;
   loading: boolean;
   error: string | null;
   clearError: () => void;
 
   /** Async actions. */
+  loadDemo: (target: DemoStage) => void;
   uploadCv: (file: File) => Promise<boolean>;
   submitManualProfile: (form: ManualProfileForm) => Promise<boolean>;
   generateIdentity: () => Promise<void>;
@@ -151,6 +168,7 @@ const initialState = {
   careerPathReports: {} as Record<string, CareerPathReport>,
   careerPathLoading: {} as Record<string, boolean>,
   careerPathErrors: {} as Record<string, string | null>,
+  demoMode: false,
   loading: false,
   error: null as string | null,
 };
@@ -208,9 +226,28 @@ export const useStageStore = create<Store>((set, get) => ({
   setSelectedRoleId: (id) => set({ selectedRoleId: id }),
   clearError: () => set({ error: null }),
 
+  loadDemo: (target) => {
+    const selectedRoleIds = target === "focus" ? DEMO_SELECTED_ROLE_IDS : [];
+    set({
+      ...initialState,
+      stage: DEMO_STAGE_TO_STAGE[target],
+      cvData: DEMO_CV_DATA,
+      embeddingProfile: DEMO_EMBEDDING_PROFILE,
+      identity: DEMO_IDENTITY,
+      ...cvDataToRecapEdits(DEMO_CV_DATA),
+      roleMatches: DEMO_ROLE_MATCHES,
+      matchAnalysis: "Demo fixture loaded without backend or OpenAI calls.",
+      selectedRoleIds,
+      selectedRoleId: selectedRoleIds[0] ?? null,
+      roleGapReports: DEMO_GAP_REPORTS,
+      careerPathReports: DEMO_CAREER_PATH_REPORTS,
+      demoMode: true,
+    });
+  },
+
   /** Parse an uploaded PDF and seed the recap from the result. */
   uploadCv: async (file) => {
-    set({ loading: true, error: null });
+    set({ loading: true, error: null, demoMode: false });
     try {
       const result = await parseCv(file);
       const identitySummary = result.embedding_profile.career_identity_summary;
@@ -232,6 +269,7 @@ export const useStageStore = create<Store>((set, get) => ({
         careerPathReports: {},
         careerPathLoading: {},
         careerPathErrors: {},
+        demoMode: false,
         loading: false,
       });
       return true;
@@ -243,7 +281,7 @@ export const useStageStore = create<Store>((set, get) => ({
 
   /** Build a CVData from the manual form via the backend and seed the recap. */
   submitManualProfile: async (form) => {
-    set({ loading: true, error: null });
+    set({ loading: true, error: null, demoMode: false });
     try {
       const result = await submitManualCv(manualFormToInput(form));
       const identitySummary = result.embedding_profile.career_identity_summary;
@@ -265,6 +303,7 @@ export const useStageStore = create<Store>((set, get) => ({
         careerPathReports: {},
         careerPathLoading: {},
         careerPathErrors: {},
+        demoMode: false,
         loading: false,
       });
       return true;
@@ -307,6 +346,10 @@ export const useStageStore = create<Store>((set, get) => ({
     if (!outgoing) {
       set({ error: "No CV data to match." });
       return false;
+    }
+    if (state.demoMode && state.roleMatches.length > 0) {
+      set({ cvData: outgoing, error: null, loading: false });
+      return true;
     }
     set({ loading: true, error: null, cvData: outgoing });
     try {

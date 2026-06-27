@@ -40,6 +40,19 @@ npm install
 npm run dev      # http://localhost:5173 (matches backend CORS)
 ```
 
+### Demo fixtures
+
+Use frontend-only fixtures when working on layout without paying for CV parsing
+or LLM role analysis:
+
+- `http://localhost:5173/?demo=recap` opens the parsed-profile recap.
+- `http://localhost:5173/?demo=roles` opens role selection with 9 demo matches.
+- `http://localhost:5173/?demo=1` is an alias for role selection.
+- `http://localhost:5173/?demo=focus` opens selected roadmaps and gap analysis.
+
+This is only a formatting aid. The normal upload, manual entry, and backend API
+flow is unchanged.
+
 ## Build / lint
 
 ```powershell

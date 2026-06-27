@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test:loading-progress": "node scripts/check-loading-progress.mjs",
+    "test:demo-fixture": "node scripts/check-demo-fixture.mjs",
     "test:profile-reset": "node scripts/check-profile-reset-regression.mjs",
     "test:scroll": "node scripts/check-scroll-regression.mjs",
     "preview": "vite preview",
