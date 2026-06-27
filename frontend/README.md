@@ -1,31 +1,26 @@
-# Career Compass — Frontend
+# Career Compass - Frontend
 
-Multi-stage Career Compass UI (originally designed in Lovable), integrated into
-this repository as a conventional single-page React app.
+Multi-stage Career Compass UI integrated as a conventional single-page React
+app.
 
 ## Stack
 
 - **React 19** + **TypeScript**
-- **Vite 7** (client-side SPA — no SSR)
+- **Vite 7** client-side SPA
 - **Tailwind CSS v4**
 - **Zustand** for client state (`src/state/useStageStore.ts`)
 - **Framer Motion** for animation
 - **lucide-react** for icons
 
-> This was migrated off Lovable's TanStack Start + Cloudflare Workers setup to a
-> standard Vite SPA. If you later need server-side rendering or a multi-page
-> router, add `@tanstack/react-router` (client-only) or TanStack Start back
-> deliberately. To re-add shadcn/ui primitives, run `npx shadcn@latest init`.
-
 ## Prerequisites
 
 - Node.js 20+ (developed against Node 24)
-- Backend running on `http://localhost:8000` (see the project root `SETUP.md`).
-  For the Matching stage, the backend also needs an OpenAI key and the populated
-  pgvector DB (see `backend/app/features/role_matching/router.py`).
+- Backend running on `http://localhost:8000` (see the project root `SETUP.md`)
+- For matching, gap analysis, and career paths: an OpenAI key plus the populated
+  pgvector/Supabase database
 
 The backend base URL defaults to `http://localhost:8000` and can be overridden
-with `VITE_API_BASE_URL` (e.g. in a `.env` file).
+with `VITE_API_BASE_URL`, for example in a frontend `.env` file.
 
 ## Setup
 
@@ -40,7 +35,7 @@ npm install
 npm run dev      # http://localhost:5173 (matches backend CORS)
 ```
 
-### Demo fixtures
+### Demo Fixtures
 
 Use frontend-only fixtures when working on layout without paying for CV parsing
 or LLM role analysis:
@@ -53,44 +48,45 @@ or LLM role analysis:
 This is only a formatting aid. The normal upload, manual entry, and backend API
 flow is unchanged.
 
-## Build / lint
+## Build / Lint
 
 ```powershell
 npm run build
 npm run lint
 ```
 
-## Project layout
+## Project Layout
 
-```
+```text
 index.html           SPA entry document (fonts, #root)
 src/
-  main.tsx           App bootstrap — mounts CareerCompassApp, imports styles.css
+  main.tsx           App bootstrap; mounts CareerCompassApp and imports styles.css
   types.ts           Shared UI view-model types
   components/
     compass/         App-specific feature components
-      stages/        Entry → Recap → Matching → Directions → Focus screens
-      modals/        DeepDiveModal shell + RoleDetailModal (real role breakdown)
-      ui/            Compass-specific primitives (GlassCard, PillButton, …)
-  state/             Zustand store driving stage navigation + profile + async actions
-  lib/               api client (api.ts), config, cvData/roleView mappers, cn helper
-  styles.css         Tailwind v4 + design tokens
+      stages/        Entry -> Recap -> Matching -> Directions -> Preparing paths -> Focus
+      modals/        DeepDiveModal shell, RoleDetailModal, skill gap, and roadmap surfaces
+      ui/            Compass-specific primitives such as GlassCard and PillButton
+  state/             Zustand store driving stage navigation, profile state, and async actions
+  lib/               API client, config, CV/profile mappers, role views, roadmap helpers
+  styles.css         Tailwind v4 plus design tokens
 ```
 
-## Backend wiring
+## Backend Wiring
 
-The app talks to the FastAPI backend (no mock data). The flow:
+The app talks to the FastAPI backend; normal upload/manual entry uses backend
+calls, not fixture data. The flow:
 
-1. **Entry** — upload a PDF (`POST /api/v1/parse-cv`) or fill the manual form
-   (assembled into `CVData` client-side).
-2. **Recap** — edit the parsed profile; the career identity comes from
-   `POST /api/v1/prompt-engineering/starter-profile`.
-3. **Matching** — `POST /api/v1/roles/match` returns ranked ESCO roles.
-4. **Directions / Focus** — render those `RoleMatch` results.
+1. **Entry** - upload a PDF through `POST /api/v1/profile-pipeline/parse-cv` or submit manual fields through `POST /api/v1/profile-pipeline/manual-cv`.
+2. **Recap** - edit the returned `CVData`; the identity summary comes from `embedding_profile.career_identity_summary`.
+3. **Matching** - convert edited `CVData` into `UserCareerProfile`, then call `POST /api/v1/roles/match` with `top_k: 9`.
+4. **Directions** - select up to 3 roles from the bucketed `RoleMatch` results.
+5. **Preparing paths** - for each selected role, call `POST /api/v1/roles/{role_id}/gap-analysis` and `POST /api/v1/roles/{role_id}/career-path`.
+6. **Focus** - render the returned gap reports and career path reports.
 
-The typed client is `src/lib/api.ts`; mappers between the backend schema and the
-UI live in `src/lib/cvData.ts` and `src/lib/roleView.ts`.
+The typed client is `src/lib/api.ts`; mappers between backend schemas and the
+UI live in `src/lib/cvData.ts`, `src/lib/roleView.ts`, and
+`src/lib/pathPreparation.ts`.
 
-`BACKEND_INTEGRATION.md` documents what is connected, the derive-and-hide
-decisions, and the remaining backend gaps (skill vectors, viability, peers,
-salary/duration, synthetic roadmaps) that keep some UI hidden.
+`BACKEND_INTEGRATION.md` documents the exact endpoint contracts, frontend
+modules, fixture-only demo mode, and current limitations.
