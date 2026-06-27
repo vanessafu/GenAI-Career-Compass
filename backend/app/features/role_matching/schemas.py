@@ -26,12 +26,12 @@ DimensionStatus = Literal["strong", "partial", "weak"]
 
 
 class ScoringWeights(BaseModel):
-    capability_vector_similarity: float = 0.20
-    intent_vector_similarity: float = 0.15
-    normalized_skill_overlap: float = 0.35
+    capability_vector_similarity: float = 0.18
+    intent_vector_similarity: float = 0.12
+    normalized_skill_overlap: float = 0.45
     interest_domain_overlap: float = 0.10
-    certification_overlap: float = 0.10
-    seniority_fit: float = 0.10
+    certification_overlap: float = 0.08
+    seniority_fit: float = 0.07
 
 
 DEFAULT_WEIGHTS = ScoringWeights()

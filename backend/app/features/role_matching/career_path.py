@@ -34,6 +34,17 @@ def _clean(value: str | None) -> str:
     return " ".join((value or "").split())
 
 
+def timeline_from_readiness(readiness: float | None) -> str:
+    score = max(0.0, min(1.0, float(readiness or 0.0)))
+    if score >= 0.75:
+        return "1-3 months"
+    if score >= 0.55:
+        return "3-6 months"
+    if score >= 0.35:
+        return "6-9 months"
+    return "9-12+ months"
+
+
 def _unique(values: Iterable[str | None]) -> list[str]:
     out: list[str] = []
     seen: set[str] = set()
@@ -221,11 +232,12 @@ async def generate_career_path(role_id: int, confirmed_profile: ConfirmedCVData)
     fallback = _fallback_draft(top_gaps, allowed_certs)
 
     milestones = _normalize_milestones(draft.milestones, top_gaps)
+    readiness_score = gap_report.overall_readiness or gap_report.readiness_score
     return CareerPathReport(
         role_id=gap_report.role_id,
         current_profile_summary=current_profile_summary,
         target_role=gap_report.job_title,
-        readiness_score=gap_report.overall_readiness or gap_report.readiness_score,
+        readiness_score=readiness_score,
         top_gaps=top_gaps,
         milestones=milestones,
         recommended_projects=_unique(
@@ -233,6 +245,6 @@ async def generate_career_path(role_id: int, confirmed_profile: ConfirmedCVData)
         ),
         skills_to_learn=top_gaps,
         certifications=_filter_certifications(draft.certifications, allowed_certs),
-        estimated_timeline=_clean(draft.estimated_timeline) or fallback.estimated_timeline,
+        estimated_timeline=timeline_from_readiness(readiness_score),
         requirement_breakdown=gap_report,
     )

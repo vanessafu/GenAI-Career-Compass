@@ -32,8 +32,13 @@ from backend.app.features.role_matching.schemas import (
     SkillDimension,
     SkillGap,
 )
-from backend.app.features.role_matching.service import _listify, as_cv_data, extract_user_skills
-from backend.app.features.role_matching.skill_ontology import get_ontology
+from backend.app.features.role_matching.service import _listify, as_cv_data
+from backend.app.features.role_matching.skill_alignment import (
+    SkillEvidence,
+    align_skills,
+    build_skill_evidence_from_confirmed_profile,
+    normalize_skill_key,
+)
 
 logger = logging.getLogger("CareerCompass.GapAnalysis")
 
@@ -125,6 +130,34 @@ def _fetch_role_certs(role_id: int) -> list[dict]:
             return cur.fetchall()
 
 
+def _fetch_role_skill_data(role_id: int) -> tuple[list[str], dict[str, str]]:
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT normalized_skill_name FROM role_skills "
+                "WHERE role_id = %s AND normalized_skill_name IS NOT NULL "
+                "ORDER BY normalized_skill_name",
+                (role_id,),
+            )
+            required = [
+                normalized
+                for row in cur.fetchall()
+                if (normalized := normalize_skill_key(row["normalized_skill_name"]))
+            ]
+
+            cur.execute(
+                "SELECT alias_key, canonical_key FROM skill_aliases "
+                "WHERE alias_key IS NOT NULL AND canonical_key IS NOT NULL"
+            )
+            aliases = {
+                normalize_skill_key(row["alias_key"]): normalize_skill_key(row["canonical_key"])
+                for row in cur.fetchall()
+                if normalize_skill_key(row["alias_key"]) and normalize_skill_key(row["canonical_key"])
+            }
+
+    return list(dict.fromkeys(required)), aliases
+
+
 def _retrieve_esco_grounding(role_id: int, missing_skills: list[str]) -> tuple[Optional[str], dict[str, str]]:
     """RAG: official occupation title for the role + ESCO descriptions for the
     missing skills, so the LLM explains them accurately instead of guessing.
@@ -163,22 +196,27 @@ def _retrieve_esco_grounding(role_id: int, missing_skills: list[str]) -> tuple[O
     return occupation_title, descriptions
 
 
-def _analyze_skills(raw_skills: Optional[str], user_skills: list[str]) -> SkillDimension:
-    coverage, matched, gaps = get_ontology().compute_coverage(raw_skills, user_skills)
+def _analyze_skills(
+    required_skills: list[str],
+    user_evidence: SkillEvidence,
+    alias_map: dict[str, str],
+) -> SkillDimension:
+    alignment = align_skills(required_skills, user_evidence, alias_map)
     return SkillDimension(
-        matched_skills=matched,
+        matched_skills=alignment.matched_skills,
+        missing_skills=alignment.missing_skills,
         skill_gaps=[
             SkillGap(
                 required_skill=g["required_skill"],
                 user_closest_skill=g["user_closest_skill"],
                 transferability=g["transferability"],
                 severity=g["severity"],
-                source="MIND",
+                source="shared_alignment",
             )
-            for g in gaps
+            for g in alignment.skill_gaps
         ],
-        coverage=coverage,
-        status=_status(coverage),
+        coverage=alignment.coverage,
+        status=_status(alignment.coverage),
     )
 
 
@@ -303,11 +341,14 @@ def analyze_role_gap(
     if role is None:
         raise ValueError(f"role_id {role_id} not found")
 
-    user_skills = extract_user_skills(confirmed_profile)
+    user_evidence = build_skill_evidence_from_confirmed_profile(confirmed_profile)
     user_certs = _user_certs(confirmed_profile)
     user_level, user_years = _user_seniority(confirmed_profile)
+    required_skills, alias_map = _fetch_role_skill_data(role_id)
+    if not required_skills:
+        required_skills = _listify(role.get("raw_skills"))
 
-    skills = _analyze_skills(role["raw_skills"], user_skills)
+    skills = _analyze_skills(required_skills, user_evidence, alias_map)
     certs = _analyze_certs(_fetch_role_certs(role_id), user_certs)
     seniority = _analyze_seniority(role["job_title"], user_level, user_years)
 

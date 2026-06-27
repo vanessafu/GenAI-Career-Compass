@@ -29,9 +29,7 @@ export function buildMissingBigSections(sections: RecapSections): string[] {
   ) {
     missing.push("education");
   }
-  if (
-    !sections.experiences.some((item) => hasText(item.role, "Role") || hasText(item.company))
-  ) {
+  if (!sections.experiences.some((item) => hasText(item.role, "Role") || hasText(item.company))) {
     missing.push("experience");
   }
   if (!sections.skills.some((item) => hasText(item.name))) missing.push("skills");

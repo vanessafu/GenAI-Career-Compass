@@ -123,6 +123,7 @@ function RoleCard({
       whileTap={!picksFull ? { scale: 0.99 } : undefined}
       onClick={onToggle}
       disabled={picksFull}
+      aria-pressed={selected}
       className={cn(
         "liquid-glass group relative flex min-h-[172px] flex-col gap-2 overflow-hidden rounded-3xl p-4 text-left transition-shadow duration-300",
         selected &&
@@ -146,15 +147,18 @@ function RoleCard({
         style={{ background: "var(--gradient-warm)", opacity: 0.18 }}
       />
 
-      <motion.span
-        aria-hidden
-        animate={{ opacity: selected ? 1 : 0, scale: selected ? 1 : 0.7, y: selected ? 0 : -4 }}
-        transition={{ type: "spring", stiffness: 360, damping: 26 }}
-        className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white"
-        style={{ background: "var(--gradient-warm)" }}
-      >
-        Selected
-      </motion.span>
+      {selected && (
+        <motion.span
+          aria-hidden
+          initial={{ opacity: 0, scale: 0.7, y: -4 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 360, damping: 26 }}
+          className="absolute right-4 top-4 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-white"
+          style={{ background: "var(--gradient-warm)" }}
+        >
+          Selected
+        </motion.span>
+      )}
 
       <span
         className="inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em]"

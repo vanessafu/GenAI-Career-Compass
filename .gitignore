@@ -5,7 +5,19 @@ data/
 .vscode/
 .idea/
 outputs/
+output/
 .DS_Store
+
+# Test/tool artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+coverage/
+.playwright-cli/
+playwright-report/
+test-results/
+blob-report/
+database/supabase/.temp/
 
 # Frontend
 frontend/node_modules/

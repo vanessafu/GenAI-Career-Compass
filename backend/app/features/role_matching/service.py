@@ -28,6 +28,12 @@ from backend.app.features.role_matching.schemas import (
     RoleSummaryBatch,
     UserCareerProfile,
 )
+from backend.app.features.role_matching.skill_alignment import (
+    SkillEvidence,
+    align_skills,
+    build_skill_evidence_from_user_profile,
+    normalize_skill_key,
+)
 
 logger = logging.getLogger("CareerCompass.RoleMatching.Service")
 
@@ -103,6 +109,26 @@ _SENIORITY_ALIASES = {
     "head": "director",
     "vp": "director",
     "chief": "director",
+}
+
+_DYNAMIC_DOMAIN_STOPWORDS = {
+    "and",
+    "the",
+    "with",
+    "for",
+    "role",
+    "engineer",
+    "developer",
+    "specialist",
+    "analyst",
+    "senior",
+    "junior",
+    "mid",
+    "level",
+    "builds",
+    "building",
+    "systems",
+    "using",
 }
 
 DEFAULT_SKILL_ALIASES: dict[str, str] = {
@@ -229,9 +255,7 @@ def _vec_literal(vec: list[float]) -> str:
 
 
 def _normalize_key(value: str | None) -> str:
-    value = (value or "").casefold()
-    value = re.sub(r"[^a-z0-9+#]+", " ", value)
-    return re.sub(r"\s+", " ", value).strip()
+    return normalize_skill_key(value)
 
 
 def normalize_certification_name(name: str | None) -> str:
@@ -422,6 +446,33 @@ def map_profile_domains(profile: UserCareerProfile) -> list[str]:
     return domains
 
 
+def _dynamic_domain_terms(terms: Iterable[str | None]) -> set[str]:
+    dynamic_terms: set[str] = set()
+    for term in terms:
+        normalized = _normalize_key(str(term or "").replace("_", " "))
+        words = [
+            word
+            for word in normalized.split()
+            if len(word) > 3 and word not in _DYNAMIC_DOMAIN_STOPWORDS
+        ]
+        dynamic_terms.update(words)
+        dynamic_terms.update(f"{left} {right}" for left, right in zip(words, words[1:]))
+    return dynamic_terms
+
+
+def _profile_domain_context_terms(profile: UserCareerProfile) -> set[str]:
+    terms: list[str | None] = [
+        profile.career_identity.title,
+        profile.career_identity.summary,
+        *profile.interests,
+    ]
+    terms.extend(exp.role for exp in profile.experience)
+    terms.extend(exp.summary for exp in profile.experience)
+    terms.extend(project.title for project in profile.projects)
+    terms.extend(project.summary for project in profile.projects)
+    return _dynamic_domain_terms(terms)
+
+
 def _seniority_level(title: str | None) -> str | None:
     text = " " + _normalize_key(title) + " "
     for level in reversed(_SENIORITY_ORDER):
@@ -561,13 +612,32 @@ def _overlap(required: list[str], available: set[str]) -> tuple[float, list[str]
     return len(matched) / len(required), matched, missing
 
 
-def _domain_overlap(role_domains: list[str], profile_domains: list[str]) -> tuple[float, list[str]]:
+def _domain_overlap(
+    role_domains: list[str],
+    profile_domains: list[str],
+    *,
+    profile_context_terms: set[str] | None = None,
+    role_title: str | None = None,
+    esco_title: str | None = None,
+) -> tuple[float, list[str]]:
     role_domain_set = {_normalize_key(domain).replace(" ", "_") for domain in role_domains}
     profile_domain_set = set(profile_domains)
     matched = [domain for domain in role_domains if _normalize_key(domain).replace(" ", "_") in profile_domain_set]
     if not role_domain_set:
-        return 0.0, []
-    return len({ _normalize_key(domain).replace(" ", "_") for domain in matched }) / len(role_domain_set), matched
+        base_overlap = 0.0
+    else:
+        base_overlap = len({_normalize_key(domain).replace(" ", "_") for domain in matched}) / len(
+            role_domain_set
+        )
+
+    if profile_context_terms:
+        role_context_terms = _dynamic_domain_terms([role_title, esco_title, *role_domains])
+        dynamic_matches = role_context_terms & profile_context_terms
+        if dynamic_matches:
+            dynamic_overlap = min(0.85, len(dynamic_matches) / max(len(role_context_terms), 1))
+            return max(base_overlap, dynamic_overlap), matched
+
+    return base_overlap, matched
 
 
 def _cert_overlap(role_certs: list[tuple[str, str]], user_cert_norms: set[str]) -> tuple[float, list[str]]:
@@ -587,17 +657,24 @@ def _candidate_from_row(
     alias_map: dict[str, str],
     role_skills: dict[str, list[str]],
     role_certs: dict[str, list[tuple[str, str]]],
-    user_skills: list[str],
+    skill_evidence: SkillEvidence,
     profile_domains: list[str],
+    profile_context_terms: set[str],
     user_cert_norms: set[str],
     user_title: str | None,
 ) -> Candidate:
     role_id = str(row["role_id"])
     required_skills = _role_required_skills(row, role_skills, alias_map)
-    skill_overlap, matched_skills, missing_skills = _overlap(required_skills, set(user_skills))
+    alignment = align_skills(required_skills, skill_evidence, alias_map)
 
     role_domains = [_normalize_key(domain).replace(" ", "_") for domain in _listify(row.get("domain_tags"))]
-    domain_overlap, matched_domains = _domain_overlap(role_domains, profile_domains)
+    domain_overlap, matched_domains = _domain_overlap(
+        role_domains,
+        profile_domains,
+        profile_context_terms=profile_context_terms,
+        role_title=row.get("job_title"),
+        esco_title=row.get("esco_title"),
+    )
 
     cert_overlap, matched_certs = _cert_overlap(role_certs.get(role_id, []), user_cert_norms)
     seniority_gap, seniority_fit = infer_seniority_gap(user_title, row.get("job_title"))
@@ -611,13 +688,13 @@ def _candidate_from_row(
         esco_uri=row.get("esco_uri") or "",
         capability_vector_similarity=float(row.get("capability_vector_similarity") or 0.0),
         intent_vector_similarity=float(row.get("intent_vector_similarity") or 0.0),
-        normalized_skill_overlap=skill_overlap,
+        normalized_skill_overlap=alignment.coverage,
         interest_domain_overlap=domain_overlap,
         certification_overlap=cert_overlap,
         seniority_fit=seniority_fit,
         seniority_gap=seniority_gap,
-        matched_skills=matched_skills,
-        missing_skills=missing_skills,
+        matched_skills=alignment.matched_skills,
+        missing_skills=alignment.missing_skills,
         matched_domains=matched_domains,
         matched_certifications=matched_certs,
     )
@@ -638,7 +715,9 @@ def _match_roles_sync(
     roles, alias_map, role_skills, role_certs = _fetch_catalog(v_capability, v_intent)
 
     normalized_user_skills = normalize_user_skills(_profile_skill_terms(profile), alias_map)
+    skill_evidence = build_skill_evidence_from_user_profile(profile)
     profile_domains = map_profile_domains(profile)
+    profile_context_terms = _profile_domain_context_terms(profile)
     user_cert_norms = normalize_user_certifications(
         cert.name for cert in profile.certifications if _clean_text(cert.name)
     )
@@ -650,8 +729,9 @@ def _match_roles_sync(
             alias_map=alias_map,
             role_skills=role_skills,
             role_certs=role_certs,
-            user_skills=normalized_user_skills,
+            skill_evidence=skill_evidence,
             profile_domains=profile_domains,
+            profile_context_terms=profile_context_terms,
             user_cert_norms=user_cert_norms,
             user_title=user_title,
         )

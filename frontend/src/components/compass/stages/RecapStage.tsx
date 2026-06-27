@@ -522,9 +522,7 @@ function MissingInfoPrompt({ items }: { items: string[] }) {
         <p className="font-medium text-foreground/80">
           Add missing info to improve recommendations.
         </p>
-        <p className="mt-0.5">
-          Missing: {items.join(", ")}. Add details in the sections below.
-        </p>
+        <p className="mt-0.5">Missing: {items.join(", ")}. Add details in the sections below.</p>
       </div>
     </motion.div>
   );

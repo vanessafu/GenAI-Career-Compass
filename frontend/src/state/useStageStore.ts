@@ -173,6 +173,8 @@ const initialState = {
   error: null as string | null,
 };
 
+let matchingRequest: Promise<boolean> | null = null;
+
 export const useStageStore = create<Store>((set, get) => ({
   ...initialState,
   setStage: (s) => set({ stage: s }),
@@ -341,36 +343,45 @@ export const useStageStore = create<Store>((set, get) => ({
 
   /** Match the (edited) CV against ESCO roles using the embedding pipeline query text. */
   runMatching: async () => {
-    const state = get();
-    const outgoing = buildOutgoingCvData(state);
-    if (!outgoing) {
-      set({ error: "No CV data to match." });
-      return false;
-    }
-    if (state.demoMode && state.roleMatches.length > 0) {
-      set({ cvData: outgoing, error: null, loading: false });
-      return true;
-    }
-    set({ loading: true, error: null, cvData: outgoing });
-    try {
-      const result = await matchRoles(cvDataToUserCareerProfile(outgoing, state.identity), 9);
-      set({
-        roleMatches: result.matched_roles,
-        matchAnalysis: result.analysis,
-        selectedRoleIds: [],
-        roleGapReports: {},
-        roleGapLoading: {},
-        roleGapErrors: {},
-        careerPathReports: {},
-        careerPathLoading: {},
-        careerPathErrors: {},
-        loading: false,
-      });
-      return true;
-    } catch (err) {
-      set({ loading: false, error: errorMessage(err, "Role matching is unavailable.") });
-      return false;
-    }
+    if (matchingRequest) return matchingRequest;
+
+    const request = (async () => {
+      const state = get();
+      const outgoing = buildOutgoingCvData(state);
+      if (!outgoing) {
+        set({ error: "No CV data to match." });
+        return false;
+      }
+      if (state.demoMode && state.roleMatches.length > 0) {
+        set({ cvData: outgoing, error: null, loading: false });
+        return true;
+      }
+      set({ loading: true, error: null, cvData: outgoing });
+      try {
+        const result = await matchRoles(cvDataToUserCareerProfile(outgoing, state.identity), 9);
+        set({
+          roleMatches: result.matched_roles,
+          matchAnalysis: result.analysis,
+          selectedRoleIds: [],
+          roleGapReports: {},
+          roleGapLoading: {},
+          roleGapErrors: {},
+          careerPathReports: {},
+          careerPathLoading: {},
+          careerPathErrors: {},
+          loading: false,
+        });
+        return true;
+      } catch (err) {
+        set({ loading: false, error: errorMessage(err, "Role matching is unavailable.") });
+        return false;
+      }
+    })();
+
+    matchingRequest = request.finally(() => {
+      matchingRequest = null;
+    });
+    return matchingRequest;
   },
 
   loadRoleGapAnalysis: async (roleId) => {
