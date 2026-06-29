@@ -9,14 +9,14 @@ matching, gap analysis, and career roadmap generation use backend calls.
 The typed client lives in `frontend/src/lib/api.ts`. Its base URL is defined in
 `frontend/src/lib/config.ts` and can be overridden with `VITE_API_BASE_URL`.
 
-| Stage | Call | Notes |
-|---|---|---|
-| Entry upload | `POST /api/v1/profile-pipeline/parse-cv` | Uploads a PDF and returns `ProfilePipelineResponse`. |
-| Entry manual | `POST /api/v1/profile-pipeline/manual-cv` | Posts `ManualCVInput` and returns the same pipeline response shape. |
-| Recap | no extra backend call | Edits happen in frontend state and are merged back into `CVData`. |
-| Matching | `POST /api/v1/roles/match` | Sends `UserCareerProfile`, `top_k: 9`, `mode: "balanced"`. |
-| Gap analysis | `POST /api/v1/roles/{role_id}/gap-analysis` | Sends `ConfirmedCVData` for the selected role. |
-| Career path | `POST /api/v1/roles/{role_id}/career-path` | Sends `ConfirmedCVData`; response includes `requirement_breakdown`. |
+| Stage        | Call                                        | Notes                                                               |
+| ------------ | ------------------------------------------- | ------------------------------------------------------------------- |
+| Entry upload | `POST /api/v1/profile-pipeline/parse-cv`    | Uploads a PDF and returns `ProfilePipelineResponse`.                |
+| Entry manual | `POST /api/v1/profile-pipeline/manual-cv`   | Posts `ManualCVInput` and returns the same pipeline response shape. |
+| Recap        | no extra backend call                       | Edits happen in frontend state and are merged back into `CVData`.   |
+| Matching     | `POST /api/v1/roles/match`                  | Sends `UserCareerProfile`, `top_k: 9`, `mode: "balanced"`.          |
+| Gap analysis | `POST /api/v1/roles/{role_id}/gap-analysis` | Sends `ConfirmedCVData` for the selected role.                      |
+| Career path  | `POST /api/v1/roles/{role_id}/career-path`  | Sends `ConfirmedCVData`; response includes `requirement_breakdown`. |
 
 Balanced matching displays up to 3 roles per bucket, so the response can contain
 fewer than 9 roles when a bucket has fewer qualified candidates.
