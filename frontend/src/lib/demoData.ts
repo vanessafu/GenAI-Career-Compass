@@ -213,7 +213,8 @@ export const DEMO_CV_DATA: CVData = {
     },
     {
       label: "target_constraint",
-      value: "Wants to stay close to product teams rather than move into pure infrastructure ownership.",
+      value:
+        "Wants to stay close to product teams rather than move into pure infrastructure ownership.",
       source_section: "profile",
       reason_not_mapped: "Career preference used for presentation only.",
     },
@@ -520,7 +521,9 @@ export const DEMO_CAREER_PATH_REPORTS = {
         "A small credential or course is enough here; the main value is giving structure to pipeline design vocabulary while the project work carries most of the proof.",
       ),
     ],
-    ["Build a release readiness dashboard that combines CI failures, smoke tests, open bugs, and support tags."],
+    [
+      "Build a release readiness dashboard that combines CI failures, smoke tests, open bugs, and support tags.",
+    ],
     [],
     "You're already close to this role: Python automation, CI checks, QA collaboration, and release coordination all line up well. The main upgrade is to turn those pieces into explicit release governance and observable pipeline evidence.",
   ),
@@ -651,7 +654,9 @@ export const DEMO_CAREER_PATH_REPORTS = {
         "This proves the work is usable outside the original owner and addresses the collaboration side of test platform roles.",
       ),
     ],
-    ["Build a reusable Playwright/Pytest fixture layer with parallel CI reporting and a test environment health page."],
+    [
+      "Build a reusable Playwright/Pytest fixture layer with parallel CI reporting and a test environment health page.",
+    ],
     [],
     "This is a next-step role: the demo profile has strong test automation ingredients, but needs more shared-infrastructure proof before it reads like test platform ownership.",
   ),
@@ -692,7 +697,9 @@ export const DEMO_CAREER_PATH_REPORTS = {
         "Certification prep is useful here because it fills vocabulary around pipeline design, environments, approvals, and artifacts while the project work proves applied ability.",
       ),
     ],
-    ["Redesign one service's CI flow with artifact tracking, retry rules, and clearer failure reporting."],
+    [
+      "Redesign one service's CI flow with artifact tracking, retry rules, and clearer failure reporting.",
+    ],
     ["Azure DevOps Engineer Expert"],
     "CI Pipeline Engineer is adjacent to the current work, but less ready than release automation because the profile needs stronger architecture and artifact-management evidence.",
   ),
@@ -831,7 +838,9 @@ export const DEMO_CAREER_PATH_REPORTS = {
         "This certification directly supports the identified infrastructure-as-code gap and gives structure to the concepts used in the review-environment project.",
       ),
     ],
-    ["Provision an ephemeral review environment from code with secrets handling and teardown automation."],
+    [
+      "Provision an ephemeral review environment from code with secrets handling and teardown automation.",
+    ],
     ["Terraform Associate"],
     "Cloud Automation Engineer is intentionally a stretch. The demo profile has scripting and CI foundations, but needs direct infrastructure, networking, and secrets-management proof.",
   ),

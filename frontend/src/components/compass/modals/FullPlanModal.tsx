@@ -76,7 +76,10 @@ export function FullPlanModal({
       subtitle="Full plan"
       headerAside={
         readiness !== null ? (
-          <PlanStats readiness={readiness} timeline={report ? displayTimeline(report) : undefined} />
+          <PlanStats
+            readiness={readiness}
+            timeline={report ? displayTimeline(report) : undefined}
+          />
         ) : undefined
       }
       headerDescription={
@@ -727,7 +730,9 @@ function displayMilestones(milestones: CareerPathMilestone[]): CareerPathMilesto
 }
 
 function displayTimeline(report: CareerPathReport): string {
-  return totalTimeline(displayMilestones(report.milestones)) || formatTimeline(report.estimated_timeline);
+  return (
+    totalTimeline(displayMilestones(report.milestones)) || formatTimeline(report.estimated_timeline)
+  );
 }
 
 function totalTimeline(milestones: CareerPathMilestone[]): string {
@@ -763,7 +768,9 @@ function reportPlanSummary(report: CareerPathReport): string {
 
   const gaps = report.top_gaps.filter(Boolean).slice(0, 3);
   const matched = report.requirement_breakdown.skills.matched_skills.filter(Boolean).slice(0, 3);
-  const readiness = percent(report.readiness_score || report.requirement_breakdown.overall_readiness);
+  const readiness = percent(
+    report.readiness_score || report.requirement_breakdown.overall_readiness,
+  );
   const closeness =
     readiness >= 75
       ? "You're already close"
