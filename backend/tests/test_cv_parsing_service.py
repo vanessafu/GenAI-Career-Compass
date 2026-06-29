@@ -7,8 +7,8 @@ from backend.app.features.cv_parsing.schemas import CVData
 def test_blank_parsed_interests_are_generated(monkeypatch):
     calls = []
 
-    async def fake_parse_structured(messages, response_format, *, model_purpose=None):
-        calls.append((response_format, model_purpose, list(messages)))
+    async def fake_parse_structured(messages, response_format, *, model_purpose=None, model=None):
+        calls.append((response_format, model_purpose, model, list(messages)))
         if response_format is CVData:
             return CVData(interests=[])
         return response_format(interests=[" Cloud platforms ", "AI", "ai", "", "Data"])
@@ -25,8 +25,8 @@ def test_blank_parsed_interests_are_generated(monkeypatch):
 def test_existing_parsed_interests_skip_generation(monkeypatch):
     calls = []
 
-    async def fake_parse_structured(messages, response_format, *, model_purpose=None):
-        calls.append((response_format, model_purpose, list(messages)))
+    async def fake_parse_structured(messages, response_format, *, model_purpose=None, model=None):
+        calls.append((response_format, model_purpose, model, list(messages)))
         assert response_format is CVData
         return CVData(interests=["Cloud platforms"])
 
@@ -41,8 +41,8 @@ def test_existing_parsed_interests_skip_generation(monkeypatch):
 def test_interest_generation_failure_keeps_cv_parse_result(monkeypatch):
     calls = []
 
-    async def fake_parse_structured(messages, response_format, *, model_purpose=None):
-        calls.append((response_format, model_purpose, list(messages)))
+    async def fake_parse_structured(messages, response_format, *, model_purpose=None, model=None):
+        calls.append((response_format, model_purpose, model, list(messages)))
         if response_format is CVData:
             return CVData(interests=[])
         raise RuntimeError("interest generation unavailable")
@@ -53,3 +53,23 @@ def test_interest_generation_failure_keeps_cv_parse_result(monkeypatch):
 
     assert result.interests == []
     assert len(calls) == 2
+
+
+def test_model_override_is_used_for_parse_and_interest_generation(monkeypatch):
+    calls = []
+
+    async def fake_parse_structured(messages, response_format, *, model_purpose=None, model=None):
+        calls.append((response_format, model_purpose, model))
+        if response_format is CVData:
+            return CVData(interests=[])
+        return response_format(interests=["AI"])
+
+    monkeypatch.setattr(service.openai_client, "parse_structured", fake_parse_structured)
+
+    result = asyncio.run(service.parse_cv_to_pydantic("Python backend developer", model="model-x"))
+
+    assert result.interests == ["AI"]
+    assert calls == [
+        (CVData, "cv_parsing", "model-x"),
+        (service._GeneratedInterests, "identity", "model-x"),
+    ]

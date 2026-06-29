@@ -1,0 +1,1064 @@
+{
+  "profiles": [
+    {
+      "name": "frontend_student",
+      "judged_roles": [
+        {
+          "role_id": "90",
+          "title": "Entry Level Web Developer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "126",
+          "title": "Junior Web Developer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "96",
+          "title": "Front End Developer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "122",
+          "title": "Junior Front End Developer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "356",
+          "title": "Front-End Designer",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "39",
+          "title": "Accessibility Specialist",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "195",
+          "title": "Web Developer",
+          "relevance": 3,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "118",
+          "title": "Javascript Developer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "98",
+          "title": "Full Stack Developer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "123",
+          "title": "Junior iOS Developer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "101",
+          "title": "Game Developer",
+          "relevance": 0
+        }
+      ],
+      "profile": {
+        "career_identity": {
+          "title": "Frontend student"
+        },
+        "skills": [
+          "React",
+          "JavaScript",
+          "HTML",
+          "CSS",
+          "Git"
+        ],
+        "interests": [
+          "cloud",
+          "ux",
+          "web development"
+        ]
+      }
+    },
+    {
+      "name": "python_data_student",
+      "judged_roles": [
+        {
+          "role_id": "72",
+          "title": "Data Analyst",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "476",
+          "title": "Data Analyst",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "317",
+          "title": "Business Intelligence Analyst",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "363",
+          "title": "Data Science Specialist",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "73",
+          "title": "Data Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "29",
+          "title": "Principle Engineer in Data Analysis",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "304",
+          "title": "Principle Engineer in Data Analysis",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "68",
+          "title": "Computer Systems Analyst",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "10",
+          "title": "Big Data Engineer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "85",
+          "title": "Entry Level Developer",
+          "relevance": 0
+        }
+      ],
+      "profile": {
+        "career_identity": {
+          "title": "Python/data student"
+        },
+        "skills": [
+          "Python",
+          "SQL",
+          "pandas",
+          "statistics",
+          "data visualization"
+        ],
+        "certifications": [
+          {
+            "name": "Google Data Analytics Certificate"
+          }
+        ],
+        "interests": [
+          "AI",
+          "analytics",
+          "data"
+        ]
+      }
+    },
+    {
+      "name": "it_support_beginner",
+      "judged_roles": [
+        {
+          "role_id": "436",
+          "title": "IT Technician",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "326",
+          "title": "Help Desk Technician",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "423",
+          "title": "IT Support Specialist",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "383",
+          "title": "Computer Support Specialist",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "439",
+          "title": "Computer Network Specialist",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "287",
+          "title": "Network and Systems Administrator",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "402",
+          "title": "Technology Assistant",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "83",
+          "title": "Docker Engineer",
+          "relevance": 0
+        },
+        {
+          "role_id": "54",
+          "title": "Chef Inspec Engineer",
+          "relevance": 0
+        },
+        {
+          "role_id": "77",
+          "title": "Datadog Engineer",
+          "relevance": 0
+        }
+      ],
+      "profile": {
+        "career_identity": {
+          "title": "IT support beginner"
+        },
+        "skills": [
+          "Windows",
+          "Linux",
+          "networking",
+          "troubleshooting",
+          "Active Directory"
+        ],
+        "certifications": [
+          {
+            "name": "CompTIA A+"
+          }
+        ],
+        "interests": [
+          "cybersecurity",
+          "cloud"
+        ]
+      }
+    },
+    {
+      "name": "backend_developer",
+      "judged_roles": [
+        {
+          "role_id": "117",
+          "title": "Java Developer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "275",
+          "title": "Java Developer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "259",
+          "title": "Full Stack Java Developer/Programmer/Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "99",
+          "title": "Full Stack Java Developer/Programmer/Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "174",
+          "title": "Software Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "331",
+          "title": "Java Architect",
+          "relevance": 2,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "391",
+          "title": "Cloud/Software Architect",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "56",
+          "title": "Cloud Architect",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "89",
+          "title": "Entry Level Software Engineer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "85",
+          "title": "Entry Level Developer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        }
+      ],
+      "profile": {
+        "career_identity": {
+          "title": "Backend developer"
+        },
+        "experience": [
+          {
+            "role": "Backend Developer"
+          }
+        ],
+        "skills": [
+          "Java",
+          "SQL",
+          "APIs",
+          "Git",
+          "Docker",
+          "Spring"
+        ],
+        "certifications": [
+          {
+            "name": "Oracle Certified Associate Java Programmer"
+          }
+        ],
+        "interests": [
+          "DevOps",
+          "architecture",
+          "cloud"
+        ]
+      }
+    },
+    {
+      "name": "design_frontend",
+      "judged_roles": [
+        {
+          "role_id": "356",
+          "title": "Front-End Designer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "257",
+          "title": "Front End Developer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "96",
+          "title": "Front End Developer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "39",
+          "title": "Accessibility Specialist",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "346",
+          "title": "Web Designer",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "344",
+          "title": "Web Developer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "90",
+          "title": "Entry Level Web Developer",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "121",
+          "title": "Junior Developer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "85",
+          "title": "Entry Level Developer",
+          "relevance": 0
+        },
+        {
+          "role_id": "120",
+          "title": "Jr Developer",
+          "relevance": 0
+        }
+      ],
+      "profile": {
+        "career_identity": {
+          "title": "Design/frontend profile"
+        },
+        "skills": [
+          "Figma",
+          "HTML",
+          "CSS",
+          "JavaScript",
+          "accessibility",
+          "responsive design"
+        ],
+        "interests": [
+          "UX",
+          "frontend",
+          "design"
+        ]
+      }
+    },
+    {
+      "name": "cloud_security_analyst",
+      "judged_roles": [
+        {
+          "role_id": "60",
+          "title": "Cloud Security Engineer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "226",
+          "title": "Cloud Security Engineer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "319",
+          "title": "Cybersecurity Analyst",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "362",
+          "title": "Cybersecurity Specialist",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "368",
+          "title": "Infosec Analyst/Cybersecurity Analyst",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "111",
+          "title": "Information Security Analyst",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "44",
+          "title": "Application Security Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "202",
+          "title": "Application Security Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "81",
+          "title": "Devsecops Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "244",
+          "title": "Devsecops Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "193",
+          "title": "Vault Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "80",
+          "title": "Devsecops Architect",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "243",
+          "title": "Devsecops Architect",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "59",
+          "title": "Cloud Network Engineer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "338",
+          "title": "Penetration Tester",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "375",
+          "title": "Security Administrator",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "374",
+          "title": "Director of Security",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "241",
+          "title": "DevOps Architect",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "396",
+          "title": "Platform Engineer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        }
+      ],
+      "profile": {
+        "career_identity": {
+          "title": "Cloud security analyst",
+          "summary": "Security analyst focused on cloud identity, vulnerability management, and incident response."
+        },
+        "experience": [
+          {
+            "role": "Security Analyst",
+            "summary": "Reviewed IAM access, handled vulnerability tickets, and supported incident response for AWS workloads.",
+            "skills": [
+              "AWS",
+              "IAM",
+              "cloud security",
+              "vulnerability management",
+              "incident response"
+            ]
+          }
+        ],
+        "skills": [
+          "AWS",
+          "Azure",
+          "IAM",
+          "cloud security",
+          "vulnerability management",
+          "compliance",
+          "incident response",
+          "Terraform"
+        ],
+        "certifications": [
+          {
+            "name": "CompTIA Security+"
+          }
+        ],
+        "interests": [
+          "cloud",
+          "cybersecurity",
+          "security automation"
+        ]
+      }
+    },
+    {
+      "name": "qa_automation_engineer",
+      "judged_roles": [
+        {
+          "role_id": "158",
+          "title": "QA Engineer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "165",
+          "title": "Selenium Engineer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "156",
+          "title": "Pytest Engineer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "127",
+          "title": "Junit Engineer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "280",
+          "title": "Junit Engineer",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "397",
+          "title": "Software Quality Assurance Analyst",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "71",
+          "title": "Coverage.py Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "236",
+          "title": "Coverage.py Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "116",
+          "title": "Jacoco Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "274",
+          "title": "Jacoco Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "316",
+          "title": "Automation Specialist",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "175",
+          "title": "Sonarqube Engineer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "340",
+          "title": "Quality Assurance Manager",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "338",
+          "title": "Penetration Tester",
+          "relevance": 0
+        },
+        {
+          "role_id": "109",
+          "title": "Groovy Engineer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "12",
+          "title": "Build and Release Engineer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "34",
+          "title": "Senior Build Engineer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "18",
+          "title": "DevOps Engineer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        }
+      ],
+      "profile": {
+        "career_identity": {
+          "title": "QA automation engineer",
+          "summary": "Automation-focused tester building Python and Java regression suites for web products."
+        },
+        "experience": [
+          {
+            "role": "QA Automation Engineer",
+            "summary": "Maintained Selenium, pytest, and JUnit tests in CI/CD pipelines.",
+            "skills": [
+              "Selenium",
+              "pytest",
+              "JUnit",
+              "CI/CD",
+              "test automation"
+            ]
+          }
+        ],
+        "skills": [
+          "Python",
+          "Java",
+          "Selenium",
+          "pytest",
+          "JUnit",
+          "test automation",
+          "quality assurance",
+          "Jenkins",
+          "Git"
+        ],
+        "certifications": [
+          {
+            "name": "ISTQB Foundation Level"
+          }
+        ],
+        "interests": [
+          "qa",
+          "automation",
+          "software quality"
+        ]
+      }
+    },
+    {
+      "name": "product_analytics_pm",
+      "judged_roles": [
+        {
+          "role_id": "473",
+          "title": "Business Systems Analyst",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "52",
+          "title": "Business Systems Analyst",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "317",
+          "title": "Business Intelligence Analyst",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "352",
+          "title": "Web Analytics Developer",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "425",
+          "title": "Technical Product Manager",
+          "relevance": 3,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "151",
+          "title": "Product Manager",
+          "relevance": 3,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "484",
+          "title": "Product Manager",
+          "relevance": 3,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "408",
+          "title": "Requirements Manager",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "68",
+          "title": "Computer Systems Analyst",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "233",
+          "title": "Computer Systems Analyst",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "470",
+          "title": "Business Intelligence Developer",
+          "relevance": 1,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "472",
+          "title": "Agile Project Manager",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "40",
+          "title": "Agile Project Manager",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "426",
+          "title": "Project Manager",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "22",
+          "title": "Jira Administrator",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "348",
+          "title": "Web Producer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "215",
+          "title": "Big Data Specialist",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "184",
+          "title": "Technical Account Manager",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "428",
+          "title": "Portfolio Manager",
+          "relevance": 0
+        }
+      ],
+      "profile": {
+        "career_identity": {
+          "title": "Product analytics analyst",
+          "summary": "Analyst moving toward technical product management with product discovery and dashboarding experience."
+        },
+        "experience": [
+          {
+            "role": "Product Analyst",
+            "summary": "Translated stakeholder needs into requirements, dashboards, and experiment readouts for product teams.",
+            "skills": [
+              "SQL",
+              "requirements gathering",
+              "stakeholder management",
+              "data analysis",
+              "Jira"
+            ]
+          }
+        ],
+        "skills": [
+          "SQL",
+          "Power BI",
+          "data analysis",
+          "requirements gathering",
+          "stakeholder management",
+          "product roadmap",
+          "user research",
+          "Jira",
+          "agile methodologies"
+        ],
+        "certifications": [
+          {
+            "name": "Certified Scrum Product Owner (CSPO)"
+          }
+        ],
+        "interests": [
+          "product management",
+          "analytics",
+          "experimentation"
+        ]
+      }
+    },
+    {
+      "name": "ux_researcher",
+      "judged_roles": [
+        {
+          "role_id": "449",
+          "title": "UX/UI Researcher",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "192",
+          "title": "UX Designer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "343",
+          "title": "UX/UI Designer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "450",
+          "title": "UX/UI Specialist",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "112",
+          "title": "Interaction Designer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "482",
+          "title": "Interaction Designer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "398",
+          "title": "UI (User Interface) Designer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "189",
+          "title": "UI Designer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "481",
+          "title": "Information Architect",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "110",
+          "title": "Information Architect",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "39",
+          "title": "Accessibility Specialist",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "471",
+          "title": "Accessibility Specialist",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "194",
+          "title": "Web Designer (UI/UX Designer)",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "346",
+          "title": "Web Designer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "96",
+          "title": "Front End Developer",
+          "relevance": 0
+        },
+        {
+          "role_id": "387",
+          "title": "Database Analyst",
+          "relevance": 0
+        },
+        {
+          "role_id": "397",
+          "title": "Software Quality Assurance Analyst",
+          "relevance": 0
+        },
+        {
+          "role_id": "72",
+          "title": "Data Analyst",
+          "relevance": 0
+        },
+        {
+          "role_id": "8",
+          "title": "Artificial Intelligence Researcher",
+          "relevance": 0
+        },
+        {
+          "role_id": "441",
+          "title": "Computer and Information Research Manager",
+          "relevance": 0
+        },
+        {
+          "role_id": "280",
+          "title": "Junit Engineer",
+          "relevance": 0
+        }
+      ],
+      "profile": {
+        "career_identity": {
+          "title": "UX researcher",
+          "summary": "Research-heavy UX profile focused on interviews, usability testing, and evidence-backed design decisions."
+        },
+        "experience": [
+          {
+            "role": "UX Researcher",
+            "summary": "Ran user interviews, usability studies, and prototype tests for product teams.",
+            "skills": [
+              "user research",
+              "usability testing",
+              "prototyping",
+              "data analysis"
+            ]
+          }
+        ],
+        "skills": [
+          "user research",
+          "usability testing",
+          "prototyping",
+          "wireframing",
+          "Figma",
+          "accessibility",
+          "data analysis",
+          "reporting"
+        ],
+        "certifications": [
+          {
+            "name": "Google UX Design Professional Certificate"
+          }
+        ],
+        "interests": [
+          "ux",
+          "design",
+          "research"
+        ]
+      }
+    }
+  ]
+}

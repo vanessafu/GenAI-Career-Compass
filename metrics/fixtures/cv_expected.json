@@ -1,0 +1,792 @@
+{
+  "cvs": [
+    {
+      "name": "semjon_eschweiler_04_26",
+      "pdf": "test_data/cvs/semjon_eschweiler_04_26.pdf",
+      "fields": {
+        "full_name": "Semjon Marcelowitsch Eschweiler",
+        "email": "semjon.eschweiler@gmail.com",
+        "phone": "+49 15116914895",
+        "location": "Jochbergweg 7/24, 85748, Garching b. München, Germany",
+        "experience_roles": [
+          "Internship in Computer Vision Development",
+          "Orientation Internship as Software Developer",
+          "Web Developer as Freelancer",
+          "Python Developer"
+        ],
+        "experience_organizations": [
+          "Genetec Vienna",
+          "DMG Mori Digital GmbH",
+          "Pixel Passion",
+          "Rocket Upload"
+        ],
+        "experience_locations": [
+          "Vienna, Austria",
+          "Pfronten, Germany",
+          "Augsburg, Germany"
+        ],
+        "experience_date_ranges": [
+          "2023",
+          "2022",
+          "2021 2022",
+          "2020"
+        ],
+        "experience_responsibilities": [
+          "generation of high-quality synthetic images using Unreal Engine 5 (UE5) for CV applications",
+          "downstream tasks of reidentification, person orientation, person detection, and camera alignment",
+          "orientation internship in software development",
+          "development of features in Typescript and C++ involving OOP/Networks",
+          "development of fast and aesthetic websites with Wordpress",
+          "development of automation software in the context of webscraping with Selenium",
+          "building and designing a GUI-application with Qt-creator"
+        ],
+        "experience_contextual_skills": [
+          "Unreal Engine 5",
+          "Computer Vision",
+          "reidentification",
+          "person orientation",
+          "person detection",
+          "camera alignment",
+          "Typescript",
+          "C++",
+          "OOP",
+          "Networks",
+          "Wordpress",
+          "Python",
+          "Selenium",
+          "Qt"
+        ],
+        "education_entry_types": [
+          "degree",
+          "semester_abroad",
+          "degree",
+          "semester_abroad",
+          "other",
+          "high_school"
+        ],
+        "education": [
+          "M.Sc. Robotics Cognition and Intelligence",
+          "Bachelor of Engineering in Mechatronics Robotics",
+          "Abitur"
+        ],
+        "education_institutions": [
+          "Technical University of Munich",
+          "Universidad de Antioquia",
+          "FH Technikum Wien",
+          "Universidad Carlos III de Madrid",
+          "Gymnasium bei St. Anna"
+        ],
+        "education_date_ranges": [
+          "2023 present",
+          "2025 2026",
+          "2020 2023",
+          "2022",
+          "2018 2019",
+          "2010 2018"
+        ],
+        "education_grades": [
+          "1.7",
+          "Austrian GPA 1.88",
+          "Austrian GPA 1.0"
+        ],
+        "education_theses": [
+          "Evaluation of a synthetically generated dataset with Unreal Engine for people detection"
+        ],
+        "education_courses": [
+          "Machine Learning",
+          "Computer Vision 2 & 3",
+          "Introduction to Deep Learning",
+          "Roboterdynamics",
+          "Mechatronical Device Technology",
+          "AI in Medicine",
+          "Fundamentals of AI",
+          "NLP",
+          "Graph Neural Networks",
+          "Deep Learning for Human Modelling"
+        ],
+        "skills": [
+          "Unreal Engine 5",
+          "Computer Vision",
+          "reidentification",
+          "person orientation",
+          "person detection",
+          "camera alignment",
+          "Typescript",
+          "C++",
+          "OOP",
+          "Networks",
+          "Wordpress",
+          "Python",
+          "Selenium",
+          "Qt",
+          "Machine Learning",
+          "Deep Learning",
+          "NLP",
+          "Graph Neural Networks",
+          "Gaussian Splatting"
+        ],
+        "languages": [
+          "German",
+          "English C1",
+          "Spanish C1",
+          "Russian A2"
+        ],
+        "projects": [
+          "Accessible 3D Human Generation: A Resource-Efficient Implementation of Gaussian Splatting",
+          "Cross-Domain Application of TacticAI: Tactical Modeling in Competitive Esports Using GNNs"
+        ],
+        "project_date_ranges": [
+          "2025",
+          "2025"
+        ],
+        "project_descriptions": [
+          "practical at TUM in deep learning for human modelling",
+          "implementation of single view image to 3D person application",
+          "seminar in the field of graph neural networks"
+        ],
+        "project_technologies": [
+          "Gaussian Splatting",
+          "Graph Neural Networks",
+          "TacticAI"
+        ],
+        "project_outcomes": [
+          "allowed 45x faster training times than SOTA, but with a considerable quality trade-off",
+          "successful implementation of TacticAI (a GNN based corner kick predictor in football) in the domain of competitive esports"
+        ],
+        "project_links": [
+          "https://www.linkedin.com/in/semjon-eschweiler/overlay/Project/1428598619/treasury/",
+          "https://www.linkedin.com/in/semjon-eschweiler/overlay/Project/1428320010/treasury/"
+        ],
+        "thesis_titles": [
+          "Evaluation of a synthetically generated dataset with Unreal Engine for people detection"
+        ],
+        "thesis_technologies": [
+          "Unreal Engine",
+          "people detection"
+        ]
+      }
+    },
+    {
+      "name": "alison_thorpe",
+      "pdf": "test_data/cvs/alison_thorpe.pdf",
+      "fields": {
+        "full_name": "Alison Thorpe",
+        "email": "alisonthorpe@inter.net",
+        "phone": "07759 123456",
+        "location": "17a Christmas Way, Abingdon, Oxon OX99 2PQ",
+        "links": [
+          "linkedin.com/alison-thorpe-xxxx",
+          "github.com/alithorpe"
+        ],
+        "experience_roles": [
+          "Industrial Placement Developer",
+          "IT Support Intern",
+          "Volunteer",
+          "Retail Assistant"
+        ],
+        "experience_organizations": [
+          "Question Technologies",
+          "Group MTI",
+          "Tech4Kids",
+          "Sainsbury's"
+        ],
+        "experience_locations": [
+          "Hybrid working",
+          "Oxford",
+          "Office based",
+          "Ipswich"
+        ],
+        "experience_date_ranges": [
+          "2020 2021",
+          "2019",
+          "2018",
+          "2016 2018"
+        ],
+        "experience_responsibilities": [
+          "Contributed to development of the March 2021 update for Question Technologies' flagship software, Question Answerer 4, primarily coding using C and C#",
+          "Responsible for implementing improvements to the user interface and conducted in-depth research into methods to increase the software's accessibility functionality",
+          "Shadowed senior IT support technicians to support ten of Group MTI's clients",
+          "Installed and configured computer hardware systems and IT software",
+          "Monitored IT networks to maintain availability",
+          "Troubleshot desktop PCs, laptops and mobile devices",
+          "Assisted in teaching the basics of coding",
+          "Deputised for the department manager",
+          "Trained and supported two new members of staff on how to use the retail point of sale, cash management and order management systems"
+        ],
+        "experience_contextual_skills": [
+          "C",
+          "C#",
+          "user interface",
+          "accessibility",
+          "teamworking",
+          "IT support",
+          "hardware configuration",
+          "network monitoring",
+          "troubleshooting",
+          "customer service",
+          "retail point of sale",
+          "cash management",
+          "order management"
+        ],
+        "education_entry_types": [
+          "degree",
+          "high_school"
+        ],
+        "education": [
+          "BSc Hons Computer Science with Information Systems",
+          "A Levels and GCSEs"
+        ],
+        "education_institutions": [
+          "University of Abingdon",
+          "John Redmond High School"
+        ],
+        "education_date_ranges": [
+          "2018 2022",
+          "2012 2018"
+        ],
+        "education_grades": [
+          "Predicted a 2.1",
+          "Maths A",
+          "English B",
+          "Information Technology A"
+        ],
+        "education_courses": [
+          "high-performance computing and distributed systems",
+          "database systems implementation",
+          "advanced machine learning"
+        ],
+        "skills": [
+          "C",
+          "C++",
+          "C#",
+          "Go",
+          "Java",
+          "JavaScript",
+          "PHP",
+          "Python",
+          "CouchDB",
+          "InterBase",
+          "MongoDB",
+          "MySQL",
+          "SQL Server",
+          "Windows",
+          "Mac OS",
+          "Linux OS",
+          "Docker",
+          "Git",
+          "Kubernetes",
+          "AWS",
+          "Google Cloud",
+          "Bash",
+          "Microsoft Access",
+          "Excel",
+          "PowerPoint",
+          "Word"
+        ],
+        "interests": [
+          "Grade 8 Oboe",
+          "university woodwind band",
+          "Basketball",
+          "Hiking"
+        ],
+        "projects": [
+          "University Challenge Virtual Hackathon",
+          "FindMyGlasses Android Application"
+        ],
+        "project_date_ranges": [
+          "2021",
+          "2019"
+        ],
+        "project_descriptions": [
+          "Represented the University of Abingdon at a three-day hackathon, in a team of five students",
+          "Developed gamification to help school students explore different STEM careers",
+          "Working in a team of two at a hackathon, developed an application for Android OS in 36 hours",
+          "This app used GPS tracking to find a user's glasses",
+          "This was written in Java"
+        ],
+        "project_technologies": [
+          "GitHub",
+          "gamification",
+          "Android OS",
+          "GPS tracking",
+          "Java",
+          "Play Store"
+        ],
+        "project_outcomes": [
+          "Pitched the game to a jury of IT companies and came second, securing an invite to the Champions of Champions hackathon",
+          "This demo was later fleshed out and released on the Play Store in October 2019",
+          "Downloaded 1,467 times since release"
+        ],
+        "project_links": [
+          "github.com/alithorpe/game",
+          "github.com/alithorpe/glasses"
+        ],
+        "certifications": [
+          "AWS Educate",
+          "Accenture Digital Skills: User Experience"
+        ]
+      }
+    },
+    {
+      "name": "ben_theurich_12_25",
+      "pdf": "test_data/cvs/ben_theurich_12_25.pdf",
+      "fields": {
+        "full_name": "Ben Theurich",
+        "email": "bentheurich@gmail.com",
+        "phone": "+49 1512 9467132",
+        "location": "Munich, Germany 85748",
+        "links": [
+          "linkedin.com/in/ben-theurich",
+          "github.com/BenTheurich",
+          "bentheurich.com"
+        ],
+        "experience_roles": [
+          "Software Engineer II",
+          "Software Engineer I",
+          "Contract Software Engineer",
+          "Software Engineering Intern"
+        ],
+        "experience_organizations": [
+          "Systems Planning and Analysis",
+          "HM Electronics",
+          "Tech For Good"
+        ],
+        "experience_locations": [
+          "San Diego, CA",
+          "Carlsbad, CA",
+          "Boston, MA"
+        ],
+        "experience_date_ranges": [
+          "2025",
+          "2023 2025",
+          "2022 2023",
+          "2022",
+          "2021"
+        ],
+        "experience_responsibilities": [
+          "Led ongoing development of a Java-based analysis tool",
+          "prioritizing user feedback and coordinating cross-team work to keep releases on track",
+          "Streamlined user workflows by reducing manual steps ~30-50%, improving task throughput",
+          "Established release cadence with QA gates",
+          "Automated build versioning and standardized sprint notes",
+          "Delivered on-site hands-on training to DoD users",
+          "Coordinated with multiple teams to establish a continuous integration (CI) process between development builds and automated testing using Jenkins automation servers and Azure cloud",
+          "Utilized Ansible to improve setup process for new Raspberry Pi's, increasing productivity by 200%",
+          "Developed a front-end interface for a simulator application using Python and the Flask web framework",
+          "Identified and resolved issues in Python code for automating web browser tests using Selenium",
+          "Coded donation collection and distribution functionality in Solidity using Ethereum smart contracts"
+        ],
+        "experience_contextual_skills": [
+          "Java",
+          "user feedback",
+          "cross-team coordination",
+          "QA gates",
+          "Agile",
+          "Jenkins",
+          "Azure",
+          "Ansible",
+          "Raspberry Pi",
+          "Python",
+          "Flask",
+          "shell scripts",
+          "Linux services",
+          "Selenium",
+          "Solidity",
+          "Ethereum smart contracts",
+          "GitHub",
+          "Zoom",
+          "Notion"
+        ],
+        "education_entry_types": [
+          "degree",
+          "degree"
+        ],
+        "education": [
+          "Master of Science in Informatics Computer Science",
+          "Bachelor of Science in Software Engineering"
+        ],
+        "education_institutions": [
+          "Technical University Munich",
+          "California State University San Marcos"
+        ],
+        "education_date_ranges": [
+          "2025 present",
+          "2023"
+        ],
+        "education_grades": [
+          "GPA 3.9",
+          "magna cum laude"
+        ],
+        "skills": [
+          "Java",
+          "Python",
+          "C++",
+          "SQL",
+          "Bash",
+          "Cucumber",
+          "Git",
+          "VI",
+          "JUnit",
+          "Selenium",
+          "Jenkins",
+          "Jira",
+          "Flask",
+          "Ansible",
+          "Confluence",
+          "Azure",
+          "Linux",
+          "Solidity",
+          "Ethereum",
+          "GitHub"
+        ],
+        "projects": [
+          "SecuriKey",
+          "Stocker",
+          "EduComic"
+        ],
+        "project_date_ranges": [
+          "2021",
+          "2023",
+          "2025"
+        ],
+        "project_descriptions": [
+          "Secure password management application using Java to store encrypted passwords on a USB flash drive"
+        ],
+        "project_technologies": [
+          "Java",
+          "encrypted passwords",
+          "USB flash drive"
+        ],
+        "project_outcomes": [
+          "Winner - LPL Financial 24-Hour Hackathon 2023",
+          "Winner - Black Forest Labs Challenge, START Munich Hackathon 2025"
+        ],
+        "project_links": [
+          "github.com/BenTheurich/SecuriKeyGUI",
+          "github.com/BenTheurich/Stocker",
+          "github.com/BenTheurich/EduComic"
+        ]
+      }
+    },
+    {
+      "name": "maya_rodriguez_product_data_cv",
+      "pdf": "test_data/cvs/maya_rodriguez_product_data_cv.pdf",
+      "fields": {
+        "full_name": "Maya Rodriguez",
+        "email": "maya.rodriguez@example.com",
+        "phone": "+49 170 555 0142",
+        "location": "Berlin, Germany",
+        "current_role": "Product Data Analyst",
+        "links": [
+          "linkedin.com/in/maya-rodriguez-data",
+          "github.com/mayarodriguez"
+        ],
+        "years_of_experience": 6,
+        "experience_roles": [
+          "Senior Product Data Analyst",
+          "Product Analyst",
+          "Analytics Intern"
+        ],
+        "experience_organizations": [
+          "Northstar Learning GmbH",
+          "MarketFleet AG",
+          "BlueOrbit Travel"
+        ],
+        "experience_date_ranges": [
+          "2023 present",
+          "2020 2022",
+          "2018 2020"
+        ],
+        "experience_responsibilities": [
+          "Owns product analytics for a learning platform used by 420k monthly active learners",
+          "Built dbt models and Looker dashboards for activation, completion, subscription conversion, cancellation reasons, and learning outcomes",
+          "Designed and analysed 17 experiments",
+          "Combined cancellation survey themes with event data to identify onboarding friction",
+          "Analysed seller performance, search ranking experiments, logistics delays, and stockouts",
+          "Created a seller health score",
+          "Defined North Star and input metrics",
+          "Cleaned booking datasets, automated Excel and SQL reports, and built first Power BI dashboards for channel performance and cancellation cohorts"
+        ],
+        "experience_contextual_skills": [
+          "SQL",
+          "Python",
+          "dbt",
+          "Looker",
+          "Power BI",
+          "Tableau",
+          "A/B testing",
+          "cohort analysis",
+          "funnel analysis",
+          "retention modelling",
+          "KPI design",
+          "survey analysis",
+          "dashboard governance"
+        ],
+        "education_entry_types": [
+          "degree",
+          "degree"
+        ],
+        "education": [
+          "M.Sc. Data Science for Business",
+          "B.A. Business Administration and Information Systems"
+        ],
+        "education_institutions": [
+          "HTW Berlin",
+          "Universidad Carlos III de Madrid"
+        ],
+        "education_date_ranges": [
+          "2018 2020",
+          "2014 2018"
+        ],
+        "education_grades": [
+          "1.4"
+        ],
+        "education_courses": [
+          "applied statistics",
+          "machine learning",
+          "data warehousing",
+          "behavioural economics",
+          "privacy-aware analytics",
+          "stakeholder interviewing",
+          "dashboard design"
+        ],
+        "skills": [
+          "SQL",
+          "Python",
+          "pandas",
+          "dbt",
+          "Looker",
+          "Tableau",
+          "Power BI",
+          "Amplitude",
+          "Mixpanel",
+          "GA4",
+          "BigQuery",
+          "Snowflake",
+          "PostgreSQL",
+          "Airflow",
+          "GitHub Actions",
+          "Docker",
+          "Terraform",
+          "A/B testing",
+          "cohort and funnel analysis",
+          "retention modelling",
+          "stakeholder interviews",
+          "KPI design",
+          "data contracts",
+          "survey analysis",
+          "dashboard governance"
+        ],
+        "languages": [
+          "Spanish native",
+          "English C1",
+          "German B2",
+          "Portuguese A2"
+        ],
+        "interests": [
+          "ethical product analytics",
+          "education technology",
+          "experimentation culture",
+          "accessible data storytelling"
+        ],
+        "projects": [
+          "Retention Early Warning Model",
+          "Open Product Metrics Catalog",
+          "Experiment Readout Template",
+          "Accessibility Dashboard Review"
+        ],
+        "project_technologies": [
+          "Python",
+          "pandas",
+          "scikit-learn",
+          "Snowflake",
+          "dbt",
+          "YAML",
+          "Looker",
+          "Amplitude",
+          "Notion",
+          "Tableau"
+        ],
+        "project_date_ranges": [
+          "2024",
+          "2023",
+          "2022"
+        ],
+        "project_descriptions": [
+          "churn-risk model for trial users",
+          "metric definitions, owners, SQL lineage, dashboard links, and review cadence for 60 recurring KPIs",
+          "reusable decision log for hypothesis, sample size, guardrails, result, and follow-up action",
+          "reduced colour-only status cues and rewrote labels for non-technical stakeholders"
+        ],
+        "certifications": [
+          "dbt Fundamentals",
+          "Google Analytics IQ",
+          "Tableau Desktop Specialist",
+          "GDPR analytics training"
+        ],
+        "certification_issue_dates": [
+          "2023",
+          "2022",
+          "2021"
+        ]
+      }
+    },
+    {
+      "name": "nathan_lee_cloud_security_cv",
+      "pdf": "test_data/cvs/nathan_lee_cloud_security_cv.pdf",
+      "fields": {
+        "full_name": "Nathan Lee",
+        "email": "nathan.lee@example.com",
+        "phone": "+31 6 1234 7788",
+        "location": "Amsterdam, Netherlands",
+        "current_role": "Cloud Security Engineer",
+        "links": [
+          "linkedin.com/in/nathanlee-cloudsec",
+          "github.com/nathanlee-secops"
+        ],
+        "years_of_experience": 8,
+        "experience_roles": [
+          "Cloud Security Engineer",
+          "DevOps Engineer",
+          "Software Engineer"
+        ],
+        "experience_organizations": [
+          "FinPay Europe",
+          "CareLoop Health",
+          "Atlas Retail Systems"
+        ],
+        "experience_locations": [
+          "Amsterdam",
+          "Utrecht",
+          "Rotterdam"
+        ],
+        "experience_date_ranges": [
+          "2022 present",
+          "2019 2022",
+          "2016 2019"
+        ],
+        "experience_responsibilities": [
+          "Leads cloud security improvements across 38 AWS accounts and 11 Kubernetes clusters",
+          "Built Terraform modules for IAM boundaries, encrypted S3 logging, GuardDuty routing, account baselines, and reusable alerting",
+          "Rolled out secret scanning, dependency-risk checks, and SAST quality gates",
+          "Coordinated response to leaked staging API token",
+          "Maintained Azure Kubernetes Service clusters, deployment pipelines, Helm charts, and Grafana dashboards",
+          "Partnered with compliance and engineering to document data-flow diagrams, backup tests, retention controls, and ISO 27001 audit evidence",
+          "Improved on-call runbooks and deployment rollback notes",
+          "Built Java and TypeScript services for inventory planning"
+        ],
+        "experience_contextual_skills": [
+          "AWS",
+          "Azure",
+          "Kubernetes",
+          "Terraform",
+          "IAM",
+          "S3",
+          "GuardDuty",
+          "GitLab CI",
+          "SAST",
+          "incident response",
+          "Helm",
+          "Grafana",
+          "ISO 27001",
+          "Java",
+          "TypeScript",
+          "Linux"
+        ],
+        "education_entry_types": [
+          "degree"
+        ],
+        "education": [
+          "B.Sc. Computer Science"
+        ],
+        "education_institutions": [
+          "Delft University of Technology"
+        ],
+        "education_date_ranges": [
+          "2012 2016"
+        ],
+        "education_courses": [
+          "Information Security"
+        ],
+        "skills": [
+          "AWS",
+          "Azure",
+          "Kubernetes",
+          "Docker",
+          "Terraform",
+          "Helm",
+          "Linux",
+          "Nginx",
+          "IAM",
+          "SSO",
+          "OAuth2/OIDC",
+          "vulnerability management",
+          "threat modelling",
+          "SIEM",
+          "incident response",
+          "SAST",
+          "dependency scanning",
+          "secrets management",
+          "Python",
+          "Go",
+          "Bash",
+          "TypeScript",
+          "GitLab CI",
+          "GitHub Actions",
+          "Jenkins",
+          "Prometheus",
+          "Grafana",
+          "Datadog",
+          "PostgreSQL"
+        ],
+        "languages": [
+          "English C2",
+          "Dutch B2",
+          "Mandarin B1",
+          "German A2"
+        ],
+        "interests": [
+          "cloud IAM graph analysis",
+          "practical incident retrospectives",
+          "secure developer tooling",
+          "privacy-preserving telemetry"
+        ],
+        "projects": [
+          "Cloud Access Review Toolkit",
+          "Kubernetes Admission Policy Baseline",
+          "Security Champions Workshop"
+        ],
+        "project_technologies": [
+          "Python",
+          "AWS IAM",
+          "Neo4j",
+          "OPA Gatekeeper",
+          "Helm",
+          "GitLab CI"
+        ],
+        "project_date_ranges": [
+          "2024",
+          "2023",
+          "2022"
+        ],
+        "project_descriptions": [
+          "maps cross-account roles, detects unused high-risk permissions, and exports review packets",
+          "policy-as-code checks for privileged pods, hostPath mounts, resource limits, approved registries, and exceptions",
+          "threat-modelling exercises, dependency-risk examples, and secret-handling labs"
+        ],
+        "certifications": [
+          "AWS Certified Security - Specialty",
+          "Certified Kubernetes Security Specialist",
+          "Azure Security Engineer Associate",
+          "CompTIA Security+"
+        ],
+        "certification_issue_dates": [
+          "2024",
+          "2023",
+          "2021",
+          "2018"
+        ]
+      }
+    }
+  ]
+}
