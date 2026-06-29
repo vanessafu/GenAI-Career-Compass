@@ -7,13 +7,30 @@ from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
 
-from backend.app.core.config import OPENAI_API_KEY, OPENAI_MODEL, OPENAI_TEMPERATURE
+from backend.app.core.config import (
+    OPENAI_API_KEY,
+    OPENAI_CAREER_PATH_MODEL,
+    OPENAI_CV_PARSING_MODEL,
+    OPENAI_IDENTITY_MODEL,
+    OPENAI_MODEL,
+    OPENAI_ROLE_DESCRIPTION_MODEL,
+    OPENAI_TEMPERATURE,
+)
 
 logger = logging.getLogger("CareerCompass.Core.OpenAIClient")
 
 T = TypeVar("T", bound=BaseModel)
 
 _client: AsyncOpenAI | None = None
+
+
+def select_model(model_purpose: str | None = None) -> str:
+    return {
+        "cv_parsing": OPENAI_CV_PARSING_MODEL,
+        "identity": OPENAI_IDENTITY_MODEL,
+        "role_description": OPENAI_ROLE_DESCRIPTION_MODEL,
+        "career_path": OPENAI_CAREER_PATH_MODEL,
+    }.get(model_purpose, OPENAI_MODEL)
 
 
 def get_client() -> AsyncOpenAI:
@@ -48,10 +65,12 @@ async def openai_client_lifespan() -> AsyncGenerator[None, None]:
 async def parse_structured(
     messages: Iterable[ChatCompletionMessageParam],
     response_format: type[T],
+    *,
+    model_purpose: str | None = None,
 ) -> T | None:
     """Call the LLM and parse the response into a Pydantic model."""
     response = await get_client().beta.chat.completions.parse(
-        model=OPENAI_MODEL,
+        model=select_model(model_purpose),
         messages=messages,
         response_format=response_format,
         temperature=OPENAI_TEMPERATURE,
@@ -69,10 +88,12 @@ async def parse_structured(
 
 async def complete(
     messages: Iterable[ChatCompletionMessageParam],
+    *,
+    model_purpose: str | None = None,
 ) -> str | None:
     """Call the LLM and return the response as a plain string."""
     response = await get_client().chat.completions.create(
-        model=OPENAI_MODEL,
+        model=select_model(model_purpose),
         messages=messages,
         temperature=OPENAI_TEMPERATURE,
     )

@@ -2,28 +2,30 @@ from fastapi import APIRouter, HTTPException
 
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
 from backend.app.features.prompt_engineering.career_profile_extraction_service import build_career_profile_response
+from backend.app.features.prompt_engineering.embedding_handoff_service import prepare_for_embedding
 from backend.app.features.prompt_engineering.embedding_preparation_service import build_embedding_input
 from backend.app.features.prompt_engineering.schemas import (
     CareerProfileResponse,
     EmbeddingInputResponse,
     SemanticEmbeddingInputResponse,
-    StarterProfileResponse,
 )
 from backend.app.features.prompt_engineering.semantic_embedding_service import (
     build_embedding_chunks_from_confirmed,
-)
-from backend.app.features.prompt_engineering.identity_generation_service import (
-    generate_starter_profile,
 )
 
 router = APIRouter(prefix="/api/v1/prompt-engineering", tags=["Prompt Engineering"])
 
 
-@router.post("/starter-profile", response_model=StarterProfileResponse)
-async def create_starter_profile(confirmed_profile: ConfirmedCVData) -> StarterProfileResponse:
-    """Generate the initial editable identity and follow-up questions from confirmed CV JSON."""
+@router.post("/prepare-for-embedding", response_model=ConfirmedCVData)
+async def create_embedding_ready_profile(confirmed_profile: ConfirmedCVData) -> ConfirmedCVData:
+    """Privacy-strip the confirmed CV and attach a generated career identity.
+
+    Returns the ConfirmedCVData handed to the embedding step: the privacy-stripped
+    CV (same schema) plus the ``career_identity_statement``. All intermediate
+    artifacts are persisted under the pipeline output directory.
+    """
     try:
-        return await generate_starter_profile(confirmed_profile)
+        return await prepare_for_embedding(confirmed_profile)
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

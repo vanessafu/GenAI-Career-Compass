@@ -24,12 +24,14 @@ See [docs/proposal.md](docs/proposal.md) for the full project proposal.
 |       |-- features/
 |       |   |-- cv_parsing/
 |       |   |-- cv_confirmation/
+|       |   |-- profile_pipeline/
 |       |   |-- role_matching/
 |       |   `-- prompt_engineering/
 |       `-- scripts/
+|-- database/
+|   `-- supabase/migrations/
 |-- frontend/
 |-- docs/
-|-- data/
 |-- test_data/
 |-- pyproject.toml
 |-- uv.lock
@@ -60,14 +62,25 @@ Required keys:
 
 | Variable | Purpose |
 |---|---|
-| `OPENAI_API_KEY` | API key used for CV parsing and role-matching analysis |
-| `OPENAI_MODEL` | Chat model to use, for example `gpt-4o-mini` |
+| `OPENAI_API_KEY` | API key used for CV parsing, identity generation, role summaries, and roadmaps |
+| `OPENAI_MODEL` | Fallback chat model for unclassified LLM calls |
+| `OPENAI_CV_PARSING_MODEL` | Strong model for CV parsing, default `gpt-5.5` |
+| `OPENAI_IDENTITY_MODEL` | Cheaper model for identity/context generation, default `gpt-5.4-mini` |
+| `OPENAI_ROLE_DESCRIPTION_MODEL` | Cheaper model for role card summaries, default `gpt-5.4-mini` |
+| `OPENAI_CAREER_PATH_MODEL` | Middle/strong model for career path generation, default `gpt-5.4` |
 | `OPENAI_TEMPERATURE` | Sampling temperature, default `0.0` |
-| `DATABASE_URL` | Postgres connection string for the `esco_occupations` pgvector table |
+| `DATABASE_URL` | Postgres/Supabase connection string used by matching, gap analysis, and career paths |
 
 ### 3. Database
 
-The role-matching feature expects a Postgres database with the `pgvector` extension enabled and an `esco_occupations` table populated with ESCO data and precomputed embeddings. Loader scripts live under `backend/scripts/`.
+The role-matching feature expects a Postgres/Supabase database with `pgvector`
+enabled, populated `career_roles`, ESCO mapping/skill tables, certification
+tables, and split role embeddings. Apply the SQL migrations in
+`database/supabase/migrations/`, then rebuild role embeddings with:
+
+```powershell
+uv run python -m backend.scripts.role_embeddings
+```
 
 ## Running The Backend
 
@@ -79,10 +92,23 @@ uv run uvicorn backend.app.main:app --reload
 
 The server listens on `http://localhost:8000`. Interactive docs are available at `http://localhost:8000/docs`.
 
-Key endpoints:
+Key endpoints used by the frontend:
 
-- `POST /api/v1/parse-cv` uploads a PDF and returns a structured `CVData` profile
-- `POST /api/v1/roles/match` submits a confirmed profile and returns top-k matching ESCO roles with reasoning
+- `POST /api/v1/profile-pipeline/parse-cv` uploads a PDF, parses it, privacy-strips it, and returns `ProfilePipelineResponse`
+- `POST /api/v1/profile-pipeline/manual-cv` builds the same pipeline response from manual profile input
+- `POST /api/v1/roles/match` submits the frontend-converted career profile and returns up to 9 bucketed ESCO role matches
+- `POST /api/v1/roles/{role_id}/gap-analysis` returns the selected role's gap report for a confirmed profile
+- `POST /api/v1/roles/{role_id}/career-path` returns the selected role's grounded roadmap, including the gap report as `requirement_breakdown`
+
+The main app flow is:
+
+```text
+profile-pipeline/* -> frontend profile conversion -> /roles/match -> gap API -> path API
+```
+
+The older `POST /api/v1/parse-cv` and `POST /api/v1/manual-cv` routes still
+exist for lower-level parsing/manual DTO work, but the frontend uses the
+profile-pipeline routes.
 
 ### CLI
 
@@ -94,7 +120,7 @@ uv run career-compass parse-cv test_data/cvs/your_cv.pdf
 uv run career-compass confirm-cv test_data/cvs/your_cv.pdf
 uv run career-compass confirm-json outputs/your_cv_parsed.json
 uv run career-compass manual-profile
-uv run career-compass identity-followups outputs/your_confirmed.json
+uv run career-compass prepare-for-embedding outputs/your_confirmed.json
 uv run career-compass career-profile outputs/your_confirmed.json
 uv run career-compass embedding-input outputs/your_confirmed.json
 uv run career-compass embedding-chunks outputs/your_confirmed.json
@@ -111,6 +137,16 @@ npm run dev
 ```
 
 The dev server runs on `http://localhost:5173` and talks to the backend at `http://localhost:8000`.
+
+### Demo Data
+
+For frontend-only demo data, start the Vite dev server and open one of:
+
+- `http://localhost:5173/?demo=recap`
+- `http://localhost:5173/?demo=roles`
+- `http://localhost:5173/?demo=focus`
+
+These fixture screens are useful for layout/demo work and do not require the backend flow.
 
 See [frontend/README.md](frontend/README.md) for more details.
 
