@@ -6,6 +6,10 @@ data/
 .idea/
 outputs/
 output/
+metrics/outputs/**
+!metrics/outputs/
+!metrics/outputs/**/
+!metrics/outputs/**/*.md
 .DS_Store
 
 # Test/tool artifacts

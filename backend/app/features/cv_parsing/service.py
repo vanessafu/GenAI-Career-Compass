@@ -58,7 +58,7 @@ def _clean_interests(values: list[str]) -> list[str]:
     return interests[:5]
 
 
-async def _fill_blank_interests(cv_data: CVData, raw_text: str) -> CVData:
+async def _fill_blank_interests(cv_data: CVData, raw_text: str, *, model: str | None = None) -> CVData:
     if any(item.strip() for item in cv_data.interests):
         cv_data.interests = _clean_interests(cv_data.interests)
         return cv_data
@@ -71,6 +71,7 @@ async def _fill_blank_interests(cv_data: CVData, raw_text: str) -> CVData:
             ],
             response_format=_GeneratedInterests,
             model_purpose="identity",
+            model=model,
         )
     except Exception as exc:
         logger.warning("Interest generation failed; keeping blank interests: %s", exc)
@@ -92,7 +93,7 @@ def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
         raise ValueError("The PDF document could not be read.") from exc
 
 
-async def parse_cv_to_pydantic(raw_text: str) -> CVData:
+async def parse_cv_to_pydantic(raw_text: str, *, model: str | None = None) -> CVData:
     """Send CV text to the LLM and validate the result against the CVData schema."""
     logger.info("Sending CV text to LLM for structured parsing...")
     try:
@@ -103,9 +104,12 @@ async def parse_cv_to_pydantic(raw_text: str) -> CVData:
             ],
             response_format=CVData,
             model_purpose="cv_parsing",
+            model=model,
         )
+        if result is None:
+            raise RuntimeError("CV parser returned no structured output")
         logger.info("CV parsed successfully.")
-        return await _fill_blank_interests(result, raw_text)
+        return await _fill_blank_interests(result, raw_text, model=model)
     except Exception as exc:
         logger.exception("LLM communication error (%s): %s", type(exc).__name__, exc)
         raise RuntimeError(f"Error while processing with the LLM: {type(exc).__name__}: {exc}") from exc

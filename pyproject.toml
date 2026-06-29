@@ -43,4 +43,4 @@ packages = ["backend"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["backend/tests"]
+testpaths = ["backend/tests", "metrics"]

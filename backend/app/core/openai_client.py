@@ -67,10 +67,11 @@ async def parse_structured(
     response_format: type[T],
     *,
     model_purpose: str | None = None,
+    model: str | None = None,
 ) -> T | None:
     """Call the LLM and parse the response into a Pydantic model."""
     response = await get_client().beta.chat.completions.parse(
-        model=select_model(model_purpose),
+        model=model or select_model(model_purpose),
         messages=messages,
         response_format=response_format,
         temperature=OPENAI_TEMPERATURE,

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
 import os
 import unittest
+from pathlib import Path
 
+from metrics.common import evaluate_matching_roles
 from backend.app.features.role_matching.schemas import (
     CareerIdentity,
     RoleMatchRequest,
@@ -18,6 +21,9 @@ from backend.app.features.role_matching.service import (
     normalize_user_certifications,
     normalize_user_skills,
 )
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def mock_frontend_profiles() -> dict[str, UserCareerProfile]:
@@ -128,31 +134,34 @@ class MockProfileEvaluationFixturesTests(unittest.TestCase):
 )
 class LiveMockProfileEvaluationTests(unittest.IsolatedAsyncioTestCase):
     async def test_live_profiles_surface_expected_role_families(self) -> None:
-        expected_title_terms = {
-            "frontend_student": ("front", "web", "react"),
-            "python_data_student": ("data", "analytics", "business intelligence", "python"),
-            "it_support_beginner": ("support", "technician", "network", "helpdesk"),
-            "backend_developer": ("backend", "java", "developer", "api"),
-            "design_frontend": ("front", "design", "ux", "accessibility"),
+        fixture = json.loads(
+            (REPO_ROOT / "metrics" / "fixtures" / "matching_profiles.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        judged_roles = {
+            profile["name"]: profile["judged_roles"]
+            for profile in fixture["profiles"]
         }
 
         for name, profile in mock_frontend_profiles().items():
             with self.subTest(name=name):
                 response = await match_roles_for_profile(profile, top_k=9, include_debug=True)
-                titles = [
-                    role.job_title.casefold()
+                roles = [
+                    {
+                        "role_id": str(role.role_id),
+                        "title": role.job_title,
+                        "bucket": role.bucket.value,
+                    }
                     for role in [
                         *response.buckets.ready_now,
                         *response.buckets.next_step,
                         *response.buckets.aspirational,
                     ]
                 ]
-                joined_titles = " | ".join(titles)
+                metrics = evaluate_matching_roles(roles, judged_roles[name])
 
-                self.assertTrue(
-                    any(term in joined_titles for term in expected_title_terms[name]),
-                    joined_titles,
-                )
+                self.assertGreater(metrics["ndcg_at_9"], 0.0, roles)
 
 
 if __name__ == "__main__":
