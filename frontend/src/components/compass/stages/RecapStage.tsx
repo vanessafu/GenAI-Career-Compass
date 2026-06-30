@@ -27,6 +27,15 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/** Join two year-ish values with a single dash, dropping empty/placeholder parts. */
+function formatYearRange(start: string, end: string): string {
+  const clean = (v: string) => (v && v.trim() && v.trim() !== "—" ? v.trim() : "");
+  const s = clean(start);
+  const e = clean(end);
+  if (s && e) return `${s}–${e}`;
+  return s || e;
+}
+
 const SKILL_ICONS: Record<string, LucideIcon> = {
   default: Wrench,
   Python: Code2,
@@ -154,8 +163,8 @@ export function RecapStage() {
 
         {missingBigSections.length > 0 && <MissingInfoPrompt items={missingBigSections} />}
 
-        {/* Two-row grid with a content-sized recap row. */}
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-3">
+        {/* Consistent two-column rows across the recap. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
           {/* Row 1 — Education (left) + Experience (right). */}
           <div className="grid gap-3 lg:grid-cols-2">
             <SectionCard icon={GraduationCap} title="Education" count={educations.length}>
@@ -165,9 +174,9 @@ export function RecapStage() {
                     <RowItem
                       key={`${e.school}-${i}`}
                       idx={i}
-                      title={e.degree}
+                      title={[e.degree, e.field].filter(Boolean).join(" — ") || "Education"}
                       subtitle={e.school}
-                      meta={`${e.start}–${e.end}`}
+                      meta={formatYearRange(e.start, e.end)}
                       onRemove={() => removeEducation(i)}
                     />
                   ))}
@@ -188,7 +197,7 @@ export function RecapStage() {
                       idx={i}
                       title={e.role}
                       subtitle={e.company}
-                      meta={`${e.start}–${e.end}`}
+                      meta={formatYearRange(e.start, e.end)}
                       onRemove={() => removeExperience(i)}
                     />
                   ))}
@@ -201,8 +210,8 @@ export function RecapStage() {
             </SectionCard>
           </div>
 
-          {/* Row 2 — Skills, Interests, Certifications, Projects (all open). */}
-          <div className="grid min-h-0 gap-3 lg:grid-cols-4">
+          {/* Row 2 — Skills (left) + Interests (right). */}
+          <div className="grid min-h-0 gap-3 lg:grid-cols-2">
             <SectionCard icon={Wrench} title="Skills" count={skills.length}>
               <div className="flex flex-1 flex-wrap content-start gap-1.5 overflow-y-auto">
                 {skills.length === 0 && <EmptyPrompt>Add core technical skills.</EmptyPrompt>}
@@ -297,7 +306,10 @@ export function RecapStage() {
                 />
               </div>
             </SectionCard>
+          </div>
 
+          {/* Row 3 — Certifications (left) + Projects (right). */}
+          <div className="grid min-h-0 gap-3 lg:grid-cols-2">
             <SectionCard icon={Award} title="Certifications" count={certifications.length}>
               <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
                 <AnimatePresence initial={false}>
@@ -560,13 +572,13 @@ function AddExperienceRow({
         value={role}
         onChange={(e) => setRole(e.target.value)}
         placeholder="Role"
-        className="bg-transparent outline-none placeholder:text-foreground/40"
+        className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
       />
       <input
         value={company}
         onChange={(e) => setCompany(e.target.value)}
         placeholder="Company"
-        className="bg-transparent outline-none placeholder:text-foreground/40"
+        className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
       />
       <input
         value={start}
@@ -594,58 +606,73 @@ function AddExperienceRow({
 function AddEducationRow({
   onAdd,
 }: {
-  onAdd: (e: { degree: string; school: string; start: string; end: string }) => void;
+  onAdd: (e: { degree: string; field: string; school: string; start: string; end: string }) => void;
 }) {
   const [degree, setDegree] = useState("");
+  const [field, setField] = useState("");
   const [school, setSchool] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const submit = () => {
-    if (!degree.trim() || !school.trim()) return;
+    if (!degree.trim() && !field.trim()) return;
+    if (!school.trim()) return;
     onAdd({
       degree: degree.trim(),
+      field: field.trim(),
       school: school.trim(),
       start: start.trim() || "—",
       end: end.trim() || "—",
     });
     setDegree("");
+    setField("");
     setSchool("");
     setStart("");
     setEnd("");
   };
   return (
-    <div className="mt-1 grid grid-cols-[1fr_1fr_auto_auto_auto] items-center gap-1 rounded-lg border border-dashed border-foreground/15 bg-white/50 px-2 py-2 text-[13px]">
-      <input
-        value={degree}
-        onChange={(e) => setDegree(e.target.value)}
-        placeholder="Degree"
-        className="bg-transparent outline-none placeholder:text-foreground/40"
-      />
-      <input
-        value={school}
-        onChange={(e) => setSchool(e.target.value)}
-        placeholder="School"
-        className="bg-transparent outline-none placeholder:text-foreground/40"
-      />
-      <input
-        value={start}
-        onChange={(e) => setStart(e.target.value)}
-        placeholder="From"
-        className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
-      />
-      <input
-        value={end}
-        onChange={(e) => setEnd(e.target.value)}
-        placeholder="To"
-        className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
-      />
-      <button
-        onClick={submit}
-        className="grid h-6 w-6 place-items-center rounded-full text-white"
-        style={{ background: "var(--gradient-warm)" }}
-      >
-        <Plus size={11} />
-      </button>
+    <div className="mt-1 flex flex-col gap-1.5 rounded-lg border border-dashed border-foreground/15 bg-white/50 px-2 py-2 text-[13px]">
+      <div className="grid grid-cols-3 gap-1">
+        <input
+          value={degree}
+          onChange={(e) => setDegree(e.target.value)}
+          placeholder="Degree"
+          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
+        />
+        <input
+          value={field}
+          onChange={(e) => setField(e.target.value)}
+          placeholder="Field"
+          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
+        />
+        <input
+          value={school}
+          onChange={(e) => setSchool(e.target.value)}
+          placeholder="School"
+          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
+        />
+      </div>
+      <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-1 border-t border-foreground/10 pt-1.5">
+        <input
+          value={start}
+          onChange={(e) => setStart(e.target.value)}
+          placeholder="From"
+          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
+        />
+        <input
+          value={end}
+          onChange={(e) => setEnd(e.target.value)}
+          placeholder="To"
+          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
+        />
+        <button
+          onClick={submit}
+          className="grid h-6 w-6 place-items-center rounded-full text-white"
+          style={{ background: "var(--gradient-warm)" }}
+          aria-label="Add education"
+        >
+          <Plus size={11} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -673,7 +700,7 @@ function AddSimpleRow({
         value={a}
         onChange={(e) => setA(e.target.value)}
         placeholder={placeholderA}
-        className="bg-transparent outline-none placeholder:text-foreground/40"
+        className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
       />
       <input
         value={b}

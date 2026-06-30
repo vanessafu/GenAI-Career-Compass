@@ -14,7 +14,6 @@ from backend.app.features.cv_parsing.schemas import (
     SkillsExtracted,
     SourceDocument,
     TechnicalSkill,
-    UnmappedInformation,
 )
 
 MAX_LIST_ITEMS = 50
@@ -72,18 +71,13 @@ def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
     current_role = _clean(request.current_role)
     seniority_level = _clean(request.seniority_level)
     interests = _dedupe_strings(request.interests)
-    target_constraints = _dedupe_strings(request.target_constraints)
 
     if not current_role:
         raise ManualCVValidationError("Provide your current role.")
-    if not seniority_level:
-        raise ManualCVValidationError("Provide your seniority level.")
-    if request.years_of_experience is None:
-        raise ManualCVValidationError("Provide your years of experience.")
     if not technical_skill_names:
         raise ManualCVValidationError("Provide at least one technical skill.")
-    if not interests and not target_constraints:
-        raise ManualCVValidationError("Provide at least one interest or target constraint.")
+    if not interests:
+        raise ManualCVValidationError("Provide at least one interest.")
 
     education = [
         Education(
@@ -152,13 +146,5 @@ def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
         certifications=certifications,
         skills_extracted=skills_extracted,
         interests=interests,
-        unmapped_information=[
-            UnmappedInformation(
-                label="target_constraint",
-                value=value,
-                source_section="manual_entry",
-                reason_not_mapped="Career target preference captured outside the CV schema.",
-            )
-            for value in target_constraints
-        ],
+        unmapped_information=[],
     )

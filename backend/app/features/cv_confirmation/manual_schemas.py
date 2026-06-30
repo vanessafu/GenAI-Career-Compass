@@ -51,4 +51,3 @@ class ManualCVInput(BaseModel):
     interests: list[str] = Field(default_factory=list)
     projects: list[ManualProjectInput] = Field(default_factory=list)
     certifications: list[ManualCertificationInput] = Field(default_factory=list)
-    target_constraints: list[str] = Field(default_factory=list)
