@@ -52,14 +52,12 @@ export type RecapEdits = {
 
 /** Build the backend manual-entry DTO from the tiered entry form. */
 export function manualFormToInput(form: ManualProfileForm): ManualCVInput {
-  const languages = form.languageName.trim()
-    ? [{ language: form.languageName.trim(), level: form.languageLevel.trim() || null }]
-    : [];
+  const languages = form.languages
+    .filter((item) => item.name.trim())
+    .map((item) => ({ language: item.name.trim(), level: item.level.trim() || null }));
 
   return {
     current_role: form.currentRole.trim() || null,
-    seniority_level: form.seniorityLevel.trim() || null,
-    years_of_experience: form.yearsOfExperience,
     summary: form.summary.trim() || null,
     education: form.education
       .filter((item) => item.degree.trim())
@@ -98,7 +96,6 @@ export function manualFormToInput(form: ManualProfileForm): ManualCVInput {
         issuing_organization: item.issuingOrganization.trim() || null,
         issue_date: item.issueDate.trim() || null,
       })),
-    target_constraints: form.targetConstraints.map((s) => s.trim()).filter(Boolean),
   };
 }
 
@@ -144,7 +141,8 @@ export function cvDataToExperiences(cv: CVData): ExperienceItem[] {
 
 export function cvDataToEducations(cv: CVData): EducationItem[] {
   return cv.education.map((e) => ({
-    degree: e.degree_type ?? e.field_of_study ?? "Education",
+    degree: e.degree_type ?? "",
+    field: e.field_of_study ?? "",
     school: e.institution ?? "—",
     start: yearOf(e.start_date),
     end: yearOf(e.end_date),
@@ -225,26 +223,6 @@ function normalizeInterests(values: Iterable<string | null | undefined>): string
   return uniqueText(Array.from(values).flatMap((value) => (value ?? "").split(/[,;\n]/)));
 }
 
-function targetPreferences(cv: CVData): string[] {
-  return uniqueText(
-    cv.unmapped_information
-      .filter((item) => item.label === "target_constraint")
-      .map((item) => item.value),
-  );
-}
-
-export function identityLeadWithTargetPreferences(
-  cv: CVData,
-  lead: string | null | undefined,
-): string {
-  const base = textOrNull(lead) ?? fallbackIdentity(cv).lead;
-  const preferences = targetPreferences(cv);
-  if (preferences.length === 0) return base;
-
-  const line = `Target preferences: ${preferences.join(", ")}`;
-  return base.includes(line) ? base : `${base}\n\n${line}`;
-}
-
 /** Project edited CVData into the clean profile schema expected by role matching. */
 export function cvDataToUserCareerProfile(
   cv: CVData,
@@ -309,7 +287,8 @@ export function applyEditsToCvData(base: CVData, edits: RecapEdits): CVData {
 
   const education: Education[] = edits.educations.map((e, i) => ({
     ...(base.education[i] ?? emptyEducation()),
-    degree_type: e.degree,
+    degree_type: e.degree.trim() || null,
+    field_of_study: e.field.trim() || null,
     institution: e.school,
     start_date: e.start === "—" ? null : e.start,
     end_date: e.end === "—" ? null : e.end,

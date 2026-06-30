@@ -8,13 +8,22 @@ import {
   getLoadingProgressState,
   type LoadingProgressConfig,
 } from "@/lib/loadingProgress";
-import { Upload, FileText, X, Plus, ArrowRight, Sparkles, ChevronDown } from "lucide-react";
+import {
+  Upload,
+  FileText,
+  X,
+  Plus,
+  ArrowRight,
+  Sparkles,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+} from "lucide-react";
 import { LoadingPanel } from "../ui/LoadingPanel";
 
 const PARSE_STEPS = ["Reading your CV", "Privacy-stripping data", "Generating identity"];
 const MANUAL_STEPS = ["Structuring your profile", "Privacy-stripping data", "Generating identity"];
-
-const SENIORITY_OPTIONS = ["Student", "Junior", "Mid", "Senior", "Lead"];
 
 const ROLE_PRESETS = [
   "Senior Backend Developer",
@@ -29,16 +38,21 @@ const ROLE_PRESETS = [
   "Product Designer",
 ];
 
-const EDU_PRESETS = [
-  "MSc Computer Science",
-  "BSc Computer Science",
-  "BSc Information Systems",
-  "MSc Information Systems",
-  "MSc Data Science",
-  "Self-taught",
+const DEGREE_LEVELS = [
+  "B.Sc.",
+  "M.Sc.",
+  "B.A.",
+  "M.A.",
+  "B.Eng.",
+  "M.Eng.",
+  "PhD",
+  "MBA",
+  "Abitur",
   "Bootcamp",
-  "PhD Computer Science",
+  "Other",
 ];
+
+const LANGUAGE_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2", "Native"];
 
 const SKILL_PRESETS = [
   "Python",
@@ -98,22 +112,18 @@ export function EntryStage() {
     startDate: "",
     endDate: "",
   });
-  const [seniority, setSeniority] = useState("");
-  const [yearsOfExperience, setYearsOfExperience] = useState("");
   const [skills, setSkills] = useState<string[]>([]);
   const [skillDraft, setSkillDraft] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
   const [interestDraft, setInterestDraft] = useState("");
-  const [targetConstraints, setTargetConstraints] = useState<string[]>([]);
-  const [targetConstraintDraft, setTargetConstraintDraft] = useState("");
 
   // Tier 2 — add more context (collapsed by default)
   const [showMore, setShowMore] = useState(false);
   const [summary, setSummary] = useState("");
   const [softSkills, setSoftSkills] = useState<string[]>([]);
   const [softSkillDraft, setSoftSkillDraft] = useState("");
-  const [languageName, setLanguageName] = useState("");
-  const [languageLevel, setLanguageLevel] = useState("");
+  const [languages, setLanguages] = useState<{ name: string; level: string }[]>([]);
+  const [languageDraft, setLanguageDraft] = useState({ name: "", level: "" });
   const [projects, setProjects] = useState<
     {
       title: string;
@@ -216,11 +226,11 @@ export function EntryStage() {
     setInterestDraft("");
   };
 
-  const addTargetConstraint = (s: string) => {
-    const val = s.trim();
-    if (!val || targetConstraints.some((item) => item.toLowerCase() === val.toLowerCase())) return;
-    setTargetConstraints([...targetConstraints, val]);
-    setTargetConstraintDraft("");
+  const addLanguage = () => {
+    const name = languageDraft.name.trim();
+    if (!name || languages.some((item) => item.name.toLowerCase() === name.toLowerCase())) return;
+    setLanguages([...languages, { name, level: languageDraft.level.trim() }]);
+    setLanguageDraft({ name: "", level: "" });
   };
 
   const addEducation = () => {
@@ -314,32 +324,72 @@ export function EntryStage() {
 
   const buildManualProfile = async () => {
     if (parsing) return;
-    const parsedYears = yearsOfExperience.trim() === "" ? null : Number(yearsOfExperience);
     if (!role.trim()) {
       setFormError("Add your current role.");
-      return;
-    }
-    if (!seniority.trim()) {
-      setFormError("Select your seniority.");
-      return;
-    }
-    if (
-      parsedYears === null ||
-      !Number.isInteger(parsedYears) ||
-      parsedYears < 0 ||
-      parsedYears > 80
-    ) {
-      setFormError("Add years of experience as a whole number from 0 to 80.");
       return;
     }
     if (skills.length === 0) {
       setFormError("Add at least one technical skill.");
       return;
     }
-    if (interests.length === 0 && targetConstraints.length === 0) {
-      setFormError("Add at least one interest or target constraint.");
+    if (interests.length === 0) {
+      setFormError("Add at least one interest.");
       return;
     }
+
+    // Flush any typed-but-not-added drafts so nothing is lost on submit.
+    const educationOut = educationDraft.degree.trim()
+      ? [
+          ...education,
+          {
+            degree: educationDraft.degree.trim(),
+            institution: educationDraft.institution.trim(),
+            fieldOfStudy: educationDraft.fieldOfStudy.trim(),
+            startDate: educationDraft.startDate.trim(),
+            endDate: educationDraft.endDate.trim(),
+          },
+        ]
+      : education;
+    const experienceOut = experienceDraft.role.trim()
+      ? [
+          ...experience,
+          {
+            role: experienceDraft.role.trim(),
+            organization: experienceDraft.organization.trim(),
+            startDate: experienceDraft.startDate.trim(),
+            endDate: experienceDraft.endDate.trim(),
+          },
+        ]
+      : experience;
+    const projectsOut = projectDraft.title.trim()
+      ? [
+          ...projects,
+          {
+            title: projectDraft.title.trim(),
+            description: projectDraft.description.trim(),
+            technologies: projectDraft.technologies
+              .split(",")
+              .map((item) => item.trim())
+              .filter(Boolean),
+            startDate: projectDraft.startDate.trim(),
+            endDate: projectDraft.endDate.trim(),
+          },
+        ]
+      : projects;
+    const certificationsOut = certificationDraft.name.trim()
+      ? [
+          ...certifications,
+          {
+            name: certificationDraft.name.trim(),
+            issuingOrganization: certificationDraft.issuingOrganization.trim(),
+            issueDate: certificationDraft.issueDate.trim(),
+          },
+        ]
+      : certifications;
+    const languagesOut = languageDraft.name.trim()
+      ? [...languages, { name: languageDraft.name.trim(), level: languageDraft.level.trim() }]
+      : languages;
+
     setFormError(null);
     setSteps(MANUAL_STEPS);
     setParsing(true);
@@ -348,19 +398,15 @@ export function EntryStage() {
 
     const ok = await submitManualProfile({
       currentRole: role,
-      seniorityLevel: seniority,
-      yearsOfExperience: parsedYears,
-      education,
-      experience,
+      education: educationOut,
+      experience: experienceOut,
       skills,
       interests,
-      targetConstraints,
-      summary,
       softSkills,
-      languageName,
-      languageLevel,
-      projects,
-      certifications,
+      languages: languagesOut,
+      projects: projectsOut,
+      certifications: certificationsOut,
+      summary,
     });
     if (ok) {
       finishProgress();
@@ -593,99 +639,57 @@ export function EntryStage() {
                   <div className="grid gap-2.5">
                     <AutocompleteInput
                       label="Current role"
+                      required
                       value={role}
                       onChange={setRole}
                       presets={ROLE_PRESETS}
                       placeholder="e.g. Senior Backend Developer"
                     />
-                    <div className="grid gap-2.5 sm:grid-cols-2">
-                      <label className="block">
-                        <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                          Seniority
-                        </span>
-                        <select
-                          value={seniority}
-                          onChange={(e) => setSeniority(e.target.value)}
-                          className="manual-input"
-                        >
-                          <option value="">Select…</option>
-                          {SENIORITY_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="block">
-                        <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                          Years of experience
-                        </span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={80}
-                          value={yearsOfExperience}
-                          onChange={(e) => setYearsOfExperience(e.target.value)}
-                          placeholder="e.g. 5"
-                          className="manual-input"
-                        />
-                      </label>
-                    </div>
                   </div>
 
                   <RepeatableSection
                     title="Education"
                     items={education.map((item) => ({
-                      title: item.degree,
-                      subtitle: [item.fieldOfStudy, item.institution].filter(Boolean).join(" · "),
-                      meta: [item.startDate, item.endDate].filter(Boolean).join("-"),
+                      title: [item.degree, item.fieldOfStudy].filter(Boolean).join(" — "),
+                      subtitle: item.institution,
+                      meta: formatRange(item.startDate, item.endDate),
                     }))}
                     onRemove={(idx) => setEducation(education.filter((_, i) => i !== idx))}
                   >
                     <div className="grid gap-2.5 sm:grid-cols-2">
-                      <AutocompleteInput
-                        label="Degree"
+                      <InlineAutocomplete
                         value={educationDraft.degree}
                         onChange={(value) =>
                           setEducationDraft({ ...educationDraft, degree: value })
                         }
-                        presets={EDU_PRESETS}
-                        placeholder="e.g. MSc Robotics"
-                      />
-                      <input
-                        value={educationDraft.institution}
-                        onChange={(e) =>
-                          setEducationDraft({ ...educationDraft, institution: e.target.value })
-                        }
-                        placeholder="Institution"
-                        className="manual-input self-end"
+                        presets={DEGREE_LEVELS}
+                        placeholder="Degree, e.g. M.Sc."
                       />
                       <input
                         value={educationDraft.fieldOfStudy}
                         onChange={(e) =>
                           setEducationDraft({ ...educationDraft, fieldOfStudy: e.target.value })
                         }
-                        placeholder="Field of study"
+                        placeholder="Field of study, e.g. Robotics"
                         className="manual-input"
                       />
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <input
-                          value={educationDraft.startDate}
-                          onChange={(e) =>
-                            setEducationDraft({ ...educationDraft, startDate: e.target.value })
-                          }
-                          placeholder="From"
-                          className="manual-input"
-                        />
-                        <input
-                          value={educationDraft.endDate}
-                          onChange={(e) =>
-                            setEducationDraft({ ...educationDraft, endDate: e.target.value })
-                          }
-                          placeholder="To"
-                          className="manual-input"
-                        />
-                      </div>
+                      <input
+                        value={educationDraft.institution}
+                        onChange={(e) =>
+                          setEducationDraft({ ...educationDraft, institution: e.target.value })
+                        }
+                        placeholder="Institution, e.g. TU Munich"
+                        className="manual-input sm:col-span-2"
+                      />
+                      <MonthRange
+                        start={educationDraft.startDate}
+                        end={educationDraft.endDate}
+                        onStart={(value) =>
+                          setEducationDraft({ ...educationDraft, startDate: value })
+                        }
+                        onEnd={(value) => setEducationDraft({ ...educationDraft, endDate: value })}
+                        className="sm:col-span-2"
+                      />
                     </div>
                     <AddRowButton onClick={addEducation} label="Add education" />
                   </RepeatableSection>
@@ -695,7 +699,7 @@ export function EntryStage() {
                     items={experience.map((item) => ({
                       title: item.role,
                       subtitle: item.organization,
-                      meta: [item.startDate, item.endDate || "Present"].filter(Boolean).join("-"),
+                      meta: formatRange(item.startDate, item.endDate, "Present"),
                     }))}
                     onRemove={(idx) => setExperience(experience.filter((_, i) => i !== idx))}
                   >
@@ -716,21 +720,16 @@ export function EntryStage() {
                         placeholder="Organization"
                         className="manual-input"
                       />
-                      <input
-                        value={experienceDraft.startDate}
-                        onChange={(e) =>
-                          setExperienceDraft({ ...experienceDraft, startDate: e.target.value })
+                      <MonthRange
+                        start={experienceDraft.startDate}
+                        end={experienceDraft.endDate}
+                        onStart={(value) =>
+                          setExperienceDraft({ ...experienceDraft, startDate: value })
                         }
-                        placeholder="From"
-                        className="manual-input"
-                      />
-                      <input
-                        value={experienceDraft.endDate}
-                        onChange={(e) =>
-                          setExperienceDraft({ ...experienceDraft, endDate: e.target.value })
+                        onEnd={(value) =>
+                          setExperienceDraft({ ...experienceDraft, endDate: value })
                         }
-                        placeholder="To"
-                        className="manual-input"
+                        className="sm:col-span-2"
                       />
                     </div>
                     <AddRowButton onClick={addExperience} label="Add experience" />
@@ -738,7 +737,7 @@ export function EntryStage() {
 
                   <div>
                     <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                      Technical skills
+                      Technical skills <RequiredMark />
                     </p>
                     <TagField
                       tags={skills}
@@ -756,7 +755,7 @@ export function EntryStage() {
 
                   <div>
                     <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                      What are you drawn to?
+                      What are you drawn to? <RequiredMark />
                     </p>
                     <TagField
                       tags={interests}
@@ -767,26 +766,6 @@ export function EntryStage() {
                           setDraft={setInterestDraft}
                           onAdd={addInterest}
                           placeholder="Add interest"
-                        />
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                      Target constraints
-                    </p>
-                    <TagField
-                      tags={targetConstraints}
-                      onRemove={(t) =>
-                        setTargetConstraints(targetConstraints.filter((x) => x !== t))
-                      }
-                      typeahead={
-                        <PlainTagInput
-                          draft={targetConstraintDraft}
-                          setDraft={setTargetConstraintDraft}
-                          onAdd={addTargetConstraint}
-                          placeholder="Add constraint"
                         />
                       }
                     />
@@ -818,20 +797,6 @@ export function EntryStage() {
                         <div className="flex flex-col gap-3.5 pt-0.5">
                           <div>
                             <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                              Professional summary
-                            </p>
-                            <textarea
-                              value={summary}
-                              onChange={(e) => setSummary(e.target.value)}
-                              rows={2}
-                              maxLength={300}
-                              placeholder="A sentence or two about your focus and strengths…"
-                              className="manual-input resize-none"
-                            />
-                          </div>
-
-                          <div>
-                            <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
                               Soft skills
                             </p>
                             <TagField
@@ -848,32 +813,43 @@ export function EntryStage() {
                             />
                           </div>
 
-                          <div>
-                            <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-                              Language
-                            </p>
+                          <RepeatableSection
+                            title="Languages"
+                            items={languages.map((item) => ({
+                              title: item.name,
+                              meta: item.level,
+                            }))}
+                            onRemove={(idx) =>
+                              setLanguages(languages.filter((_, i) => i !== idx))
+                            }
+                          >
                             <div className="grid gap-2.5 sm:grid-cols-2">
                               <input
-                                value={languageName}
-                                onChange={(e) => setLanguageName(e.target.value)}
-                                placeholder="e.g. English"
+                                value={languageDraft.name}
+                                onChange={(e) =>
+                                  setLanguageDraft({ ...languageDraft, name: e.target.value })
+                                }
+                                placeholder="Language, e.g. English"
                                 className="manual-input"
                               />
-                              <input
-                                value={languageLevel}
-                                onChange={(e) => setLanguageLevel(e.target.value)}
-                                placeholder="e.g. C2 / Native"
-                                className="manual-input"
+                              <InlineAutocomplete
+                                value={languageDraft.level}
+                                onChange={(value) =>
+                                  setLanguageDraft({ ...languageDraft, level: value })
+                                }
+                                presets={LANGUAGE_LEVELS}
+                                placeholder="Level, e.g. C2"
                               />
                             </div>
-                          </div>
+                            <AddRowButton onClick={addLanguage} label="Add language" />
+                          </RepeatableSection>
 
                           <RepeatableSection
                             title="Projects"
                             items={projects.map((item) => ({
                               title: item.title,
                               subtitle: item.description,
-                              meta: [item.startDate, item.endDate].filter(Boolean).join("-"),
+                              meta: formatRange(item.startDate, item.endDate),
                             }))}
                             onRemove={(idx) => setProjects(projects.filter((_, i) => i !== idx))}
                           >
@@ -902,24 +878,16 @@ export function EntryStage() {
                                 placeholder="Short description"
                                 className="manual-input"
                               />
-                              <div className="grid grid-cols-2 gap-2.5">
-                                <input
-                                  value={projectDraft.startDate}
-                                  onChange={(e) =>
-                                    setProjectDraft({ ...projectDraft, startDate: e.target.value })
-                                  }
-                                  placeholder="From"
-                                  className="manual-input"
-                                />
-                                <input
-                                  value={projectDraft.endDate}
-                                  onChange={(e) =>
-                                    setProjectDraft({ ...projectDraft, endDate: e.target.value })
-                                  }
-                                  placeholder="To"
-                                  className="manual-input"
-                                />
-                              </div>
+                              <MonthRange
+                                start={projectDraft.startDate}
+                                end={projectDraft.endDate}
+                                onStart={(value) =>
+                                  setProjectDraft({ ...projectDraft, startDate: value })
+                                }
+                                onEnd={(value) =>
+                                  setProjectDraft({ ...projectDraft, endDate: value })
+                                }
+                              />
                             </div>
                             <AddRowButton onClick={addProject} label="Add project" />
                           </RepeatableSection>
@@ -972,13 +940,28 @@ export function EntryStage() {
                             </div>
                             <AddRowButton onClick={addCertification} label="Add certification" />
                           </RepeatableSection>
+
+                          <div>
+                            <p className="mb-1.5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
+                              Professional summary
+                            </p>
+                            <textarea
+                              value={summary}
+                              onChange={(e) => setSummary(e.target.value)}
+                              rows={2}
+                              maxLength={300}
+                              placeholder="A sentence or two about your focus and strengths…"
+                              className="manual-input resize-none"
+                            />
+                          </div>
                         </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
 
                   <p className="text-[11.5px] leading-snug text-foreground/50">
-                    You can review and edit everything on the next screen.
+                    <span className="text-[color:var(--brand)]">*</span> required field. You can
+                    review and edit everything on the next screen.
                   </p>
 
                   <motion.button
@@ -1080,6 +1063,182 @@ function RepeatableSection({
   );
 }
 
+function RequiredMark() {
+  return (
+    <span className="text-[color:var(--brand)]" aria-hidden="true">
+      *
+    </span>
+  );
+}
+
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/** Render a `YYYY-MM` value as a friendly "Mar 2024" label (or the raw value). */
+function formatMonthLabel(value: string): string {
+  const match = value.trim().match(/^(\d{4})-(\d{2})$/);
+  if (!match) return value.trim();
+  const monthIndex = Number(match[2]) - 1;
+  const month = MONTH_LABELS[monthIndex] ?? match[2];
+  return `${month} ${match[1]}`;
+}
+
+/** Join a start/end month range with a single dash, skipping empty parts. */
+function formatRange(start: string, end: string, endFallback = ""): string {
+  const startLabel = formatMonthLabel(start);
+  const endLabel = end.trim() ? formatMonthLabel(end) : endFallback;
+  if (startLabel && endLabel) return `${startLabel} – ${endLabel}`;
+  return startLabel || endLabel;
+}
+
+function MonthRange({
+  start,
+  end,
+  onStart,
+  onEnd,
+  className,
+}: {
+  start: string;
+  end: string;
+  onStart: (v: string) => void;
+  onEnd: (v: string) => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("grid grid-cols-2 gap-2.5", className)}>
+      <MonthYearPicker value={start} onChange={onStart} placeholder="From" />
+      <MonthYearPicker value={end} onChange={onEnd} placeholder="To" allowPresent />
+    </div>
+  );
+}
+
+/** Modern month/year picker: a styled trigger that opens a compact popover. */
+function MonthYearPicker({
+  value,
+  onChange,
+  placeholder,
+  allowPresent,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  allowPresent?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const parsed = value.trim().match(/^(\d{4})-(\d{2})$/);
+  const selectedYear = parsed ? Number(parsed[1]) : null;
+  const selectedMonth = parsed ? Number(parsed[2]) : null;
+  const [viewYear, setViewYear] = useState(selectedYear ?? new Date().getFullYear());
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          setViewYear(selectedYear ?? new Date().getFullYear());
+          setOpen((v) => !v);
+        }}
+        className="manual-input flex items-center justify-between gap-2 text-left"
+      >
+        <span className={cn(value.trim() ? "text-foreground" : "text-foreground/40")}>
+          {value.trim() ? formatMonthLabel(value) : (placeholder ?? "Select")}
+        </span>
+        <Calendar size={14} className="shrink-0 text-foreground/40" />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden="true" />
+            <motion.div
+              initial={{ opacity: 0, y: -4, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+              transition={{ duration: 0.14 }}
+              className="absolute left-0 top-full z-40 mt-1.5 w-56 rounded-2xl border border-foreground/10 bg-white/95 p-2.5 shadow-xl backdrop-blur"
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setViewYear((y) => y - 1)}
+                  className="grid h-7 w-7 place-items-center rounded-lg text-foreground/60 transition hover:bg-foreground/5"
+                  aria-label="Previous year"
+                >
+                  <ChevronLeft size={15} />
+                </button>
+                <span className="text-[13.5px] font-semibold tabular-nums">{viewYear}</span>
+                <button
+                  type="button"
+                  onClick={() => setViewYear((y) => y + 1)}
+                  className="grid h-7 w-7 place-items-center rounded-lg text-foreground/60 transition hover:bg-foreground/5"
+                  aria-label="Next year"
+                >
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {MONTH_LABELS.map((m, i) => {
+                  const isSelected = selectedYear === viewYear && selectedMonth === i + 1;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        onChange(`${viewYear}-${String(i + 1).padStart(2, "0")}`);
+                        setOpen(false);
+                      }}
+                      className={cn(
+                        "rounded-lg py-1.5 text-[12.5px] transition",
+                        isSelected
+                          ? "text-white"
+                          : "text-foreground/75 hover:bg-[color:var(--brand)]/10",
+                      )}
+                      style={isSelected ? { background: "var(--gradient-warm)" } : undefined}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-2 flex items-center justify-between border-t border-foreground/10 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange("");
+                    setOpen(false);
+                  }}
+                  className="rounded-md px-2 py-1 text-[12px] text-foreground/55 transition hover:bg-foreground/5"
+                >
+                  {allowPresent ? "Present" : "Clear"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="rounded-md px-2 py-1 text-[12px] font-medium text-[color:var(--brand-deep)] transition hover:bg-[color:var(--brand)]/10"
+                >
+                  Done
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function AddRowButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button
@@ -1093,27 +1252,87 @@ function AddRowButton({ onClick, label }: { onClick: () => void; label: string }
   );
 }
 
+/** Plain input with a styled autocomplete popover but no label above it. */
+function InlineAutocomplete({
+  value,
+  onChange,
+  presets,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  presets: string[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const matches = presets
+    .filter((p) => p.toLowerCase().includes(value.toLowerCase()) && p !== value)
+    .slice(0, 15);
+  return (
+    <div className={cn("relative", className)}>
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        className="manual-input"
+      />
+      <AnimatePresence>
+        {open && matches.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="absolute left-0 right-0 top-full z-30 mt-1 max-h-44 overflow-y-auto rounded-xl border border-foreground/10 bg-white/95 p-1.5 shadow-lg backdrop-blur"
+          >
+            {matches.map((m) => (
+              <button
+                key={m}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(m);
+                  setOpen(false);
+                }}
+                className="block w-full rounded-md px-2 py-1.5 text-left text-[12.5px] text-foreground/80 hover:bg-foreground/5"
+              >
+                {m}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function AutocompleteInput({
   label,
   value,
   onChange,
   presets,
   placeholder,
+  required,
+  className,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   presets: string[];
   placeholder?: string;
+  required?: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const matches = presets
     .filter((p) => p.toLowerCase().includes(value.toLowerCase()) && p !== value)
-    .slice(0, 6);
+    .slice(0, 15);
   return (
-    <label className="relative block">
+    <label className={cn("relative block", className)}>
       <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
-        {label}
+        {label} {required && <RequiredMark />}
       </span>
       <input
         value={value}

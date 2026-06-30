@@ -383,7 +383,6 @@ export type ManualCVInput = {
   interests?: string[];
   projects?: ManualProjectInput[];
   certifications?: ManualCertificationInput[];
-  target_constraints?: string[];
 };
 
 // HTTP helpers

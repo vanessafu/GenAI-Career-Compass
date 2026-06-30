@@ -17,7 +17,6 @@ import {
   cvDataToRecapEdits,
   cvDataToUserCareerProfile,
   fallbackIdentity,
-  identityLeadWithTargetPreferences,
   manualFormToInput,
   toConfirmedCvData,
   type RecapEdits,
@@ -258,7 +257,7 @@ export const useStageStore = create<Store>((set, get) => ({
         embeddingProfile: result.embedding_profile,
         identity: {
           archetype: identitySummary.label,
-          lead: identityLeadWithTargetPreferences(result.cv_data, identitySummary.summary),
+          lead: identitySummary.summary.trim() || fallbackIdentity(result.cv_data).lead,
         },
         ...cvDataToRecapEdits(result.cv_data),
         roleMatches: [],
@@ -292,7 +291,7 @@ export const useStageStore = create<Store>((set, get) => ({
         embeddingProfile: result.embedding_profile,
         identity: {
           archetype: identitySummary.label,
-          lead: identityLeadWithTargetPreferences(result.cv_data, identitySummary.summary),
+          lead: identitySummary.summary.trim() || fallbackIdentity(result.cv_data).lead,
         },
         ...cvDataToRecapEdits(result.cv_data),
         roleMatches: [],
@@ -321,21 +320,14 @@ export const useStageStore = create<Store>((set, get) => ({
     if (!outgoing) return;
     set({ identityLoading: true });
     try {
-      const result = { starter_identity: fallbackIdentity(outgoing).lead, suggested_questions: [] };
       set({
-        identity: {
-          archetype: fallbackIdentity(outgoing).archetype,
-          lead: identityLeadWithTargetPreferences(outgoing, result.starter_identity),
-        },
+        identity: fallbackIdentity(outgoing),
         identityLoading: false,
       });
     } catch {
       // Identity is non-blocking — fall back to a CV-derived statement.
       set({
-        identity: {
-          ...fallbackIdentity(outgoing),
-          lead: identityLeadWithTargetPreferences(outgoing, fallbackIdentity(outgoing).lead),
-        },
+        identity: fallbackIdentity(outgoing),
         identityLoading: false,
       });
     }

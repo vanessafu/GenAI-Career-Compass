@@ -9,7 +9,13 @@
 export type AnalyzedSkill = { name: string; confidence: number };
 
 export type ExperienceItem = { role: string; company: string; start: string; end: string };
-export type EducationItem = { degree: string; school: string; start: string; end: string };
+export type EducationItem = {
+  degree: string;
+  field: string;
+  school: string;
+  start: string;
+  end: string;
+};
 export type CertificationItem = { name: string; issuer: string; year: string };
 export type ProjectItem = { name: string; detail: string; year: string };
 
@@ -45,41 +51,38 @@ export type ManualCertificationFormItem = {
   issueDate: string;
 };
 
+export type ManualLanguageFormItem = {
+  name: string;
+  level: string;
+};
+
 /** Manual-entry form captured on the entry screen (tier 1 + collapsible tier 2). */
 export type ManualProfileForm = {
   // Tier 1 — quick start
   currentRole: string;
-  seniorityLevel: string;
-  yearsOfExperience: number | null;
   education: ManualEducationFormItem[];
   experience: ManualExperienceFormItem[];
   skills: string[];
   interests: string[];
-  targetConstraints: string[];
   // Tier 2 — add more context
-  summary: string;
   softSkills: string[];
-  languageName: string;
-  languageLevel: string;
+  languages: ManualLanguageFormItem[];
   projects: ManualProjectFormItem[];
   certifications: ManualCertificationFormItem[];
+  summary: string;
 };
 
 export const emptyManualProfileForm: ManualProfileForm = {
   currentRole: "",
-  seniorityLevel: "",
-  yearsOfExperience: null,
   education: [],
   experience: [],
   skills: [],
   interests: [],
-  targetConstraints: [],
-  summary: "",
   softSkills: [],
-  languageName: "",
-  languageLevel: "",
+  languages: [],
   projects: [],
   certifications: [],
+  summary: "",
 };
 
 /** A matched role projected for the cards and detail view. */
