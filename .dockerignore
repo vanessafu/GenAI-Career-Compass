@@ -1,0 +1,13 @@
+.git
+.idea
+.pytest_cache
+.venv
+**/__pycache__
+**/.DS_Store
+**/node_modules
+frontend/dist
+output
+outputs
+metrics/outputs
+test_data
+.env

@@ -150,6 +150,12 @@ These fixture screens are useful for layout/demo work and do not require the bac
 
 See [frontend/README.md](frontend/README.md) for more details.
 
+## Deployment
+
+For the temporary feedback deployment on Cloud Run, see [DEPLOYMENT.md](DEPLOYMENT.md).
+After code changes are pushed to GitHub, redeploy from the repo root with the
+command in that file.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
