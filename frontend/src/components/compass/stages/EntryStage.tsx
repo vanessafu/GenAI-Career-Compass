@@ -657,26 +657,20 @@ export function EntryStage() {
                     onRemove={(idx) => setEducation(education.filter((_, i) => i !== idx))}
                   >
                     <div className="grid gap-2.5 sm:grid-cols-2">
-                      <input
-                        list="degree-levels"
+                      <InlineAutocomplete
                         value={educationDraft.degree}
-                        onChange={(e) =>
-                          setEducationDraft({ ...educationDraft, degree: e.target.value })
+                        onChange={(value) =>
+                          setEducationDraft({ ...educationDraft, degree: value })
                         }
-                        placeholder="Degree (e.g. M.Sc.)"
-                        className="manual-input"
+                        presets={DEGREE_LEVELS}
+                        placeholder="Degree, e.g. M.Sc."
                       />
-                      <datalist id="degree-levels">
-                        {DEGREE_LEVELS.map((opt) => (
-                          <option key={opt} value={opt} />
-                        ))}
-                      </datalist>
                       <input
                         value={educationDraft.fieldOfStudy}
                         onChange={(e) =>
                           setEducationDraft({ ...educationDraft, fieldOfStudy: e.target.value })
                         }
-                        placeholder="Field of study (e.g. Robotics)"
+                        placeholder="Field of study, e.g. Robotics"
                         className="manual-input"
                       />
                       <input
@@ -684,7 +678,7 @@ export function EntryStage() {
                         onChange={(e) =>
                           setEducationDraft({ ...educationDraft, institution: e.target.value })
                         }
-                        placeholder="Institution"
+                        placeholder="Institution, e.g. TU Munich"
                         className="manual-input sm:col-span-2"
                       />
                       <MonthRange
@@ -835,23 +829,17 @@ export function EntryStage() {
                                 onChange={(e) =>
                                   setLanguageDraft({ ...languageDraft, name: e.target.value })
                                 }
-                                placeholder="e.g. English"
+                                placeholder="Language, e.g. English"
                                 className="manual-input"
                               />
-                              <input
-                                list="language-levels"
+                              <InlineAutocomplete
                                 value={languageDraft.level}
-                                onChange={(e) =>
-                                  setLanguageDraft({ ...languageDraft, level: e.target.value })
+                                onChange={(value) =>
+                                  setLanguageDraft({ ...languageDraft, level: value })
                                 }
-                                placeholder="e.g. C2 / Native"
-                                className="manual-input"
+                                presets={LANGUAGE_LEVELS}
+                                placeholder="Level, e.g. C2"
                               />
-                              <datalist id="language-levels">
-                                {LANGUAGE_LEVELS.map((opt) => (
-                                  <option key={opt} value={opt} />
-                                ))}
-                              </datalist>
                             </div>
                             <AddRowButton onClick={addLanguage} label="Add language" />
                           </RepeatableSection>
@@ -1130,27 +1118,19 @@ function MonthRange({
 }) {
   return (
     <div className={cn("grid grid-cols-2 gap-2.5", className)}>
-      <MonthYearPicker label="From" value={start} onChange={onStart} placeholder="Start" />
-      <MonthYearPicker
-        label="To"
-        value={end}
-        onChange={onEnd}
-        placeholder="Present"
-        allowPresent
-      />
+      <MonthYearPicker value={start} onChange={onStart} placeholder="From" />
+      <MonthYearPicker value={end} onChange={onEnd} placeholder="To" allowPresent />
     </div>
   );
 }
 
 /** Modern month/year picker: a styled trigger that opens a compact popover. */
 function MonthYearPicker({
-  label,
   value,
   onChange,
   placeholder,
   allowPresent,
 }: {
-  label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
@@ -1163,10 +1143,7 @@ function MonthYearPicker({
   const [viewYear, setViewYear] = useState(selectedYear ?? new Date().getFullYear());
 
   return (
-    <label className="relative block">
-      <span className="mb-1 block text-[10.5px] uppercase tracking-[0.12em] text-foreground/45">
-        {label}
-      </span>
+    <div className="relative">
       <button
         type="button"
         onClick={() => {
@@ -1258,7 +1235,7 @@ function MonthYearPicker({
           </>
         )}
       </AnimatePresence>
-    </label>
+    </div>
   );
 }
 
@@ -1275,6 +1252,62 @@ function AddRowButton({ onClick, label }: { onClick: () => void; label: string }
   );
 }
 
+/** Plain input with a styled autocomplete popover but no label above it. */
+function InlineAutocomplete({
+  value,
+  onChange,
+  presets,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  presets: string[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const matches = presets
+    .filter((p) => p.toLowerCase().includes(value.toLowerCase()) && p !== value)
+    .slice(0, 15);
+  return (
+    <div className={cn("relative", className)}>
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        className="manual-input"
+      />
+      <AnimatePresence>
+        {open && matches.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="absolute left-0 right-0 top-full z-30 mt-1 max-h-44 overflow-y-auto rounded-xl border border-foreground/10 bg-white/95 p-1.5 shadow-lg backdrop-blur"
+          >
+            {matches.map((m) => (
+              <button
+                key={m}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onChange(m);
+                  setOpen(false);
+                }}
+                className="block w-full rounded-md px-2 py-1.5 text-left text-[12.5px] text-foreground/80 hover:bg-foreground/5"
+              >
+                {m}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function AutocompleteInput({
   label,
   value,
@@ -1282,6 +1315,7 @@ function AutocompleteInput({
   presets,
   placeholder,
   required,
+  className,
 }: {
   label: string;
   value: string;
@@ -1289,13 +1323,14 @@ function AutocompleteInput({
   presets: string[];
   placeholder?: string;
   required?: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const matches = presets
     .filter((p) => p.toLowerCase().includes(value.toLowerCase()) && p !== value)
-    .slice(0, 6);
+    .slice(0, 15);
   return (
-    <label className="relative block">
+    <label className={cn("relative block", className)}>
       <span className="mb-1.5 block text-[11.5px] font-medium uppercase tracking-[0.12em] text-foreground/55">
         {label} {required && <RequiredMark />}
       </span>
