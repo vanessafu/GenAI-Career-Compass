@@ -6,32 +6,11 @@ from pathlib import Path
 from backend.app.core.openai_client import openai_client_lifespan
 from backend.app.features.cv_confirmation.cli_flow import confirm_cv_interactively, confirm_json_file
 from backend.app.features.cv_confirmation.manual_flow import collect_manual_cv_data
-from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
 from backend.app.features.cv_confirmation.service import to_confirmed_cv_data
 from backend.app.features.cv_parsing.schemas import SourceDocument
 from backend.app.features.cv_parsing.service import (
     extract_text_from_pdf_bytes,
     parse_cv_to_pydantic,
-)
-from backend.app.features.prompt_engineering.artifact_service import (
-    save_career_profile_artifact,
-    save_embedding_input_text_artifact,
-    save_embedding_chunks_artifact,
-)
-from backend.app.features.prompt_engineering.career_profile_extraction_service import (
-    build_career_profile_response,
-)
-from backend.app.features.prompt_engineering.embedding_handoff_service import prepare_for_embedding
-from backend.app.features.prompt_engineering.embedding_preparation_service import (
-    build_embedding_input,
-)
-from backend.app.features.prompt_engineering.schemas import (
-    CareerProfileResponse,
-    EmbeddingInputResponse,
-    SemanticEmbeddingInputResponse,
-)
-from backend.app.features.prompt_engineering.semantic_embedding_service import (
-    build_embedding_chunks_from_confirmed,
 )
 
 
@@ -53,10 +32,6 @@ def write_json_output(output_path: Path, payload: dict) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     return output_path
-
-
-def load_confirmed_profile(json_path: Path) -> ConfirmedCVData:
-    return ConfirmedCVData.model_validate_json(json_path.read_text(encoding="utf-8"))
 
 
 async def run_with_openai(coro):
@@ -101,62 +76,6 @@ def collect_manual_profile(output_path: Path, assume_yes: bool = False) -> Path:
     return write_json_output(output_path, result.model_dump(mode="json"))
 
 
-async def prepare_for_embedding_from_file(json_path: Path) -> ConfirmedCVData:
-    confirmed_profile = load_confirmed_profile(json_path)
-    return await prepare_for_embedding(confirmed_profile)
-
-
-def build_embedding_input_from_file(json_path: Path) -> EmbeddingInputResponse:
-    confirmed_profile = load_confirmed_profile(json_path)
-    return build_embedding_input(confirmed_profile)
-
-
-def build_career_profile_from_file(json_path: Path) -> CareerProfileResponse:
-    confirmed_profile = load_confirmed_profile(json_path)
-    return build_career_profile_response(confirmed_profile)
-
-
-def build_embedding_chunks_from_file(
-    json_path: Path,
-) -> SemanticEmbeddingInputResponse:
-    confirmed_profile = load_confirmed_profile(json_path)
-    return build_embedding_chunks_from_confirmed(confirmed_profile)
-
-
-def print_career_identity(result: ConfirmedCVData) -> None:
-    print("\nCareer identity statement:")
-    print(result.career_identity_statement or "(none generated)")
-
-
-def print_career_profile(result: CareerProfileResponse) -> None:
-    profile = result.career_profile
-    print("\nNormalized roles:")
-    for role in profile.normalized_roles:
-        print(f"- {role}")
-    print("\nCareer domains:")
-    for domain in profile.career_domains:
-        print(f"- {domain}")
-    print("\nTechnical domains:")
-    for domain in profile.technical_domains:
-        print(f"- {domain}")
-    print("\nCareer direction candidates:")
-    for candidate in profile.career_direction_candidates:
-        print(f"- {candidate}")
-    if profile.seniority_estimate:
-        print(f"\nSeniority estimate: {profile.seniority_estimate}")
-
-
-def print_embedding_chunks(result: SemanticEmbeddingInputResponse) -> None:
-    print(f"\nEmbedding chunks: {len(result.chunks)}")
-    for chunk in result.chunks:
-        print(f"\n[{chunk.chunk_id}] {chunk.chunk_type}")
-        print(chunk.text)
-        if chunk.skills:
-            print(f"Skills: {', '.join(chunk.skills)}")
-        if chunk.domains:
-            print(f"Domains: {', '.join(chunk.domains)}")
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Career Compass backend CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -197,31 +116,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     manual_parser.add_argument("--yes", action="store_true", help="Confirm all sections automatically.")
 
-    prepare_parser = subparsers.add_parser(
-        "prepare-for-embedding",
-        help="Privacy-strip a confirmed CV and attach a generated career identity.",
-    )
-    prepare_parser.add_argument("json_path", type=Path)
-    prepare_parser.add_argument("-o", "--output", type=Path)
-
-    embedding_parser = subparsers.add_parser(
-        "embedding-input",
-        help="Build embedding input text from confirmed JSON.",
-    )
-    embedding_parser.add_argument("json_path", type=Path)
-
-    career_profile_parser = subparsers.add_parser(
-        "career-profile",
-        help="Build a normalized career profile from confirmed JSON.",
-    )
-    career_profile_parser.add_argument("json_path", type=Path)
-
-    embedding_chunks_parser = subparsers.add_parser(
-        "embedding-chunks",
-        help="Build semantic embedding chunks from confirmed JSON.",
-    )
-    embedding_chunks_parser.add_argument("json_path", type=Path)
-
     return parser
 
 
@@ -257,34 +151,6 @@ def main() -> None:
     if args.command == "manual-profile":
         output_path = collect_manual_profile(args.output, assume_yes=args.yes)
         print(f"Confirmed manual profile written to {output_path}")
-        return
-
-    if args.command == "prepare-for-embedding":
-        result = asyncio.run(run_with_openai(prepare_for_embedding_from_file(args.json_path)))
-        print_career_identity(result)
-        output_path = args.output or default_output_path(args.json_path, "embedding_ready")
-        write_json_output(output_path, result.model_dump(mode="json"))
-        print(f"\nEmbedding-ready profile written to {output_path}")
-        return
-
-    if args.command == "embedding-input":
-        result = build_embedding_input_from_file(args.json_path)
-        output_path = save_embedding_input_text_artifact(args.json_path, result)
-        print(f"Embedding input text written to {output_path}")
-        return
-
-    if args.command == "career-profile":
-        result = build_career_profile_from_file(args.json_path)
-        print_career_profile(result)
-        output_path = save_career_profile_artifact(args.json_path, result)
-        print(f"\nCareer profile written to {output_path}")
-        return
-
-    if args.command == "embedding-chunks":
-        result = build_embedding_chunks_from_file(args.json_path)
-        print_embedding_chunks(result)
-        output_path = save_embedding_chunks_artifact(args.json_path, result)
-        print(f"\nEmbedding chunks written to {output_path}")
         return
 
     parser.error(f"Unknown command: {args.command}")
