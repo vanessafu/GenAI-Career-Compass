@@ -1,6 +1,6 @@
 """Always-on persistence of intermediate pipeline artifacts.
 
-Every step of the parse -> confirm -> prompt-engineering -> embedding flow writes
+Every step of the parse -> confirm -> profile-preparation -> embedding flow writes
 its output to ``<PIPELINE_OUTPUT_DIR>/<profile_stem>/<step>.<suffix>`` so the data
 handed between stages can be inspected on disk.
 """

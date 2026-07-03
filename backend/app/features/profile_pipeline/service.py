@@ -7,11 +7,11 @@ from backend.app.features.cv_confirmation.schemas import (
 )
 from backend.app.features.cv_parsing.debug_output import save_cv_debug_artifact
 from backend.app.features.cv_parsing.schemas import CVData
-from backend.app.features.prompt_engineering.identity_generation_service import (
+from backend.app.features.profile_preparation.identity_generation_service import (
     generate_career_identity,
 )
-from backend.app.features.prompt_engineering.cv_privacy_service import privacy_strip_cv_data
-from backend.app.features.prompt_engineering.schemas import (
+from backend.app.features.profile_preparation.cv_privacy_service import privacy_strip_cv_data
+from backend.app.features.profile_preparation.schemas import (
     CareerIdentitySummary,
     EmbeddingProfile,
 )

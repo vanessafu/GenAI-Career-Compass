@@ -1,5 +1,5 @@
 from backend.app.features.cv_parsing.schemas import CVData
-from backend.app.features.prompt_engineering.schemas import EmbeddingProfile
+from backend.app.features.profile_preparation.schemas import EmbeddingProfile
 
 from pydantic import BaseModel
 

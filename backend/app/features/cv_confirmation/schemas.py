@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from backend.app.features.cv_parsing.schemas import CVData
-from backend.app.features.prompt_engineering.schemas import CareerIdentitySummary
+from backend.app.features.profile_preparation.schemas import CareerIdentitySummary
 
 ConfirmationStatus = Literal["pending", "confirmed", "edited", "skipped"]
 
@@ -26,7 +26,7 @@ class ConfirmationMetadata(BaseModel):
 class ConfirmedCVData(BaseModel):
     confirmed_cv_data: CVData
     confirmation_metadata: ConfirmationMetadata
-    # Set by the prompt-engineering step once the profile is privacy-stripped and
+    # Set by the profile-preparation step once the profile is privacy-stripped and
     # enriched with a generated career identity. This is the object handed to the
     # embedding step.
     career_identity_statement: str | None = None

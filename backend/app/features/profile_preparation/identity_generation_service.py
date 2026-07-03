@@ -2,7 +2,7 @@ import logging
 
 from backend.app.core import openai_client
 from backend.app.features.cv_parsing.schemas import CVData
-from backend.app.features.prompt_engineering.schemas import CareerIdentityGeneration
+from backend.app.features.profile_preparation.schemas import CareerIdentityGeneration
 
 logger = logging.getLogger("CareerCompass.PromptEngineering.IdentityGenerationService")
 

@@ -26,7 +26,7 @@ See [docs/proposal.md](docs/proposal.md) for the full project proposal.
 |       |   |-- cv_confirmation/
 |       |   |-- profile_pipeline/
 |       |   |-- role_matching/
-|       |   `-- prompt_engineering/
+|       |   `-- profile_preparation/
 |       `-- scripts/
 |-- database/
 |   `-- supabase/migrations/
