@@ -10,7 +10,7 @@ from backend.app.features.cv_parsing.schemas import CVData
 from backend.app.features.prompt_engineering.identity_generation_service import (
     generate_career_identity,
 )
-from backend.app.features.prompt_engineering.profile_projector import privacy_strip_cv_data
+from backend.app.features.prompt_engineering.cv_privacy_service import privacy_strip_cv_data
 from backend.app.features.prompt_engineering.schemas import (
     CareerIdentitySummary,
     EmbeddingProfile,
