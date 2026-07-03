@@ -16,16 +16,14 @@ logger = logging.getLogger("CareerCompass.RoleMatching.Router")
 async def match_roles(request: RoleMatchRequest) -> CareerResultsV1:
     """Match one clean career profile against the Supabase role catalog."""
     logger.info(
-        "Role match request: top_k=%d mode=%s include_debug=%s",
+        "Role match request: top_k=%d include_debug=%s",
         request.top_k,
-        request.mode.value,
         request.include_debug,
     )
     try:
         response = await match_roles_for_profile(
             profile=request.profile,
             top_k=request.top_k,
-            mode=request.mode,
             include_debug=request.include_debug,
         )
         return CareerResultsV1.from_bucketed_roles(response.buckets)

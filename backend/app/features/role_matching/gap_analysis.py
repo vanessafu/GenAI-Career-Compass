@@ -13,14 +13,25 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
-from typing import Literal, Optional
+from typing import Optional
 
 from psycopg2.extras import RealDictCursor
 
 from backend.app.core.database import get_db_connection
 from backend.app.core.openai_client import parse_structured
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
+from backend.app.features.role_matching.normalization import (
+    canon_seniority_label,
+    certification_match_keys,
+    normalize_certification_name,
+    normalize_skill_key,
+    normalize_user_certifications,
+    required_skills_from_sort_skills,
+    seniority_gap,
+    seniority_level_from_title,
+    skill_domain_map,
+    skill_weight_map,
+)
 from backend.app.features.role_matching.schemas import (
     CertificationDimension,
     CertificationGap,
@@ -37,7 +48,6 @@ from backend.app.features.role_matching.skill_alignment import (
     SkillEvidence,
     align_skills,
     build_skill_evidence_from_confirmed_profile,
-    normalize_skill_key,
 )
 
 logger = logging.getLogger("CareerCompass.GapAnalysis")
@@ -45,15 +55,6 @@ logger = logging.getLogger("CareerCompass.GapAnalysis")
 # --- tunables --------------------------------------------------------------
 READINESS_W = {"skills": 0.60, "certifications": 0.25, "seniority": 0.15}
 MAX_GROUNDING_SKILLS = 8   # cap missing skills sent to the LLM (prompt budget)
-
-_SENIORITY_ORDER = ["intern", "junior", "mid", "senior", "lead", "staff", "principal", "head", "director"]
-_SENIORITY_ALIASES = {
-    "entry": "junior", "associate": "junior", "graduate": "junior", "jr": "junior",
-    "intermediate": "mid", "regular": "mid",
-    "sr": "senior", "snr": "senior",
-    "team lead": "lead", "tech lead": "lead",
-    "vp": "director", "chief": "director",
-}
 
 
 # ===========================================================================
@@ -67,31 +68,6 @@ def _status(coverage: float) -> DimensionStatus:
     return "weak"
 
 
-def _normalize_cert(name: str) -> str:
-    """Light deterministic normalizer for exact certification matches."""
-    s = re.sub(r"[^a-z0-9 ]+", " ", (name or "").lower())
-    return re.sub(r"\s+", " ", s).strip()
-
-
-def _canon_seniority(label: Optional[str]) -> Optional[str]:
-    if not label:
-        return None
-    s = label.strip().lower()
-    s = _SENIORITY_ALIASES.get(s, s)
-    return s if s in _SENIORITY_ORDER else None
-
-
-def _infer_role_seniority(title: str) -> Optional[str]:
-    t = (title or "").lower()
-    for level in reversed(_SENIORITY_ORDER):  # match most-senior keyword first
-        if level in t:
-            return level
-    for alias, level in _SENIORITY_ALIASES.items():
-        if alias in t:
-            return level
-    return None
-
-
 # Extract user-side facts from the confirmed profile
 def _user_certs(profile: ConfirmedCVData) -> list[str]:
     cv_data = as_cv_data(profile)
@@ -100,7 +76,7 @@ def _user_certs(profile: ConfirmedCVData) -> list[str]:
 
 def _user_seniority(profile: ConfirmedCVData) -> tuple[Optional[str], Optional[int]]:
     ps = as_cv_data(profile).profile_summary
-    level = _canon_seniority(ps.current_seniority_level)
+    level = canon_seniority_label(ps.current_seniority_level)
     years = ps.years_of_experience
     return level, years
 
@@ -109,11 +85,14 @@ def _fetch_role(role_id: int) -> Optional[dict]:
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT role_id, job_title, job_description, raw_skills, domain_tags "
+                "SELECT role_id, COALESCE(NULLIF(processed_job_title, ''), job_title) AS job_title, "
+                "job_description, raw_skills, domain_tags, sort_skills "
                 "FROM career_roles WHERE role_id = %s",
                 (role_id,),
             )
             return cur.fetchone()
+
+
 
 
 def _fetch_role_certs(role_id: int) -> list[dict]:
@@ -130,7 +109,23 @@ def _fetch_role_certs(role_id: int) -> list[dict]:
             return cur.fetchall()
 
 
-def _fetch_role_skill_data(role_id: int) -> tuple[list[str], dict[str, str]]:
+def _fetch_skill_aliases() -> dict[str, str]:
+    with get_db_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT alias_key, canonical_key FROM skill_aliases "
+                "WHERE alias_key IS NOT NULL AND canonical_key IS NOT NULL"
+            )
+            return {
+                normalize_skill_key(row["alias_key"]): normalize_skill_key(row["canonical_key"])
+                for row in cur.fetchall()
+                if normalize_skill_key(row["alias_key"]) and normalize_skill_key(row["canonical_key"])
+            }
+
+
+def _fetch_role_skills_from_table(role_id: int) -> list[str]:
+    """Fallback required-skills source for roles never reprocessed into
+    sort_skills - the older, structured role_skills relation."""
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
@@ -144,18 +139,7 @@ def _fetch_role_skill_data(role_id: int) -> tuple[list[str], dict[str, str]]:
                 for row in cur.fetchall()
                 if (normalized := normalize_skill_key(row["normalized_skill_name"]))
             ]
-
-            cur.execute(
-                "SELECT alias_key, canonical_key FROM skill_aliases "
-                "WHERE alias_key IS NOT NULL AND canonical_key IS NOT NULL"
-            )
-            aliases = {
-                normalize_skill_key(row["alias_key"]): normalize_skill_key(row["canonical_key"])
-                for row in cur.fetchall()
-                if normalize_skill_key(row["alias_key"]) and normalize_skill_key(row["canonical_key"])
-            }
-
-    return list(dict.fromkeys(required)), aliases
+    return list(dict.fromkeys(required))
 
 
 def _retrieve_esco_grounding(role_id: int, missing_skills: list[str]) -> tuple[Optional[str], dict[str, str]]:
@@ -200,8 +184,10 @@ def _analyze_skills(
     required_skills: list[str],
     user_evidence: SkillEvidence,
     alias_map: dict[str, str],
+    skill_weights: dict[str, float],
+    skill_domains: dict[str, str],
 ) -> SkillDimension:
-    alignment = align_skills(required_skills, user_evidence, alias_map)
+    alignment = align_skills(required_skills, user_evidence, alias_map, skill_weights, skill_domains)
     return SkillDimension(
         matched_skills=alignment.matched_skills,
         missing_skills=alignment.missing_skills,
@@ -211,10 +197,14 @@ def _analyze_skills(
                 user_closest_skill=g["user_closest_skill"],
                 transferability=g["transferability"],
                 severity=g["severity"],
+                importance=g.get("importance", ""),
+                domain=g.get("domain", ""),
                 source="shared_alignment",
             )
             for g in alignment.skill_gaps
         ],
+        domain_coverage=alignment.domain_scores,
+        domain_skills=alignment.domain_skills,
         coverage=alignment.coverage,
         status=_status(alignment.coverage),
     )
@@ -224,14 +214,14 @@ def _analyze_certs(role_certs: list[dict], user_certs: list[str]) -> Certificati
     if not role_certs:  # role requires no certs -> not a gap
         return CertificationDimension(coverage=1.0, status="strong")
 
-    user_norm = {_normalize_cert(c) for c in user_certs}
+    user_norm = normalize_user_certifications(user_certs)
     held: list[str] = []
     missing: list[CertificationGap] = []
 
     for rc in role_certs:
         name = rc["certification_name"]
-        norm = _normalize_cert(rc.get("normalized_certification_name") or name)
-        if norm in user_norm:  # exact normalized match
+        norm = normalize_certification_name(rc.get("normalized_certification_name") or name)
+        if certification_match_keys(norm) & user_norm:
             held.append(name)
             continue
         missing.append(
@@ -250,23 +240,20 @@ def _analyze_certs(role_certs: list[dict], user_certs: list[str]) -> Certificati
                                   coverage=coverage, status=_status(coverage))
 
 
-def _analyze_seniority(role_title: str, user_level: Optional[str], user_years: Optional[int]) -> SeniorityDimension:
-    role_level = _infer_role_seniority(role_title)
-    gap: Literal["under", "match", "over", "unknown"] = "unknown"
+def _analyze_seniority(
+    role_title: str, user_level: Optional[str], user_years: Optional[int]
+) -> tuple[SeniorityDimension, float]:
+    role_level = seniority_level_from_title(role_title)
+    gap, fit = seniority_gap(user_level, role_level)
     note = None
-    if role_level and user_level:
-        d = _SENIORITY_ORDER.index(role_level) - _SENIORITY_ORDER.index(user_level)
-        gap = "match" if d == 0 else ("under" if d > 0 else "over")
-        if gap == "under":
-            note = f"Role looks {role_level}; you are {user_level}. Expect a stretch in scope/leadership."
-        elif gap == "over":
-            note = f"You ({user_level}) may be over-levelled for a {role_level} role."
-    return SeniorityDimension(user_level=user_level, role_level=role_level,
-                              user_years=user_years, gap=gap, note=note)
-
-
-def _seniority_fit(dim: SeniorityDimension) -> float:
-    return {"match": 1.0, "over": 0.8, "under": 0.5, "unknown": 0.7}[dim.gap]
+    if gap == "stretch":
+        note = f"Role looks {role_level}; you are {user_level}. Expect a stretch in scope/leadership."
+    elif gap == "overqualified":
+        note = f"You ({user_level}) may be over-levelled for a {role_level} role."
+    dimension = SeniorityDimension(
+        user_level=user_level, role_level=role_level, user_years=user_years, gap=gap, note=note
+    )
+    return dimension, fit
 
 
 
@@ -344,18 +331,25 @@ def analyze_role_gap(
     user_evidence = build_skill_evidence_from_confirmed_profile(confirmed_profile)
     user_certs = _user_certs(confirmed_profile)
     user_level, user_years = _user_seniority(confirmed_profile)
-    required_skills, alias_map = _fetch_role_skill_data(role_id)
+
+    sort_skills = role.get("sort_skills")
+    alias_map = _fetch_skill_aliases()
+    required_skills = required_skills_from_sort_skills(sort_skills)
+    if not required_skills:
+        required_skills = _fetch_role_skills_from_table(role_id)
     if not required_skills:
         required_skills = _listify(role.get("raw_skills"))
+    skill_weights = skill_weight_map(sort_skills)
+    skill_domains = skill_domain_map(sort_skills)
 
-    skills = _analyze_skills(required_skills, user_evidence, alias_map)
+    skills = _analyze_skills(required_skills, user_evidence, alias_map, skill_weights, skill_domains)
     certs = _analyze_certs(_fetch_role_certs(role_id), user_certs)
-    seniority = _analyze_seniority(role["job_title"], user_level, user_years)
+    seniority, seniority_fit = _analyze_seniority(role["job_title"], user_level, user_years)
 
     readiness = (
         READINESS_W["skills"] * skills.coverage
         + READINESS_W["certifications"] * certs.coverage
-        + READINESS_W["seniority"] * _seniority_fit(seniority)
+        + READINESS_W["seniority"] * seniority_fit
     )
 
     return GapReport(

@@ -62,6 +62,11 @@ function SkillRadar({ report }: { report: GapReport }) {
                       transition={progressTransition}
                     />
                   </div>
+                  {axis.skills.length > 0 && (
+                    <p className="mt-1.5 line-clamp-2 text-[11px] leading-snug text-foreground/45">
+                      {axis.skills.join(", ")}
+                    </p>
+                  )}
                 </div>
               );
             })}

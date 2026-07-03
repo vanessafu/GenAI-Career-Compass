@@ -17,8 +17,7 @@ class SplitRoleEmbeddingTextTests(unittest.TestCase):
         text = build_capability_embedding_text(
             title="Senior Backend Engineer",
             description="Build APIs and mentor engineers for a payments platform.",
-            normalized_skills="java, postgresql, restful apis",
-            raw_skills="Java, PostgreSQL, RESTful APIs",
+            skills_text="java, postgresql, restful apis",
             certifications="AWS Certified Developer - Associate",
             raw_certifications="AWS Certified Developer - Associate",
         )

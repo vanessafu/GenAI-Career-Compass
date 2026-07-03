@@ -19,9 +19,19 @@ from typing import Any, Iterable
 from backend.app.core import openai_client
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
 from backend.app.features.cv_parsing.schemas import CVData
+from backend.app.features.role_matching.normalization import (
+    certification_match_keys,
+    clean_alias_map,
+    normalize_certification_name,
+    normalize_skill_key,
+    normalize_user_certifications,
+    required_skills_from_sort_skills,
+    seniority_gap,
+    seniority_level_from_title,
+    skill_weight_map,
+)
 from backend.app.features.role_matching.recommendation import Candidate, recommend
 from backend.app.features.role_matching.schemas import (
-    RecommendationMode,
     RoleMatch,
     RoleMatchDebug,
     RoleMatchResponse,
@@ -32,7 +42,6 @@ from backend.app.features.role_matching.skill_alignment import (
     SkillEvidence,
     align_skills,
     build_skill_evidence_from_user_profile,
-    normalize_skill_key,
 )
 
 logger = logging.getLogger("CareerCompass.RoleMatching.Service")
@@ -88,29 +97,6 @@ DOMAIN_KEYWORDS: dict[str, tuple[str, ...]] = {
     "project_management": ("project management", "program management", "scrum", "agile", "stakeholder"),
 }
 
-_SENIORITY_ORDER = ["intern", "junior", "mid", "senior", "lead", "staff", "principal", "director"]
-_SENIORITY_ALIASES = {
-    "entry": "junior",
-    "entry level": "junior",
-    "associate": "junior",
-    "apprentice": "junior",
-    "beginner": "junior",
-    "graduate": "junior",
-    "jr": "junior",
-    "student": "junior",
-    "trainee": "junior",
-    "intermediate": "mid",
-    "regular": "mid",
-    "sr": "senior",
-    "snr": "senior",
-    "architect": "lead",
-    "team lead": "lead",
-    "tech lead": "lead",
-    "head": "director",
-    "vp": "director",
-    "chief": "director",
-}
-
 _DYNAMIC_DOMAIN_STOPWORDS = {
     "and",
     "the",
@@ -156,24 +142,6 @@ DEFAULT_SKILL_ALIASES: dict[str, str] = {
     "linux services": "linux",
     "shell scripts": "scripting",
 }
-
-_CERTIFICATION_ALIAS_GROUPS_RAW: tuple[tuple[str, ...], ...] = (
-    (
-        "Google Data Analytics Certificate",
-        "Google Data Analytics Professional Certificate",
-    ),
-    (
-        "Oracle Certified Associate Java Programmer",
-        "Oracle Certified Associate (OCA) - Java",
-        "Oracle Java Programmer Certification",
-        "OCA Java",
-    ),
-    (
-        "CompTIA A+",
-        "CompTIA A Plus",
-        "CompTIA A+ Certification",
-    ),
-)
 
 
 def as_cv_data(profile: ConfirmedCVData | CVData) -> CVData:
@@ -254,58 +222,16 @@ def _vec_literal(vec: list[float]) -> str:
     return "[" + ",".join(map(str, vec)) + "]"
 
 
-def _normalize_key(value: str | None) -> str:
-    return normalize_skill_key(value)
-
-
-def normalize_certification_name(name: str | None) -> str:
-    value = (name or "").casefold()
-    value = re.sub(r"[^a-z0-9]+", " ", value)
-    return re.sub(r"\s+", " ", value).strip()
-
-
-_CERTIFICATION_ALIAS_GROUPS = tuple(
-    frozenset(
-        normalized
-        for normalized in (normalize_certification_name(name) for name in group)
-        if normalized
-    )
-    for group in _CERTIFICATION_ALIAS_GROUPS_RAW
-)
-_CERTIFICATION_ALIAS_MAP = {
-    alias: group for group in _CERTIFICATION_ALIAS_GROUPS for alias in group
-}
-
-
-def certification_match_keys(name: str | None) -> set[str]:
-    normalized = normalize_certification_name(name)
-    if not normalized:
-        return set()
-    return set(_CERTIFICATION_ALIAS_MAP.get(normalized, {normalized}))
-
-
-def normalize_user_certifications(certification_names: Iterable[str | None]) -> set[str]:
-    normalized: set[str] = set()
-    for name in certification_names:
-        normalized.update(certification_match_keys(name))
-    return normalized
-
-
 def normalize_user_skills(skills: Iterable[str], alias_map: dict[str, str]) -> list[str]:
     normalized: list[str] = []
     seen: set[str] = set()
-    clean_alias_map = {
-        _normalize_key(alias): _normalize_key(canonical)
-        for alias, canonical in DEFAULT_SKILL_ALIASES.items()
-    }
-    clean_alias_map.update(
-        {_normalize_key(alias): _normalize_key(canonical) for alias, canonical in alias_map.items()}
-    )
+    merged_aliases = clean_alias_map(DEFAULT_SKILL_ALIASES)
+    merged_aliases.update(clean_alias_map(alias_map))
     for skill in skills:
-        key = _normalize_key(skill)
+        key = normalize_skill_key(skill)
         if not key:
             continue
-        canonical = clean_alias_map.get(key, key)
+        canonical = merged_aliases.get(key, key)
         if canonical not in seen:
             seen.add(canonical)
             normalized.append(canonical)
@@ -366,12 +292,15 @@ def extract_user_skills(profile: ConfirmedCVData | CVData | UserCareerProfile) -
 
 def build_capability_text(profile: UserCareerProfile) -> str:
     parts: list[str] = []
-
+    skill_text = _join_unique(profile.skills, limit=30)
+    if skill_text:
+        parts.append(f"Skills: {skill_text}")
+    
     for index, exp in enumerate(profile.experience, start=1):
         line_parts = [
             exp.role,
-            f"Organization: {exp.organization}" if _clean_text(exp.organization) else None,
-            f"Dates: {exp.start_date}-{exp.end_date}" if exp.start_date or exp.end_date else None,
+            # f"Organization: {exp.organization}" if _clean_text(exp.organization) else None,
+            # f"Dates: {exp.start_date}-{exp.end_date}" if exp.start_date or exp.end_date else None,
             f"Summary: {_truncate(exp.summary)}" if _clean_text(exp.summary) else None,
             f"Skills: {_join_unique(exp.skills)}" if _join_unique(exp.skills) else None,
         ]
@@ -379,53 +308,47 @@ def build_capability_text(profile: UserCareerProfile) -> str:
         if joined:
             parts.append(f"Experience {index}: {joined}")
 
-    for index, edu in enumerate(profile.education, start=1):
-        line_parts = [
-            edu.degree,
-            f"Institution: {edu.institution}" if _clean_text(edu.institution) else None,
-            f"Years: {edu.start_year}-{edu.end_year}" if edu.start_year or edu.end_year else None,
-        ]
-        joined = _join_unique(line_parts)
-        if joined:
-            parts.append(f"Education {index}: {joined}")
-
-    skill_text = _join_unique(profile.skills, limit=30)
-    if skill_text:
-        parts.append(f"Skills: {skill_text}")
-
-    for index, cert in enumerate(profile.certifications, start=1):
-        line_parts = [
-            cert.name,
-            f"Issuer: {cert.issuer}" if _clean_text(cert.issuer) else None,
-            f"Year: {cert.year}" if _clean_text(cert.year) else None,
-        ]
-        joined = _join_unique(line_parts)
-        if joined:
-            parts.append(f"Certification {index}: {joined}")
-
     for index, project in enumerate(profile.projects, start=1):
         line_parts = [
             project.title,
             f"Summary: {_truncate(project.summary)}" if _clean_text(project.summary) else None,
             f"Technologies: {_join_unique(project.technologies)}" if _join_unique(project.technologies) else None,
-            f"Year: {project.year}" if _clean_text(project.year) else None,
+            # f"Year: {project.year}" if _clean_text(project.year) else None,
         ]
         joined = _join_unique(line_parts)
         if joined:
             parts.append(f"Project {index}: {joined}")
-
+    for index, cert in enumerate(profile.certifications, start=1):
+        line_parts = [
+            cert.name,
+            # f"Issuer: {cert.issuer}" if _clean_text(cert.issuer) else None,
+            # f"Year: {cert.year}" if _clean_text(cert.year) else None,
+        ]
+        joined = _join_unique(line_parts)
+        if joined:
+            parts.append(f"Certification {index}: {joined}")
+    for index, edu in enumerate(profile.education, start=1):
+        line_parts = [
+            edu.degree,
+                # f"Institution: {edu.institution}" if _clean_text(edu.institution) else None,
+                # f"Years: {edu.start_year}-{edu.end_year}" if edu.start_year or edu.end_year else None,
+        ]
+        joined = _join_unique(line_parts)
+        if joined:
+            parts.append(f"Education {index}: {joined}")
     return "\n".join(parts).strip()
 
 
 def build_intent_text(profile: UserCareerProfile) -> str:
     parts: list[str] = []
+    interest_text = _join_unique(profile.interests, limit=20)
+    if interest_text:
+        parts.append(f"Interests: {interest_text}")
+
     if _clean_text(profile.career_identity.title):
         parts.append(f"Career identity: {profile.career_identity.title.strip()}")
     if _clean_text(profile.career_identity.summary):
         parts.append(f"Career summary: {_truncate(profile.career_identity.summary)}")
-    interest_text = _join_unique(profile.interests, limit=20)
-    if interest_text:
-        parts.append(f"Interests: {interest_text}")
     return "\n".join(parts).strip()
 
 
@@ -435,11 +358,11 @@ def map_profile_domains(profile: UserCareerProfile) -> list[str]:
         profile.career_identity.summary or "",
         *profile.interests,
     ]
-    normalized_text = " " + _normalize_key(" ".join(terms)) + " "
+    normalized_text = " " + normalize_skill_key(" ".join(terms)) + " "
     domains: list[str] = []
     for domain, keywords in DOMAIN_KEYWORDS.items():
         for keyword in keywords:
-            normalized_keyword = " " + _normalize_key(keyword) + " "
+            normalized_keyword = " " + normalize_skill_key(keyword) + " "
             if normalized_keyword in normalized_text:
                 domains.append(domain)
                 break
@@ -449,7 +372,7 @@ def map_profile_domains(profile: UserCareerProfile) -> list[str]:
 def _dynamic_domain_terms(terms: Iterable[str | None]) -> set[str]:
     dynamic_terms: set[str] = set()
     for term in terms:
-        normalized = _normalize_key(str(term or "").replace("_", " "))
+        normalized = normalize_skill_key(str(term or "").replace("_", " "))
         words = [
             word
             for word in normalized.split()
@@ -473,29 +396,8 @@ def _profile_domain_context_terms(profile: UserCareerProfile) -> set[str]:
     return _dynamic_domain_terms(terms)
 
 
-def _seniority_level(title: str | None) -> str | None:
-    text = " " + _normalize_key(title) + " "
-    for level in reversed(_SENIORITY_ORDER):
-        if f" {level} " in text:
-            return level
-    for alias, level in _SENIORITY_ALIASES.items():
-        if f" {alias} " in text:
-            return level
-    return None
-
-
 def infer_seniority_gap(user_title: str | None, role_title: str | None) -> tuple[str, float]:
-    user_level = _seniority_level(user_title)
-    role_level = _seniority_level(role_title)
-    if not user_level or not role_level:
-        return "unknown", 0.70
-
-    distance = _SENIORITY_ORDER.index(role_level) - _SENIORITY_ORDER.index(user_level)
-    if distance == 0:
-        return "match", 1.0
-    if distance > 0:
-        return "stretch", max(0.25, 0.65 - (0.20 * (distance - 1)))
-    return "overqualified", max(0.75, 0.90 - (0.05 * (abs(distance) - 1)))
+    return seniority_gap(seniority_level_from_title(user_title), seniority_level_from_title(role_title))
 
 
 def _latest_experience_title(profile: UserCareerProfile) -> str | None:
@@ -521,9 +423,10 @@ def _fetch_catalog(
     roles_sql = """
         SELECT
             cr.role_id,
-            cr.job_title,
+            COALESCE(NULLIF(cr.processed_job_title, ''), cr.job_title) AS job_title,
             cr.job_description,
             cr.raw_skills,
+            cr.sort_skills,
             cr.domain_tags,
             rs.salary_median_monthly_gross_eur,
             esco.esco_title,
@@ -561,7 +464,7 @@ def _fetch_catalog(
                 "WHERE alias_key IS NOT NULL AND canonical_key IS NOT NULL"
             )
             alias_map = {
-                _normalize_key(row["alias_key"]): _normalize_key(row["canonical_key"])
+                normalize_skill_key(row["alias_key"]): normalize_skill_key(row["canonical_key"])
                 for row in cur.fetchall()
             }
 
@@ -572,7 +475,7 @@ def _fetch_catalog(
             role_skills: dict[str, list[str]] = defaultdict(list)
             for row in cur.fetchall():
                 role_id = str(row["role_id"])
-                normalized = _normalize_key(row["normalized_skill_name"])
+                normalized = normalize_skill_key(row["normalized_skill_name"])
                 if normalized and normalized not in role_skills[role_id]:
                     role_skills[role_id].append(normalized)
 
@@ -598,18 +501,13 @@ def _fetch_catalog(
 
 
 def _role_required_skills(row: dict, role_skills: dict[str, list[str]], alias_map: dict[str, str]) -> list[str]:
+    required = required_skills_from_sort_skills(row.get("sort_skills"))
+    if required:
+        return required
     role_id = str(row["role_id"])
     if role_skills.get(role_id):
         return role_skills[role_id]
     return normalize_user_skills(_listify(row.get("raw_skills")), alias_map)
-
-
-def _overlap(required: list[str], available: set[str]) -> tuple[float, list[str], list[str]]:
-    if not required:
-        return 0.0, [], []
-    matched = [skill for skill in required if skill in available]
-    missing = [skill for skill in required if skill not in available]
-    return len(matched) / len(required), matched, missing
 
 
 def _domain_overlap(
@@ -620,13 +518,13 @@ def _domain_overlap(
     role_title: str | None = None,
     esco_title: str | None = None,
 ) -> tuple[float, list[str]]:
-    role_domain_set = {_normalize_key(domain).replace(" ", "_") for domain in role_domains}
+    role_domain_set = {normalize_skill_key(domain).replace(" ", "_") for domain in role_domains}
     profile_domain_set = set(profile_domains)
-    matched = [domain for domain in role_domains if _normalize_key(domain).replace(" ", "_") in profile_domain_set]
+    matched = [domain for domain in role_domains if normalize_skill_key(domain).replace(" ", "_") in profile_domain_set]
     if not role_domain_set:
         base_overlap = 0.0
     else:
-        base_overlap = len({_normalize_key(domain).replace(" ", "_") for domain in matched}) / len(
+        base_overlap = len({normalize_skill_key(domain).replace(" ", "_") for domain in matched}) / len(
             role_domain_set
         )
 
@@ -665,9 +563,10 @@ def _candidate_from_row(
 ) -> Candidate:
     role_id = str(row["role_id"])
     required_skills = _role_required_skills(row, role_skills, alias_map)
-    alignment = align_skills(required_skills, skill_evidence, alias_map)
+    skill_weights = skill_weight_map(row.get("sort_skills"))
+    alignment = align_skills(required_skills, skill_evidence, alias_map, skill_weights)
 
-    role_domains = [_normalize_key(domain).replace(" ", "_") for domain in _listify(row.get("domain_tags"))]
+    role_domains = [normalize_skill_key(domain).replace(" ", "_") for domain in _listify(row.get("domain_tags"))]
     domain_overlap, matched_domains = _domain_overlap(
         role_domains,
         profile_domains,
@@ -677,7 +576,7 @@ def _candidate_from_row(
     )
 
     cert_overlap, matched_certs = _cert_overlap(role_certs.get(role_id, []), user_cert_norms)
-    seniority_gap, seniority_fit = infer_seniority_gap(user_title, row.get("job_title"))
+    role_seniority_gap, role_seniority_fit = infer_seniority_gap(user_title, row.get("job_title"))
 
     return Candidate(
         role_id=role_id,
@@ -691,8 +590,8 @@ def _candidate_from_row(
         normalized_skill_overlap=alignment.coverage,
         interest_domain_overlap=domain_overlap,
         certification_overlap=cert_overlap,
-        seniority_fit=seniority_fit,
-        seniority_gap=seniority_gap,
+        seniority_fit=role_seniority_fit,
+        seniority_gap=role_seniority_gap,
         matched_skills=alignment.matched_skills,
         missing_skills=alignment.missing_skills,
         matched_domains=matched_domains,
@@ -703,7 +602,6 @@ def _candidate_from_row(
 def _match_roles_sync(
     profile: UserCareerProfile,
     top_k: int,
-    mode: RecommendationMode,
     include_debug: bool,
 ) -> RoleMatchResponse:
     from backend.app.features.role_matching.embedder import get_embedder
@@ -740,9 +638,8 @@ def _match_roles_sync(
 
     buckets = recommend(
         candidates,
-        top_k=None if top_k == 9 and mode == RecommendationMode.BALANCED else top_k,
-        mode=mode,
-        per_bucket=3 if top_k == 9 and mode == RecommendationMode.BALANCED else None,
+        top_k=None if top_k == 9 else top_k,
+        per_bucket=3 if top_k == 9 else None,
     )
     logger.info(
         "Matched %d roles -> ready=%d next=%d aspirational=%d",
@@ -751,9 +648,14 @@ def _match_roles_sync(
         len(buckets.next_step),
         len(buckets.aspirational),
     )
+    logger.info(
+        "Recommended role_ids: ready_now=%s next_step=%s aspirational=%s",
+        [role.role_id for role in buckets.ready_now],
+        [role.role_id for role in buckets.next_step],
+        [role.role_id for role in buckets.aspirational],
+    )
 
     return RoleMatchResponse(
-        mode=mode,
         buckets=buckets,
         debug=RoleMatchDebug(
             capability_text=capability_text,
@@ -835,10 +737,9 @@ async def _apply_role_summaries(_profile: UserCareerProfile, response: RoleMatch
 async def match_roles_for_profile(
     profile: UserCareerProfile,
     top_k: int = 9,
-    mode: RecommendationMode = RecommendationMode.BALANCED,
     include_debug: bool = False,
 ) -> RoleMatchResponse:
     """Offload blocking embedding + DB work to a worker thread."""
-    response = await asyncio.to_thread(_match_roles_sync, profile, top_k, mode, include_debug)
+    response = await asyncio.to_thread(_match_roles_sync, profile, top_k, include_debug)
     await _apply_role_summaries(profile, response)
     return response

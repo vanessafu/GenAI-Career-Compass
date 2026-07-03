@@ -170,7 +170,7 @@ function RoleCard({
 
       <div className="flex items-start justify-between gap-3">
         <h3
-          className="font-display tracking-tight text-balance"
+          className="min-w-0 flex-1 font-display tracking-tight text-balance break-words"
           style={{ fontSize: "clamp(1.08rem, 1.45vw, 1.25rem)", lineHeight: 1.15 }}
         >
           {role.title}

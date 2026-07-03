@@ -4,22 +4,10 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-class RecommendationMode(str, Enum):
-    BALANCED = "balanced"
-    GROWTH = "growth"
-    SAFE = "safe"
-    balanced = "balanced"
-    growth = "growth"
-    safe = "safe"
-
-
 class RecommendationBucket(str, Enum):
     READY_NOW = "ready_now"
     NEXT_STEP = "next_step"
     ASPIRATIONAL = "aspirational"
-    ready_now = "ready_now"
-    next_step = "next_step"
-    aspirational = "aspirational"
 
 
 DimensionStatus = Literal["strong", "partial", "weak"]
@@ -34,12 +22,44 @@ class ScoringWeights(BaseModel):
     seniority_fit: float = 0.07
 
 
+# Used only to compute the score shown to the user, independent of which
+# bucket-specific weights won the candidate its bucket assignment.
 DEFAULT_WEIGHTS = ScoringWeights()
 
-_DISPLAY_SCORE_RANGES = {
-    RecommendationBucket.READY_NOW: (90, 98),
-    RecommendationBucket.NEXT_STEP: (76, 89),
-    RecommendationBucket.ASPIRATIONAL: (55, 75),
+BUCKET_WEIGHTS: dict[RecommendationBucket, ScoringWeights] = {
+    RecommendationBucket.READY_NOW: ScoringWeights(
+        capability_vector_similarity=0.30,
+        intent_vector_similarity=0.11,
+        normalized_skill_overlap=0.43,
+        interest_domain_overlap=0.03,
+        certification_overlap=0.05,
+        seniority_fit=0.08,
+    ),
+    RecommendationBucket.NEXT_STEP: ScoringWeights(
+        capability_vector_similarity=0.13,
+        intent_vector_similarity=0.08,
+        normalized_skill_overlap=0.37,
+        interest_domain_overlap=0.47,
+        certification_overlap=0.08,
+        seniority_fit=0.07,
+    ),
+    RecommendationBucket.ASPIRATIONAL: ScoringWeights(
+        capability_vector_similarity=0.10,
+        intent_vector_similarity=0.55,
+        normalized_skill_overlap=0.15,
+        interest_domain_overlap=0.05,
+        certification_overlap=0.10,
+        seniority_fit=0.05,
+    ),
+}
+
+# Bucket-calibrated display ranges: guarantees ready_now always displays above
+# next_step, which always displays above aspirational, regardless of the raw
+# final_score (which is computed with one shared formula across all buckets).
+_DISPLAY_SCORE_RANGES: dict[RecommendationBucket, tuple[int, int]] = {
+    RecommendationBucket.READY_NOW: (85, 100),
+    RecommendationBucket.NEXT_STEP: (70, 85),
+    RecommendationBucket.ASPIRATIONAL: (50, 70),
 }
 
 
@@ -255,12 +275,10 @@ class RoleMatchRequest(BaseModel):
 
     profile: UserCareerProfile
     top_k: int = Field(default=9, ge=1, le=20)
-    mode: RecommendationMode = RecommendationMode.BALANCED
     include_debug: bool = False
 
 
 class RoleMatchResponse(BaseModel):
-    mode: RecommendationMode
     buckets: BucketedRoles
     debug: Optional[RoleMatchDebug] = None
 
@@ -268,6 +286,7 @@ class RoleMatchResponse(BaseModel):
 class SkillGap(BaseModel):
     skill: str = ""
     importance: str = ""
+    domain: str = ""
     suggestion: str = ""
     required_skill: str = ""
     user_closest_skill: Optional[str] = None
@@ -276,19 +295,13 @@ class SkillGap(BaseModel):
     source: str = ""
 
 
-class GapAnalysis(BaseModel):
-    missing_essential: list[SkillGap] = Field(default_factory=list)
-    missing_optional: list[SkillGap] = Field(default_factory=list)
-    bridge_projects: list[str] = Field(default_factory=list)
-    learning_plan: list[str] = Field(default_factory=list)
-    estimated_months: int = 0
-
-
 class SkillDimension(BaseModel):
     matched_skills: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)
     optional_missing_skills: list[str] = Field(default_factory=list)
     skill_gaps: list[SkillGap] = Field(default_factory=list)
+    domain_coverage: dict[str, float] = Field(default_factory=dict)
+    domain_skills: dict[str, list[str]] = Field(default_factory=dict)
     coverage: float = 0.0
     status: DimensionStatus = "weak"
     summary: str = ""
@@ -318,9 +331,6 @@ class CertificationDimension(BaseModel):
 
 
 class SeniorityDimension(BaseModel):
-    user_seniority: str = "unknown"
-    role_seniority: str = "unknown"
-    fit: str = "unknown"
     user_level: Optional[str] = None
     role_level: Optional[str] = None
     user_years: Optional[int] = None

@@ -19,6 +19,9 @@ OPENAI_ROLE_DESCRIPTION_MODEL = os.getenv("OPENAI_ROLE_DESCRIPTION_MODEL", "gpt-
 OPENAI_CAREER_PATH_MODEL = os.getenv("OPENAI_CAREER_PATH_MODEL", "gpt-5.4")
 OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.0"))
 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Pipeline artifacts: every step persists its output under this directory.

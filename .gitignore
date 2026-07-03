@@ -22,6 +22,7 @@ playwright-report/
 test-results/
 blob-report/
 database/supabase/.temp/
+backend/scripts/last_llm_failures.txt
 
 # Frontend
 frontend/node_modules/

@@ -6,10 +6,28 @@ from typing import Any, Iterable
 
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
 from backend.app.features.cv_parsing.schemas import CVData
+from backend.app.features.role_matching.normalization import clean_alias_map, normalize_skill_key
 
 FULL_CREDIT = 1.0
 TOKEN_CREDIT = 0.75
 CONTEXT_CREDIT = 0.6
+
+# Skill importance weighting (0-1 scores from career_roles.sort_skills).
+# Tiers mirror the Gemini ranking prompt in backend/scripts/role_embeddings.py.
+ESSENTIAL_WEIGHT = 0.75
+IMPORTANT_WEIGHT = 0.40
+DEFAULT_SKILL_WEIGHT = 0.5  # used when a required skill has no known importance score
+_IMPORTANCE_RANK = {"essential": 0, "important": 1, "nice_to_have": 2, "": 3}
+
+
+def skill_importance_tier(weight: float | None) -> str:
+    if weight is None:
+        return ""
+    if weight >= ESSENTIAL_WEIGHT:
+        return "essential"
+    if weight >= IMPORTANT_WEIGHT:
+        return "important"
+    return "nice_to_have"
 
 
 @dataclass(frozen=True)
@@ -24,12 +42,8 @@ class SkillAlignment:
     matched_skills: list[str]
     missing_skills: list[str]
     skill_gaps: list[dict[str, Any]]
-
-
-def normalize_skill_key(value: str | None) -> str:
-    value = (value or "").casefold()
-    value = re.sub(r"[^a-z0-9+#]+", " ", value)
-    return re.sub(r"\s+", " ", value).strip()
+    domain_scores: dict[str, float] = field(default_factory=dict)
+    domain_skills: dict[str, list[str]] = field(default_factory=dict)
 
 
 def _compact(value: str) -> str:
@@ -54,14 +68,6 @@ def _dedupe(values: Iterable[str | None]) -> list[str]:
 def _canon(value: str, alias_map: dict[str, str]) -> str:
     key = normalize_skill_key(value)
     return alias_map.get(key, key)
-
-
-def _clean_alias_map(alias_map: dict[str, str]) -> dict[str, str]:
-    return {
-        normalize_skill_key(alias): normalize_skill_key(canonical)
-        for alias, canonical in alias_map.items()
-        if normalize_skill_key(alias) and normalize_skill_key(canonical)
-    }
 
 
 def _text_parts(value: Any) -> list[str]:
@@ -224,24 +230,51 @@ def align_skills(
     required_skills: Iterable[str],
     evidence: SkillEvidence,
     alias_map: dict[str, str] | None = None,
+    skill_weights: dict[str, float] | None = None,
+    skill_domains: dict[str, str] | None = None,
 ) -> SkillAlignment:
-    aliases = _clean_alias_map(alias_map or {})
+    """skill_weights maps canonical skill keys to a 0-1 importance score, and
+    skill_domains maps them to an industry-category label (e.g. "Backend") -
+    both sourced from career_roles.sort_skills. When skill_weights is given,
+    coverage is importance-weighted and each skill_gap gets an `importance`
+    tier instead of every skill counting equally; skill_domains (if given)
+    attaches a `domain` to each gap for domain-level grouping downstream."""
+    aliases = clean_alias_map(alias_map or {})
     required = _dedupe(_canon(skill, aliases) for skill in required_skills)
     if not required:
         return SkillAlignment(coverage=0.0, matched_skills=[], missing_skills=[], skill_gaps=[])
+
+    weights = {_canon(skill, aliases): weight for skill, weight in (skill_weights or {}).items()}
+    domains = {_canon(skill, aliases): domain for skill, domain in (skill_domains or {}).items()}
 
     explicit = _dedupe(_canon(skill, aliases) for skill in evidence.explicit_terms)
     matched: list[str] = []
     missing: list[str] = []
     gaps: list[dict[str, Any]] = []
-    score_sum = 0.0
+    weighted_score_sum = 0.0
+    weight_sum = 0.0
+    domain_totals: dict[str, float] = {}
+    domain_counts: dict[str, int] = {}
+    domain_skills: dict[str, list[str]] = {}
 
     for required_skill in required:
         score, closest = _best_score(required_skill, explicit, aliases)
         if score == 0:
             score, closest = _context_score(required_skill, evidence.context_terms, aliases)
 
-        score_sum += score
+        weight = weights.get(required_skill, DEFAULT_SKILL_WEIGHT if weights else 1.0)
+        weighted_score_sum += score * weight
+        weight_sum += weight
+
+        # Group by the domain label exactly as given (no canonicalization) so
+        # display text matches what the LLM produced; skills without a domain
+        # (role never reprocessed with the hierarchy prompt) fall back to
+        # being their own pseudo-domain, same as career_path's top-gap grouping.
+        domain = domains.get(required_skill) or required_skill
+        domain_totals[domain] = domain_totals.get(domain, 0.0) + score
+        domain_counts[domain] = domain_counts.get(domain, 0) + 1
+        domain_skills.setdefault(domain, []).append(required_skill)
+
         if score >= TOKEN_CREDIT:
             matched.append(required_skill)
         if score == 0:
@@ -253,12 +286,22 @@ def align_skills(
                     "user_closest_skill": closest,
                     "transferability": score,
                     "severity": _severity(score),
+                    "importance": skill_importance_tier(weights.get(required_skill)),
+                    "domain": domains.get(required_skill, ""),
                 }
             )
 
+    gaps.sort(key=lambda gap: (_IMPORTANCE_RANK.get(gap["importance"], 3), gap["transferability"]))
+
+    domain_scores = {
+        domain: round(total / domain_counts[domain], 4) for domain, total in domain_totals.items()
+    }
+
     return SkillAlignment(
-        coverage=score_sum / len(required),
+        coverage=weighted_score_sum / weight_sum if weight_sum else 0.0,
         matched_skills=matched,
         missing_skills=missing,
         skill_gaps=gaps,
+        domain_scores=domain_scores,
+        domain_skills=domain_skills,
     )

@@ -14,7 +14,7 @@ The typed client lives in `frontend/src/lib/api.ts`. Its base URL is defined in
 | Entry upload | `POST /api/v1/profile-pipeline/parse-cv`    | Uploads a PDF and returns `ProfilePipelineResponse`.                |
 | Entry manual | `POST /api/v1/profile-pipeline/manual-cv`   | Posts `ManualCVInput` and returns the same pipeline response shape. |
 | Recap        | no extra backend call                       | Edits happen in frontend state and are merged back into `CVData`.   |
-| Matching     | `POST /api/v1/roles/match`                  | Sends `UserCareerProfile`, `top_k: 9`, `mode: "balanced"`.          |
+| Matching     | `POST /api/v1/roles/match`                  | Sends `UserCareerProfile`, `top_k: 9`.                              |
 | Gap analysis | `POST /api/v1/roles/{role_id}/gap-analysis` | Sends `ConfirmedCVData` for the selected role.                      |
 | Career path  | `POST /api/v1/roles/{role_id}/career-path`  | Sends `ConfirmedCVData`; response includes `requirement_breakdown`. |
 

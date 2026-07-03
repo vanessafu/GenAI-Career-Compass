@@ -63,7 +63,7 @@ export function FullPlanModal({
   const fallbackGapReport = gapReport ?? report?.requirement_breakdown ?? null;
   const targetRole = report?.target_role ?? role.title;
   const readiness = report
-    ? percent(report.readiness_score || report.requirement_breakdown.overall_readiness)
+    ? percent(report.readiness_score ?? report.requirement_breakdown.overall_readiness)
     : null;
   const planSummary = report ? reportPlanSummary(report) : "";
   const visibleMilestones = report ? displayMilestones(report.milestones) : [];
@@ -769,7 +769,7 @@ function reportPlanSummary(report: CareerPathReport): string {
   const gaps = report.top_gaps.filter(Boolean).slice(0, 3);
   const matched = report.requirement_breakdown.skills.matched_skills.filter(Boolean).slice(0, 3);
   const readiness = percent(
-    report.readiness_score || report.requirement_breakdown.overall_readiness,
+    report.readiness_score ?? report.requirement_breakdown.overall_readiness,
   );
   const closeness =
     readiness >= 75

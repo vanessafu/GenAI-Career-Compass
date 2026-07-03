@@ -9,11 +9,10 @@ from pathlib import Path
 from pydantic import ValidationError
 
 import backend.app.features.role_matching.schemas as role_schemas
-from backend.app.features.role_matching.recommendation import Candidate, recommend
+from backend.app.features.role_matching.recommendation import Candidate, _effective_domain_overlap, recommend
 from backend.app.features.role_matching.schemas import (
     CareerIdentity,
     RecommendationBucket,
-    RecommendationMode,
     RoleMatchRequest,
     UserCareerProfile,
     UserCertification,
@@ -26,6 +25,7 @@ from backend.app.features.role_matching.service import (
     _clean_role_card_summary,
     _cert_overlap,
     _match_roles_sync,
+    _role_required_skills,
     build_capability_text,
     build_intent_text,
     infer_seniority_gap,
@@ -101,7 +101,6 @@ class CleanProfileSchemaTests(unittest.TestCase):
     def test_valid_screenshot_shaped_profile_is_accepted(self) -> None:
         request = RoleMatchRequest(profile=sample_profile(), top_k=3)
 
-        self.assertEqual(request.mode, RecommendationMode.balanced)
         self.assertFalse(request.include_debug)
         self.assertEqual(request.profile.career_identity.title, "Robust Systems Architect")
 
@@ -176,7 +175,7 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
                     job_title="Data Engineer",
                     description="Designs scalable data pipelines.",
                     final_score=0.95,
-                    bucket=RecommendationBucket.ready_now,
+                    bucket=RecommendationBucket.READY_NOW,
                     salary="EUR 95k",
                     esco_title="Data engineer",
                     esco_uri="http://data.europa.eu/esco/occupation/example",
@@ -199,7 +198,7 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
                         "role_id": 123,
                         "bucket": "ready_now",
                         "title": "Data Engineer",
-                        "matching_score": 98,
+                        "matching_score": 99,
                         "salary": "EUR 95k",
                         "description": "Designs scalable data pipelines.",
                         "esco_title": "Data engineer",
@@ -219,21 +218,21 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
                 role_id="ready",
                 job_title="Ready Role",
                 final_score=0.42,
-                bucket=RecommendationBucket.ready_now,
+                bucket=RecommendationBucket.READY_NOW,
                 signal_breakdown=role_schemas.RoleMatchSignalBreakdown(),
             ),
             role_schemas.RoleMatch(
                 role_id="next",
                 job_title="Next Role",
                 final_score=0.42,
-                bucket=RecommendationBucket.next_step,
+                bucket=RecommendationBucket.NEXT_STEP,
                 signal_breakdown=role_schemas.RoleMatchSignalBreakdown(),
             ),
             role_schemas.RoleMatch(
                 role_id="stretch",
                 job_title="Stretch Role",
                 final_score=0.42,
-                bucket=RecommendationBucket.aspirational,
+                bucket=RecommendationBucket.ASPIRATIONAL,
                 signal_breakdown=role_schemas.RoleMatchSignalBreakdown(),
             ),
         ]
@@ -243,7 +242,7 @@ class CareerResultsV1SchemaTests(unittest.TestCase):
             for role in roles
         ]
 
-        self.assertEqual([93, 81, 63], scores)
+        self.assertEqual([91, 76, 58], scores)
 
 
 class RoleCardSummaryGenerationTests(unittest.TestCase):
@@ -253,7 +252,7 @@ class RoleCardSummaryGenerationTests(unittest.TestCase):
             job_title="Business Intelligence Analyst",
             description="Analyzes data to provide insights and support business decision-making.",
             final_score=0.72,
-            bucket=RecommendationBucket.ready_now,
+            bucket=RecommendationBucket.READY_NOW,
             salary="EUR 67k",
             esco_title="Business analyst",
             matched_skills=["python", "sql", "tableau"],
@@ -263,7 +262,6 @@ class RoleCardSummaryGenerationTests(unittest.TestCase):
             signal_breakdown=role_schemas.RoleMatchSignalBreakdown(),
         )
         response = role_schemas.RoleMatchResponse(
-            mode=RecommendationMode.balanced,
             buckets=role_schemas.BucketedRoles(ready_now=[role]),
         )
         captured: dict[str, object] = {}
@@ -467,6 +465,33 @@ class SupabaseBackedNormalizationTests(unittest.TestCase):
         self.assertNotIn("profile_embeddings", source)
 
 
+class RoleRequiredSkillsSourceTests(unittest.TestCase):
+    def test_prefers_sort_skills_over_role_skills_table_and_raw_skills(self) -> None:
+        row = {
+            "role_id": "1",
+            "raw_skills": "Databases",
+            "sort_skills": [{"skill": "PostgreSQL", "domain": "Databases", "score": 0.9}],
+        }
+
+        required = _role_required_skills(row, role_skills={"1": ["databases"]}, alias_map={})
+
+        self.assertEqual(required, ["postgresql"])
+
+    def test_falls_back_to_role_skills_table_when_sort_skills_missing(self) -> None:
+        row = {"role_id": "1", "raw_skills": "Databases", "sort_skills": None}
+
+        required = _role_required_skills(row, role_skills={"1": ["postgresql"]}, alias_map={})
+
+        self.assertEqual(required, ["postgresql"])
+
+    def test_falls_back_to_raw_skills_when_neither_sort_skills_nor_table_available(self) -> None:
+        row = {"role_id": "1", "raw_skills": "PostgreSQL, Docker", "sort_skills": []}
+
+        required = _role_required_skills(row, role_skills={}, alias_map={})
+
+        self.assertEqual(required, ["postgresql", "docker"])
+
+
 class RankingBehaviorTests(unittest.TestCase):
     def test_backend_profile_ranks_backend_role_above_unrelated_role(self) -> None:
         backend = Candidate(
@@ -508,10 +533,10 @@ class RankingBehaviorTests(unittest.TestCase):
             matched_certifications=[],
         )
 
-        buckets = recommend([unrelated, backend], mode=RecommendationMode.balanced, per_bucket=3)
+        buckets = recommend([unrelated, backend], per_bucket=3)
 
         self.assertEqual(buckets.ready_now[0].role_id, 1)
-        self.assertEqual(buckets.ready_now[0].bucket, RecommendationBucket.ready_now)
+        self.assertEqual(buckets.ready_now[0].bucket, RecommendationBucket.READY_NOW)
         self.assertGreater(
             buckets.ready_now[0].signal_breakdown.normalized_skill_overlap,
             buckets.aspirational[0].signal_breakdown.normalized_skill_overlap,
@@ -524,10 +549,11 @@ class RankingBehaviorTests(unittest.TestCase):
                 Candidate(
                     role_id=f"ready-{i}",
                     job_title=f"Ready {i}",
-                    capability_vector_similarity=0.7,
-                    intent_vector_similarity=0.7,
-                    skill_overlap=0.7,
-                    seniority_fit=1.0,
+                    capability_vector_similarity=0.75,
+                    intent_vector_similarity=0.6,
+                    skill_overlap=0.75,
+                    domain_overlap=0.1,
+                    seniority_fit=0.9,
                     seniority_gap="match",
                 )
             )
@@ -535,9 +561,10 @@ class RankingBehaviorTests(unittest.TestCase):
                 Candidate(
                     role_id=f"next-{i}",
                     job_title=f"Next {i}",
-                    capability_vector_similarity=0.7,
-                    intent_vector_similarity=0.7,
-                    skill_overlap=0.4,
+                    capability_vector_similarity=0.55,
+                    intent_vector_similarity=0.55,
+                    skill_overlap=0.45,
+                    domain_overlap=0.85,
                     seniority_fit=0.7,
                     seniority_gap="unknown",
                 )
@@ -546,15 +573,16 @@ class RankingBehaviorTests(unittest.TestCase):
                 Candidate(
                     role_id=f"asp-{i}",
                     job_title=f"Aspirational {i}",
-                    capability_vector_similarity=0.7,
-                    intent_vector_similarity=0.7,
+                    capability_vector_similarity=0.35,
+                    intent_vector_similarity=0.75,
                     skill_overlap=0.1,
-                    seniority_fit=0.7,
+                    domain_overlap=0.2,
+                    seniority_fit=0.6,
                     seniority_gap="unknown",
                 )
             )
 
-        buckets = recommend(candidates, mode=RecommendationMode.balanced, top_k=6)
+        buckets = recommend(candidates, top_k=6)
 
         self.assertEqual(2, len(buckets.ready_now))
         self.assertEqual(2, len(buckets.next_step))
@@ -567,9 +595,10 @@ class RankingBehaviorTests(unittest.TestCase):
                 Candidate(
                     role_id=f"next-{i}",
                     job_title=f"Next {i}",
-                    capability_vector_similarity=0.7,
-                    intent_vector_similarity=0.7,
-                    skill_overlap=0.4,
+                    capability_vector_similarity=0.55,
+                    intent_vector_similarity=0.55,
+                    skill_overlap=0.45,
+                    domain_overlap=0.85,
                     seniority_fit=0.7,
                     seniority_gap="unknown",
                 )
@@ -578,21 +607,22 @@ class RankingBehaviorTests(unittest.TestCase):
                 Candidate(
                     role_id=f"asp-{i}",
                     job_title=f"Aspirational {i}",
-                    capability_vector_similarity=0.7,
-                    intent_vector_similarity=0.7,
+                    capability_vector_similarity=0.35,
+                    intent_vector_similarity=0.75,
                     skill_overlap=0.1,
-                    seniority_fit=0.7,
+                    domain_overlap=0.2,
+                    seniority_fit=0.6,
                     seniority_gap="unknown",
                 )
             )
 
-        buckets = recommend(candidates, mode=RecommendationMode.balanced, top_k=6)
+        buckets = recommend(candidates, top_k=6)
 
         self.assertEqual(0, len(buckets.ready_now))
         self.assertEqual(3, len(buckets.next_step))
         self.assertEqual(3, len(buckets.aspirational))
 
-    def test_default_match_path_does_not_redistribute_empty_bucket_slots(self) -> None:
+    def test_default_match_path_backfills_empty_bucket_from_genuine_overflow(self) -> None:
         rows = []
         role_skills: dict[str, list[str]] = {}
         for i in range(6):
@@ -605,7 +635,7 @@ class RankingBehaviorTests(unittest.TestCase):
                         "job_title": f"Next {i}",
                         "job_description": "Builds useful data tools.",
                         "raw_skills": "",
-                        "domain_tags": "",
+                        "domain_tags": "backend",
                         "salary_median_monthly_gross_eur": None,
                         "capability_vector_similarity": 0.7,
                         "intent_vector_similarity": 0.7,
@@ -643,39 +673,44 @@ class RankingBehaviorTests(unittest.TestCase):
             response = _match_roles_sync(
                 sample_profile(),
                 top_k=9,
-                mode=RecommendationMode.balanced,
                 include_debug=False,
             )
 
-        self.assertEqual(0, len(response.buckets.ready_now))
+        # next_step only has room for 3 of the 6 "next"-shaped roles; the 3 that don't
+        # fit are genuine overflow with real skill/domain evidence, so they backfill
+        # ready_now instead of leaving it empty. The weak "asp" roles (zero skill,
+        # zero domain overlap) are never displaced from their own natural bucket.
+        self.assertEqual(3, len(response.buckets.ready_now))
+        self.assertEqual({"next-3", "next-4", "next-5"}, {r.role_id for r in response.buckets.ready_now})
         self.assertEqual(3, len(response.buckets.next_step))
+        self.assertEqual({"next-0", "next-1", "next-2"}, {r.role_id for r in response.buckets.next_step})
         self.assertEqual(3, len(response.buckets.aspirational))
+        self.assertEqual({"asp-0", "asp-1", "asp-2"}, {r.role_id for r in response.buckets.aspirational})
 
     def test_ready_now_requires_skill_and_capability_alignment(self) -> None:
         aligned_broad_role = Candidate(
             role_id="aligned",
             job_title="Software Engineer",
-            capability_vector_similarity=0.70,
-            intent_vector_similarity=0.65,
-            skill_overlap=0.60,
-            domain_overlap=1.0,
-            seniority_fit=0.7,
+            capability_vector_similarity=0.75,
+            intent_vector_similarity=0.55,
+            skill_overlap=0.70,
+            domain_overlap=0.15,
+            seniority_fit=0.85,
             seniority_gap="unknown",
         )
         narrow_tool_role = Candidate(
             role_id="tool",
             job_title="Specific Tool Engineer",
-            capability_vector_similarity=0.55,
-            intent_vector_similarity=0.65,
-            skill_overlap=0.70,
-            domain_overlap=1.0,
+            capability_vector_similarity=0.50,
+            intent_vector_similarity=0.55,
+            skill_overlap=0.55,
+            domain_overlap=0.85,
             seniority_fit=0.7,
             seniority_gap="unknown",
         )
 
         buckets = recommend(
             [aligned_broad_role, narrow_tool_role],
-            mode=RecommendationMode.balanced,
             top_k=2,
         )
 
@@ -722,7 +757,7 @@ class RankingBehaviorTests(unittest.TestCase):
             matched_certifications=["AWS Certified Developer - Associate"],
         )
 
-        buckets = recommend([without_cert, with_cert], mode=RecommendationMode.balanced, per_bucket=2)
+        buckets = recommend([without_cert, with_cert], per_bucket=2)
 
         self.assertEqual(buckets.next_step[0].role_id, 2)
         self.assertGreater(
@@ -754,7 +789,7 @@ class RankingBehaviorTests(unittest.TestCase):
             seniority_gap="unknown",
         )
 
-        buckets = recommend([ai_stretch, ready_backend], mode=RecommendationMode.balanced, per_bucket=3)
+        buckets = recommend([ai_stretch, ready_backend], per_bucket=3)
 
         self.assertEqual(buckets.ready_now[0].role_id, 1)
         self.assertEqual(buckets.aspirational[0].role_id, 2)
@@ -772,7 +807,7 @@ class RankingBehaviorTests(unittest.TestCase):
             seniority_gap="unknown",
         )
 
-        buckets = recommend([intent_only], mode=RecommendationMode.balanced, per_bucket=3)
+        buckets = recommend([intent_only], per_bucket=3)
 
         self.assertEqual([], buckets.ready_now)
         self.assertEqual([], buckets.next_step)
@@ -806,9 +841,19 @@ class RankingBehaviorTests(unittest.TestCase):
             matched_domains=["architecture", "cloud"],
         )
 
-        buckets = recommend([java_architect, java_developer], mode=RecommendationMode.balanced, per_bucket=3)
+        # java_architect's raw domain_overlap (1.0) is double java_developer's (0.50), but
+        # its thinner skill_overlap (0.25 vs 0.40) drops it into the damping bracket that caps
+        # effective domain at 0.50 - so the two end up with the *same* effective domain, and
+        # java_developer's stronger skill signal should make it score higher overall.
+        self.assertEqual(_effective_domain_overlap(java_developer), 0.50)
+        self.assertEqual(_effective_domain_overlap(java_architect), 0.50)
 
-        self.assertEqual(buckets.next_step[0].role_id, 1)
+        buckets = recommend([java_architect, java_developer], top_k=2)
+        combined = [*buckets.ready_now, *buckets.next_step, *buckets.aspirational]
+        self.assertGreater(
+            next(r.final_score for r in combined if r.role_id == 1),
+            next(r.final_score for r in combined if r.role_id == 2),
+        )
 
     def test_senior_profile_is_not_penalized_for_senior_role(self) -> None:
         self.assertEqual(

@@ -234,6 +234,7 @@ export type DimensionStatus = "strong" | "partial" | "weak";
 export type SkillGap = {
   skill: string;
   importance: string;
+  domain: string;
   suggestion: string;
   required_skill: string;
   user_closest_skill: string | null;
@@ -247,6 +248,8 @@ export type SkillDimension = {
   missing_skills: string[];
   optional_missing_skills: string[];
   skill_gaps: SkillGap[];
+  domain_coverage: Record<string, number>;
+  domain_skills: Record<string, string[]>;
   coverage: number;
   status: DimensionStatus;
   summary: string;
@@ -276,9 +279,6 @@ export type CertificationDimension = {
 };
 
 export type SeniorityDimension = {
-  user_seniority: string;
-  role_seniority: string;
-  fit: string;
   user_level: string | null;
   role_level: string | null;
   user_years: number | null;
@@ -440,7 +440,6 @@ export async function matchRoles(profile: UserCareerProfile, topK = 9): Promise<
     body: JSON.stringify({
       profile,
       top_k: topK,
-      mode: "balanced",
       include_debug: false,
     }),
   });

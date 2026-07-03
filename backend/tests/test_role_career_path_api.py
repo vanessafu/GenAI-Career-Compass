@@ -354,3 +354,67 @@ def test_career_path_prompt_requests_exact_milestone_durations():
 
     assert "timeline as a single duration" in career_path._SYSTEM_PROMPT
     assert "Do not output ranges" in career_path._SYSTEM_PROMPT
+
+
+def test_top_skill_gaps_groups_by_domain_and_ranks_by_worst_gap():
+    from backend.app.features.role_matching import career_path
+
+    report = GapReport(
+        role_id=1,
+        job_title="Backend Engineer",
+        skills=SkillDimension(
+            skill_gaps=[
+                SkillGap(
+                    required_skill="Docker",
+                    domain="DevOps",
+                    importance="important",
+                    severity="medium",
+                    transferability=0.4,
+                ),
+                SkillGap(
+                    required_skill="Kubernetes",
+                    domain="DevOps",
+                    importance="essential",
+                    severity="high",
+                    transferability=0.0,
+                ),
+                SkillGap(
+                    required_skill="PostgreSQL",
+                    domain="Databases",
+                    importance="important",
+                    severity="medium",
+                    transferability=0.5,
+                ),
+            ]
+        ),
+    )
+
+    top_gaps = career_path._top_skill_gaps(report)
+
+    # DevOps contains the single worst gap (essential/high/0.0) so it ranks
+    # ahead of Databases even though DevOps also has a milder gap (Docker).
+    assert top_gaps == ["DevOps", "Databases"]
+
+
+def test_top_skill_gaps_falls_back_to_skill_name_when_domain_is_missing():
+    from backend.app.features.role_matching import career_path
+
+    report = GapReport(
+        role_id=1,
+        job_title="Backend Engineer",
+        skills=SkillDimension(
+            skill_gaps=[
+                SkillGap(
+                    required_skill="GraphQL",
+                    domain="",
+                    importance="important",
+                    severity="medium",
+                    transferability=0.3,
+                ),
+            ]
+        ),
+    )
+
+    # Role never reprocessed with the domain hierarchy -> each ungrouped skill
+    # is its own pseudo-domain, so career path still has something to show.
+    assert career_path._top_skill_gaps(report) == ["GraphQL"]

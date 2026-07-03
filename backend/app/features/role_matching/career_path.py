@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections import defaultdict
 from typing import Iterable
 
 from backend.app.core.openai_client import parse_structured
@@ -94,13 +95,30 @@ def _skill_name(gap: SkillGap) -> str:
     return _clean(gap.required_skill or gap.skill)
 
 
+_IMPORTANCE_RANK = {"essential": 0, "important": 1, "nice_to_have": 2, "": 3}
+
+
 def _top_skill_gaps(report: GapReport) -> list[str]:
-    rank = {"high": 0, "medium": 1, "low": 2}
-    gaps = sorted(
-        report.skills.skill_gaps,
-        key=lambda gap: (rank.get(gap.severity, 3), gap.transferability),
-    )
-    return _unique(_skill_name(gap) for gap in gaps)[:MAX_GAPS]
+    """Career-path display groups gaps at the domain level (e.g. "Backend",
+    "DevOps") instead of individual skills - everything else (matched_skills,
+    missing_skills, the LLM prompt payload's per-skill detail, etc.) still
+    works with specific skills. Roles never reprocessed with the domain
+    hierarchy (gap.domain empty) fall back to using the skill name itself as
+    its own pseudo-domain so career path still has something to show."""
+    severity_rank = {"high": 0, "medium": 1, "low": 2}
+    domain_gaps: dict[str, list[SkillGap]] = defaultdict(list)
+    for gap in report.skills.skill_gaps:
+        domain_gaps[gap.domain or _skill_name(gap)].append(gap)
+
+    def domain_rank(domain: str) -> tuple[int, int, float]:
+        gaps = domain_gaps[domain]
+        best_importance = min(_IMPORTANCE_RANK.get(gap.importance, 3) for gap in gaps)
+        best_severity = min(severity_rank.get(gap.severity, 3) for gap in gaps)
+        avg_transferability = sum(gap.transferability for gap in gaps) / len(gaps)
+        return (best_importance, best_severity, avg_transferability)
+
+    ordered_domains = sorted(domain_gaps, key=domain_rank)
+    return _unique(ordered_domains)[:MAX_GAPS]
 
 
 def _profile_summary(profile: ConfirmedCVData) -> str:

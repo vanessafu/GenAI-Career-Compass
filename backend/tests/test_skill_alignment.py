@@ -8,7 +8,6 @@ from backend.app.features.role_matching import gap_analysis
 from backend.app.features.role_matching.career_path import timeline_from_readiness
 from backend.app.features.role_matching.schemas import (
     CareerIdentity,
-    RecommendationMode,
     UserCareerProfile,
     UserExperience,
     UserProject,
@@ -103,6 +102,56 @@ def test_context_only_role_family_credit_is_partial_not_full() -> None:
     assert result.skill_gaps[0]["transferability"] == result.coverage
 
 
+def test_align_skills_attaches_domain_to_gaps_when_given() -> None:
+    evidence = build_skill_evidence_from_confirmed_profile(robotics_profile())
+
+    result = align_skills(
+        ["Robotics", "Kubernetes"],
+        evidence,
+        alias_map={},
+        skill_domains={"robotics": "Robotics", "kubernetes": "DevOps"},
+    )
+
+    domains_by_skill = {gap["required_skill"]: gap["domain"] for gap in result.skill_gaps}
+    assert domains_by_skill == {"robotics": "Robotics", "kubernetes": "DevOps"}
+
+
+def test_align_skills_domain_defaults_to_empty_when_not_given() -> None:
+    evidence = build_skill_evidence_from_confirmed_profile(robotics_profile())
+
+    result = align_skills(["Kubernetes"], evidence, alias_map={})
+
+    assert result.skill_gaps[0]["domain"] == ""
+
+
+def test_align_skills_domain_scores_average_per_domain_using_raw_domain_label() -> None:
+    evidence = build_skill_evidence_from_confirmed_profile(robotics_profile())
+
+    result = align_skills(
+        ["ROS", "LiDAR", "Kubernetes"],
+        evidence,
+        alias_map={},
+        # "Robotics" is the raw domain label straight from sort_skills - it must
+        # come back exactly as given, not lowercased/canonicalized.
+        skill_domains={"ros": "Robotics", "lidar": "Robotics", "kubernetes": "DevOps"},
+    )
+
+    # ROS and LiDAR both have strong evidence -> Robotics domain averages high.
+    assert result.domain_scores["Robotics"] > 0.7
+    # Kubernetes has zero evidence and is the only skill in DevOps -> 0.0.
+    assert result.domain_scores["DevOps"] == 0.0
+    assert set(result.domain_skills["Robotics"]) == {"ros", "lidar"}
+    assert result.domain_skills["DevOps"] == ["kubernetes"]
+
+
+def test_align_skills_domain_scores_fall_back_to_skill_name_when_no_domain_given() -> None:
+    evidence = build_skill_evidence_from_confirmed_profile(robotics_profile())
+
+    result = align_skills(["Kubernetes"], evidence, alias_map={})
+
+    assert result.domain_scores == {"kubernetes": 0.0}
+
+
 def test_matching_ranks_niche_aligned_role_above_generic_ai(monkeypatch) -> None:
     profile = UserCareerProfile(
         career_identity=CareerIdentity(
@@ -175,7 +224,7 @@ def test_matching_ranks_niche_aligned_role_above_generic_ai(monkeypatch) -> None
         ),
     )
 
-    response = _match_roles_sync(profile, top_k=2, mode=RecommendationMode.balanced, include_debug=True)
+    response = _match_roles_sync(profile, top_k=2, include_debug=True)
     roles = [
         *response.buckets.ready_now,
         *response.buckets.next_step,
@@ -202,11 +251,14 @@ def test_gap_analysis_uses_shared_alignment_for_niche_variants(monkeypatch) -> N
     monkeypatch.setattr(gap_analysis, "_fetch_role_certs", lambda role_id: [])
     monkeypatch.setattr(
         gap_analysis,
-        "_fetch_role_skill_data",
-        lambda role_id: (
-            ["Robotics", "ROS", "Embedded Systems"],
-            {"ros2": "ros", "nvidia jetson": "embedded systems"},
-        ),
+        "_fetch_skill_aliases",
+        lambda: {"ros2": "ros", "nvidia jetson": "embedded systems"},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        gap_analysis,
+        "_fetch_role_skills_from_table",
+        lambda role_id: ["Robotics", "ROS", "Embedded Systems"],
         raising=False,
     )
 
