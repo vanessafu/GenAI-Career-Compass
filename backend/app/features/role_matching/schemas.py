@@ -45,9 +45,9 @@ BUCKET_WEIGHTS: dict[RecommendationBucket, ScoringWeights] = {
     ),
     RecommendationBucket.ASPIRATIONAL: ScoringWeights(
         capability_vector_similarity=0.10,
-        intent_vector_similarity=0.35,
+        intent_vector_similarity=0.40,
         identity_vector_similarity=0.20,
-        normalized_skill_overlap=0.15,
+        normalized_skill_overlap=0.10,
         interest_domain_overlap=0.15,
         seniority_fit=0.05,
     ),
@@ -57,7 +57,7 @@ BUCKET_WEIGHTS: dict[RecommendationBucket, ScoringWeights] = {
 # next_step, which always displays above aspirational, regardless of the raw
 # final_score (which is computed with one shared formula across all buckets).
 _DISPLAY_SCORE_RANGES: dict[RecommendationBucket, tuple[int, int]] = {
-    RecommendationBucket.READY_NOW: (85, 100),
+    RecommendationBucket.READY_NOW: (85, 98),
     RecommendationBucket.NEXT_STEP: (70, 85),
     RecommendationBucket.ASPIRATIONAL: (50, 70),
 }

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Union
 
+from .normalization import SENIORITY_ALIASES, SENIORITY_ORDER, normalize_skill_key
 from .schemas import (
     BUCKET_WEIGHTS,
     BucketedRoles,
@@ -9,6 +10,15 @@ from .schemas import (
     RoleMatch,
     RoleMatchSignalBreakdown,
     ScoringWeights,
+)
+
+# Seniority modifiers (from the same vocabulary seniority_level_from_title uses
+# to *detect* a level) are stripped before comparing job-title tokens, so
+# "Senior Data Analyst" and "Data Analyst" read as the same role core - the
+# seniority difference is already captured by seniority_fit, and it's exactly
+# these level-only variants that were slipping through MMR as "diverse".
+_SENIORITY_TITLE_TOKENS = frozenset(SENIORITY_ORDER) | frozenset(
+    alias for alias in SENIORITY_ALIASES if " " not in alias
 )
 
 
@@ -109,17 +119,31 @@ def assign_bucket(candidate: Candidate) -> tuple[RecommendationBucket, float]:
     return _ranked_buckets(candidate)[0]
 
 
-def _role_similarity(a: Candidate, b: Candidate) -> float:
-    """Jaccard over each candidate's required_skills + domain_tags (both
-    already normalize_skill_key'd upstream) - the redundancy signal for MMR."""
+def _title_tokens(candidate: Candidate) -> set[str]:
+    tokens = normalize_skill_key(candidate.job_title).split()
+    return {token for token in tokens if token not in _SENIORITY_TITLE_TOKENS}
 
-    def tokens(candidate: Candidate) -> set[str]:
-        return {s.casefold() for s in (*candidate.required_skills, *candidate.domain_tags)}
 
-    sa, sb = tokens(a), tokens(b)
+def _jaccard(sa: set[str], sb: set[str]) -> float:
     if not sa or not sb:
         return 0.0
     return len(sa & sb) / len(sa | sb)
+
+
+def _role_similarity(a: Candidate, b: Candidate) -> float:
+    """Redundancy signal for MMR: the higher of (1) Jaccard over required_skills
+    + domain_tags (already normalize_skill_key'd upstream) and (2) Jaccard over
+    job-title tokens (seniority words stripped). Two postings with near-identical
+    titles but differently-listed skills - the common case for duplicate/near-
+    duplicate job ads - are exactly what (1) alone was missing, so the max of
+    the two keeps either signal from masking the other."""
+
+    def skill_domain_tokens(candidate: Candidate) -> set[str]:
+        return {s.casefold() for s in (*candidate.required_skills, *candidate.domain_tags)}
+
+    skill_sim = _jaccard(skill_domain_tokens(a), skill_domain_tokens(b))
+    title_sim = _jaccard(_title_tokens(a), _title_tokens(b))
+    return max(skill_sim, title_sim)
 
 
 def _mmr_select(
