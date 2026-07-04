@@ -58,8 +58,8 @@ BUCKET_WEIGHTS: dict[RecommendationBucket, ScoringWeights] = {
 # final_score (which is computed with one shared formula across all buckets).
 _DISPLAY_SCORE_RANGES: dict[RecommendationBucket, tuple[int, int]] = {
     RecommendationBucket.READY_NOW: (85, 98),
-    RecommendationBucket.NEXT_STEP: (70, 85),
-    RecommendationBucket.ASPIRATIONAL: (50, 70),
+    RecommendationBucket.NEXT_STEP: (70, 84),
+    RecommendationBucket.ASPIRATIONAL: (50, 69),
 }
 
 
