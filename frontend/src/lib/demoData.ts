@@ -191,7 +191,12 @@ export const DEMO_CV_DATA: CVData = {
       { name: "Cucumber", proficiency_indication: "beginner" },
       { name: "Data visualization", proficiency_indication: "intermediate" },
     ],
-    soft_skills: ["Release coordination", "QA collaboration", "Support empathy"],
+    inferred_skills: [],
+    soft_skills: [
+      { name: "Release coordination", confidence: 85 },
+      { name: "QA collaboration", confidence: 80 },
+      { name: "Support empathy", confidence: 75 },
+    ],
     languages: [
       { language: "English", level: "C1" },
       { language: "Spanish", level: "B2" },
@@ -204,6 +209,7 @@ export const DEMO_CV_DATA: CVData = {
     "developer tooling",
     "service reliability",
   ],
+  potential_direction: null,
   unmapped_information: [
     {
       label: "target_constraint",
@@ -232,6 +238,7 @@ export const DEMO_EMBEDDING_PROFILE: EmbeddingProfile = {
   interests: DEMO_CV_DATA.interests,
   certifications: DEMO_CV_DATA.certifications,
   projects: DEMO_CV_DATA.projects,
+  potential_direction: "",
 };
 
 export const DEMO_ROLE_MATCHES = [
@@ -936,8 +943,10 @@ function skillGap(
   return {
     skill: requiredSkill,
     importance: severity,
+    domain: "",
     suggestion: bridge,
     required_skill: requiredSkill,
+    display: requiredSkill,
     user_closest_skill: closestSkill,
     transferability,
     severity,

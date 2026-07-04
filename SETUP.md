@@ -42,8 +42,12 @@ Optional model overrides:
 ## Running The Backend
 
 ```powershell
-uv run uvicorn backend.app.main:app --reload
+uv run uvicorn backend.app.main:app --reload --reload-dir backend
 ```
+
+`--reload-dir backend` keeps the file-watcher scoped to backend source code, so writes
+to `outputs/pipeline/` (debug artifacts written on every profile run) don't trigger a
+full server restart mid-request.
 
 The backend listens on `http://localhost:8000`.
 

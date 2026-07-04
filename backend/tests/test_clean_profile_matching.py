@@ -9,7 +9,13 @@ from pathlib import Path
 from pydantic import ValidationError
 
 import backend.app.features.role_matching.schemas as role_schemas
-from backend.app.features.role_matching.recommendation import Candidate, _effective_domain_overlap, recommend
+from backend.app.features.role_matching.recommendation import (
+    Candidate,
+    _effective_domain_overlap,
+    _mmr_select,
+    _role_similarity,
+    recommend,
+)
 from backend.app.features.role_matching.schemas import (
     CareerIdentity,
     RecommendationBucket,
@@ -27,6 +33,7 @@ from backend.app.features.role_matching.service import (
     _match_roles_sync,
     _role_required_skills,
     build_capability_text,
+    build_identity_text,
     build_intent_text,
     infer_seniority_gap,
     map_profile_domains,
@@ -332,15 +339,26 @@ class CleanProfileTextBuilderTests(unittest.TestCase):
         self.assertIn("Certification 1: AWS Certified Developer - Associate", text)
         self.assertIn("Project 1: Payment microservice migration", text)
 
-    def test_intent_text_contains_identity_and_interests_only(self) -> None:
-        text = build_intent_text(sample_profile())
+    def test_intent_text_contains_potential_direction_and_interests_only(self) -> None:
+        profile = sample_profile().model_copy(
+            update={"potential_direction": "Could grow into a platform reliability specialization."}
+        )
+        text = build_intent_text(profile)
+
+        self.assertIn("Potential direction: Could grow into a platform reliability specialization.", text)
+        self.assertIn("Interests: Artificial Intelligence, Big Data scale", text)
+        self.assertNotIn("Career identity", text)
+        self.assertNotIn("Robust Systems Architect", text)
+        self.assertNotIn("Payment microservice migration", text)
+        self.assertNotIn("AWS Certified Developer", text)
+
+    def test_identity_text_contains_career_identity_only(self) -> None:
+        text = build_identity_text(sample_profile())
 
         self.assertIn("Career identity: Robust Systems Architect", text)
         self.assertIn("Strong backend, cloud infrastructure", text)
-        self.assertIn("Interests: Artificial Intelligence, Big Data scale", text)
-        self.assertNotIn("possible", text.casefold())
+        self.assertNotIn("Interests", text)
         self.assertNotIn("Payment microservice migration", text)
-        self.assertNotIn("AWS Certified Developer", text)
 
 
 class SupabaseBackedNormalizationTests(unittest.TestCase):
@@ -660,8 +678,8 @@ class RankingBehaviorTests(unittest.TestCase):
             role_skills[asp_id] = ["rust", "go", "kubernetes"]
 
         class FakeEmbedder:
-            def encode_queries(self, texts: list[str]) -> tuple[list[float], list[float]]:
-                return [0.1], [0.2]
+            def encode_queries(self, texts: list[str]) -> list[list[float]]:
+                return [[0.1] for _ in texts]
 
         with (
             patch("backend.app.features.role_matching.embedder.get_embedder", return_value=FakeEmbedder()),
@@ -717,7 +735,11 @@ class RankingBehaviorTests(unittest.TestCase):
         self.assertEqual(["aligned"], [role.role_id for role in buckets.ready_now])
         self.assertEqual(["tool"], [role.role_id for role in buckets.next_step])
 
-    def test_exact_certification_match_improves_score(self) -> None:
+    def test_certification_overlap_is_display_only_and_does_not_affect_score(self) -> None:
+        """Certification is no longer a scoring dimension (dropped in favor of
+        identity_vector_similarity) - matched_certifications still displays,
+        but two otherwise-identical candidates score identically regardless
+        of certification_overlap."""
         without_cert = Candidate(
             role_id=1,
             job_title="Cloud Developer",
@@ -758,11 +780,41 @@ class RankingBehaviorTests(unittest.TestCase):
         )
 
         buckets = recommend([without_cert, with_cert], per_bucket=2)
+        all_roles = [*buckets.ready_now, *buckets.next_step, *buckets.aspirational]
 
-        self.assertEqual(buckets.next_step[0].role_id, 2)
-        self.assertGreater(
-            buckets.next_step[0].final_score,
-            buckets.next_step[1].final_score,
+        scores = {role.role_id: role.final_score for role in all_roles}
+        self.assertEqual(scores[1], scores[2])
+        matched_certs = {role.role_id: role.matched_certifications for role in all_roles}
+        self.assertEqual(matched_certs[2], ["AWS Certified Developer - Associate"])
+        self.assertEqual(matched_certs[1], [])
+
+    def test_identity_vector_similarity_is_a_weighted_scoring_dimension(self) -> None:
+        low_identity = Candidate(
+            role_id="low",
+            job_title="Low identity match",
+            capability_vector_similarity=0.5,
+            intent_vector_similarity=0.5,
+            identity_vector_similarity=0.0,
+            seniority_fit=0.5,
+        )
+        high_identity = Candidate(
+            role_id="high",
+            job_title="High identity match",
+            capability_vector_similarity=0.5,
+            intent_vector_similarity=0.5,
+            identity_vector_similarity=1.0,
+            seniority_fit=0.5,
+        )
+
+        buckets = recommend([low_identity, high_identity], per_bucket=2)
+
+        all_roles = [*buckets.ready_now, *buckets.next_step, *buckets.aspirational]
+        scores = {role.role_id: role.final_score for role in all_roles}
+        self.assertGreater(scores["high"], scores["low"])
+        self.assertAlmostEqual(
+            scores["high"] - scores["low"],
+            role_schemas.DEFAULT_WEIGHTS.identity_vector_similarity,
+            places=4,
         )
 
     def test_ai_interest_can_lift_a_stretch_role_without_overpowering_skill_mismatch(self) -> None:
@@ -867,6 +919,99 @@ class RankingBehaviorTests(unittest.TestCase):
         self.assertEqual("stretch", gap)
         self.assertLess(fit, 0.5)
 
+    def test_role_similarity_is_jaccard_over_skills_and_domains(self) -> None:
+        a = Candidate(
+            role_id="a", job_title="A", required_skills=["python", "django"], domain_tags=["backend"]
+        )
+        b = Candidate(
+            role_id="b", job_title="B", required_skills=["python", "django"], domain_tags=["backend"]
+        )
+        c = Candidate(
+            role_id="c", job_title="C", required_skills=["rust", "firmware"], domain_tags=["embedded"]
+        )
+        empty = Candidate(role_id="e", job_title="E")
+
+        self.assertEqual(_role_similarity(a, b), 1.0)
+        self.assertEqual(_role_similarity(a, c), 0.0)
+        self.assertEqual(_role_similarity(a, empty), 0.0)
+
+    def test_mmr_select_prefers_diversity_over_a_near_duplicate_runner_up(self) -> None:
+        best = Candidate(
+            role_id="best",
+            job_title="Best",
+            required_skills=["python", "django", "postgresql", "docker"],
+        )
+        best.final_score = 0.90
+        near_duplicate = Candidate(
+            role_id="near_duplicate",
+            job_title="Near Duplicate",
+            required_skills=["python", "django", "postgresql", "redis"],
+        )
+        near_duplicate.final_score = 0.88
+        distinct = Candidate(
+            role_id="distinct", job_title="Distinct", required_skills=["rust", "embedded", "firmware"]
+        )
+        distinct.final_score = 0.70
+
+        selected = _mmr_select([near_duplicate, best, distinct], k=2)
+
+        self.assertEqual([c.role_id for c in selected], ["best", "distinct"])
+
+    def test_mmr_select_falls_back_to_relevance_when_pool_fits_exactly(self) -> None:
+        only = Candidate(role_id="only", job_title="Only")
+        only.final_score = 0.5
+
+        self.assertEqual(_mmr_select([only], k=3), [only])
+        self.assertEqual(_mmr_select([], k=3), [])
+        self.assertEqual(_mmr_select([only], k=0), [])
+
+    def test_aspirational_bucket_is_mmr_reranked_for_diversity(self) -> None:
+        # Low skill/domain overlap (so _effective_domain_overlap doesn't hit
+        # NEXT_STEP's much heavier domain weight) and high intent similarity
+        # is what argmaxes all three into ASPIRATIONAL under the current
+        # (unmodified) BUCKET_WEIGHTS - see plan notes on the pre-existing
+        # bucket-assignment miscalibration this deliberately steers clear of.
+        base = dict(seniority_fit=0.3)
+        best = Candidate(
+            role_id="asp-best",
+            job_title="Aspirational Best",
+            required_skills=["python", "tensorflow", "pytorch"],
+            domain_tags=["ml_ai"],
+            capability_vector_similarity=0.15,
+            intent_vector_similarity=0.80,
+            skill_overlap=0.10,
+            domain_overlap=0.05,
+            **base,
+        )
+        near_duplicate = Candidate(
+            role_id="asp-near-duplicate",
+            job_title="Aspirational Near Duplicate",
+            required_skills=["python", "tensorflow", "keras"],
+            domain_tags=["ml_ai"],
+            capability_vector_similarity=0.13,
+            intent_vector_similarity=0.78,
+            skill_overlap=0.08,
+            domain_overlap=0.05,
+            **base,
+        )
+        distinct = Candidate(
+            role_id="asp-distinct",
+            job_title="Aspirational Distinct",
+            required_skills=["rust", "embedded", "firmware"],
+            domain_tags=["embedded_iot"],
+            capability_vector_similarity=0.10,
+            intent_vector_similarity=0.65,
+            skill_overlap=0.05,
+            domain_overlap=0.05,
+            **base,
+        )
+
+        buckets = recommend([near_duplicate, best, distinct], per_bucket=2)
+
+        self.assertEqual(
+            [role.role_id for role in buckets.aspirational],
+            ["asp-best", "asp-distinct"],
+        )
 
 if __name__ == "__main__":
     unittest.main()

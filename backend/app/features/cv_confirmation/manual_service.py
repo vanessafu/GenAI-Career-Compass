@@ -12,6 +12,7 @@ from backend.app.features.cv_parsing.schemas import (
     ProfileSummary,
     Project,
     SkillsExtracted,
+    SoftSkill,
     SourceDocument,
     TechnicalSkill,
 )
@@ -127,7 +128,9 @@ def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
 
     skills_extracted = SkillsExtracted(
         technical_skills=[TechnicalSkill(name=name) for name in technical_skill_names],
-        soft_skills=_dedupe_strings(request.soft_skills),
+        soft_skills=[
+            SoftSkill(name=name, confidence=100.0) for name in _dedupe_strings(request.soft_skills)
+        ],
         languages=_dedupe_languages(request.languages),
     )
 

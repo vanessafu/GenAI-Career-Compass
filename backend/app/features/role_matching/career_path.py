@@ -37,7 +37,9 @@ _SYSTEM_PROMPT = (
     "timeline as a single duration: use '1 week' through '4 weeks' for short work "
     "and whole 'month'/'months' values for anything longer. Do not output ranges, "
     "calendar windows, cumulative timelines, plus signs, or vague text. The API "
-    "will sum the milestone durations into estimated_timeline."
+    "computes the overall estimated_timeline itself from the readiness tier - "
+    "keep the milestones' combined duration roughly within the stated "
+    "target_timeline_range rather than planning far beyond or under it."
 )
 
 
@@ -45,15 +47,32 @@ def _clean(value: str | None) -> str:
     return " ".join((value or "").split())
 
 
-def timeline_from_readiness(readiness: float | None) -> str:
+# Weeks-per-tier, named after and thresholded the same as the /match buckets
+# (0.70/0.35 mirrors gap_analysis._status()'s strong/partial/weak cutoffs)
+# so a role graded "strong" reads as a Ready Now-style 1-3 month plan, etc.
+_TIMELINE_RANGES_WEEKS: dict[str, tuple[int, int]] = {
+    "ready_now": (4, 12),  # 1-3 months
+    "next_step": (12, 20),  # 3-5 months
+    "aspirational": (20, 32),  # 5-8 months
+}
+
+
+def readiness_tier(readiness: float | None) -> str:
     score = max(0.0, min(1.0, float(readiness or 0.0)))
-    if score >= 0.75:
-        return "3 months"
-    if score >= 0.55:
-        return "6 months"
+    if score >= 0.70:
+        return "ready_now"
     if score >= 0.35:
-        return "9 months"
-    return "12 months"
+        return "next_step"
+    return "aspirational"
+
+
+def _format_month_range(low_weeks: int, high_weeks: int) -> str:
+    return f"{low_weeks // 4}-{high_weeks // 4} months"
+
+
+def timeline_from_readiness(readiness: float | None) -> str:
+    low, high = _TIMELINE_RANGES_WEEKS[readiness_tier(readiness)]
+    return _format_month_range(low, high)
 
 
 def _unique(values: Iterable[str | None]) -> list[str]:
@@ -92,7 +111,7 @@ def _filter_certifications(generated: list[str], allowed: list[str]) -> list[str
 
 
 def _skill_name(gap: SkillGap) -> str:
-    return _clean(gap.required_skill or gap.skill)
+    return _clean(gap.display or gap.required_skill or gap.skill)
 
 
 _IMPORTANCE_RANK = {"essential": 0, "important": 1, "nice_to_have": 2, "": 3}
@@ -230,14 +249,12 @@ def _display_timeline(timeline: str, fallback: str = "4 weeks") -> str:
     return _format_duration_weeks(weeks) if weeks is not None else fallback
 
 
-def _estimated_timeline(
-    milestones: list[CareerPathMilestone],
-    readiness: float | None,
-) -> str:
-    durations = [_duration_weeks(item.timeline) for item in milestones]
-    if any(duration is None for duration in durations) or not durations:
-        return timeline_from_readiness(readiness)
-    return _format_duration_weeks(sum(duration or 0 for duration in durations))
+def _estimated_timeline(readiness: float | None) -> str:
+    """Always the readiness tier's fixed range (Ready Now 1-3mo / Next Step
+    3-5mo / Aspirational 5-8mo) - a deterministic function of readiness alone,
+    not a sum of the LLM's individual milestone durations (those stay
+    per-milestone-granular, but no longer drive the headline estimate)."""
+    return timeline_from_readiness(readiness)
 
 
 def _summary_matches_profile(summary: str, current_profile_summary: str) -> bool:
@@ -259,10 +276,12 @@ def _prompt_payload(
     top_gaps: list[str],
     allowed_certs: list[str],
 ) -> dict:
+    readiness = report.overall_readiness or report.readiness_score
     return {
         "current_profile_summary": current_profile_summary,
         "target_role": report.job_title,
-        "readiness_score": round(report.overall_readiness or report.readiness_score, 3),
+        "readiness_score": round(readiness, 3),
+        "target_timeline_range": timeline_from_readiness(readiness),
         "top_gaps": top_gaps,
         "matched_skills": report.skills.matched_skills[:10],
         "certification_gaps": allowed_certs,
@@ -361,6 +380,6 @@ async def generate_career_path(role_id: int, confirmed_profile: ConfirmedCVData)
         ),
         skills_to_learn=top_gaps,
         certifications=_filter_certifications(draft.certifications, allowed_certs),
-        estimated_timeline=_estimated_timeline(milestones, readiness_score),
+        estimated_timeline=_estimated_timeline(readiness_score),
         requirement_breakdown=gap_report,
     )

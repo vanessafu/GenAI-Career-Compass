@@ -187,7 +187,7 @@ def test_career_path_filters_llm_certifications_to_gap_report(monkeypatch):
     assert report.requirement_breakdown.job_title == "Backend Engineer"
 
 
-def test_career_path_sums_exact_milestone_durations(monkeypatch):
+def test_career_path_estimated_timeline_is_the_readiness_tiers_range(monkeypatch):
     from backend.app.features.role_matching import career_path
 
     async def fake_explain_role_gap(role_id, confirmed_profile, *, with_narrative):
@@ -247,7 +247,9 @@ def test_career_path_sums_exact_milestone_durations(monkeypatch):
         "3 weeks",
         "2 months",
     ]
-    assert report.estimated_timeline == "5 months"
+    # estimated_timeline is now the readiness tier's fixed range, not a sum of
+    # milestone durations - 0.6 readiness falls in the next_step tier (0.35-0.70).
+    assert report.estimated_timeline == "3-5 months"
 
 
 def test_career_path_replaces_profile_like_plan_summary(monkeypatch):
@@ -418,3 +420,26 @@ def test_top_skill_gaps_falls_back_to_skill_name_when_domain_is_missing():
     # Role never reprocessed with the domain hierarchy -> each ungrouped skill
     # is its own pseudo-domain, so career path still has something to show.
     assert career_path._top_skill_gaps(report) == ["GraphQL"]
+
+
+def test_top_skill_gaps_prefers_display_casing_over_normalized_required_skill():
+    from backend.app.features.role_matching import career_path
+
+    report = GapReport(
+        role_id=1,
+        job_title="Web Designer",
+        skills=SkillDimension(
+            skill_gaps=[
+                SkillGap(
+                    required_skill="ui ux design",
+                    display="UI/UX Design",
+                    domain="",
+                    importance="important",
+                    severity="medium",
+                    transferability=0.3,
+                ),
+            ]
+        ),
+    )
+
+    assert career_path._top_skill_gaps(report) == ["UI/UX Design"]

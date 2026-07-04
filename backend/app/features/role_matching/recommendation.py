@@ -17,6 +17,11 @@ from .schemas import (
 NEXT_STEP_SKILL_OVERLAP = 0.35
 STRETCH_MIN_SKILL_OVERLAP = 0.20
 
+# MMR (Maximal Marginal Relevance) trade-off, applied to every bucket's
+# selection: 0.7 relevance / 0.3 diversity - keeps picks mostly about fit,
+# but meaningfully discounts near-duplicates of what's already selected.
+MMR_LAMBDA = 0.7
+
 _BUCKET_ORDER = (
     RecommendationBucket.READY_NOW,
     RecommendationBucket.NEXT_STEP,
@@ -37,6 +42,7 @@ class Candidate:
     role_certifications: list[str] = field(default_factory=list)
     capability_vector_similarity: float = 0.0
     intent_vector_similarity: float = 0.0
+    identity_vector_similarity: float = 0.0
     normalized_skill_overlap: float = 0.0
     interest_domain_overlap: float = 0.0
     skill_overlap: float | None = None
@@ -81,9 +87,9 @@ def score_candidate(candidate: Candidate, weights: ScoringWeights) -> float:
     return (
         weights.capability_vector_similarity * _clamp01(candidate.capability_vector_similarity)
         + weights.intent_vector_similarity * _clamp01(candidate.intent_vector_similarity)
+        + weights.identity_vector_similarity * _clamp01(candidate.identity_vector_similarity)
         + weights.normalized_skill_overlap * _clamp01(candidate.normalized_skill_overlap)
         + weights.interest_domain_overlap * _effective_domain_overlap(candidate)
-        + weights.certification_overlap * _clamp01(candidate.certification_overlap)
         + weights.seniority_fit * _clamp01(candidate.seniority_fit)
     )
 
@@ -103,16 +109,54 @@ def assign_bucket(candidate: Candidate) -> tuple[RecommendationBucket, float]:
     return _ranked_buckets(candidate)[0]
 
 
+def _role_similarity(a: Candidate, b: Candidate) -> float:
+    """Jaccard over each candidate's required_skills + domain_tags (both
+    already normalize_skill_key'd upstream) - the redundancy signal for MMR."""
+
+    def tokens(candidate: Candidate) -> set[str]:
+        return {s.casefold() for s in (*candidate.required_skills, *candidate.domain_tags)}
+
+    sa, sb = tokens(a), tokens(b)
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
+
+
+def _mmr_select(
+    candidates: list[Candidate], k: int, lambda_: float = MMR_LAMBDA
+) -> list[Candidate]:
+    """Maximal Marginal Relevance: iteratively pick the candidate maximizing
+    lambda_ * relevance - (1 - lambda_) * max_similarity_to_already_selected.
+    Relevance = final_score, the same number used for display everywhere
+    else. Front-loads a relevance/diversity trade-off, so callers should treat
+    the returned order as final display order, not re-sort it."""
+    if k <= 0 or not candidates:
+        return []
+    pool = sorted(candidates, key=lambda c: c.final_score, reverse=True)
+    selected = [pool.pop(0)]
+    while pool and len(selected) < k:
+
+        def mmr_key(candidate: Candidate) -> float:
+            redundancy = max(_role_similarity(candidate, s) for s in selected)
+            return lambda_ * candidate.final_score - (1 - lambda_) * redundancy
+
+        pool.sort(key=mmr_key, reverse=True)
+        selected.append(pool.pop(0))
+    return selected
+
+
 def _backfill_underfilled_buckets(
     grouped: dict[RecommendationBucket, list[Candidate]],
     quota: int,
 ) -> dict[RecommendationBucket, list[Candidate]]:
     """Each bucket first keeps up to `quota` of its own natural (argmax)
-    candidates. Any bucket left short is topped up from the genuine overflow
-    of the other buckets - candidates who lost the cut in their own best
-    bucket - ranked by how well they'd fit the short bucket specifically.
-    This never displaces a candidate who already earned a spot in their own
-    best-fit bucket; it only reuses real leftovers to avoid an empty section."""
+    candidates, chosen via MMR (relevance + diversity) so a bucket doesn't
+    fill up with near-duplicate roles. Any bucket left short is topped up
+    from the genuine overflow of the other buckets - candidates who lost
+    the cut in their own best bucket - ranked by how well they'd fit the
+    short bucket specifically. This never displaces a candidate who already
+    earned a spot in their own best-fit bucket; it only reuses real
+    leftovers to avoid an empty section."""
     if quota <= 0:
         return {bucket: [] for bucket in _BUCKET_ORDER}
 
@@ -120,8 +164,9 @@ def _backfill_underfilled_buckets(
     overflow: list[Candidate] = []
     for bucket in _BUCKET_ORDER:
         bucket_candidates = grouped[bucket]
-        kept[bucket] = bucket_candidates[:quota]
-        overflow.extend(bucket_candidates[quota:])
+        kept[bucket] = _mmr_select(bucket_candidates, quota)
+        kept_ids = {id(c) for c in kept[bucket]}
+        overflow.extend(c for c in bucket_candidates if id(c) not in kept_ids)
 
     for bucket in _BUCKET_ORDER:
         shortfall = quota - len(kept[bucket])
@@ -133,7 +178,12 @@ def _backfill_underfilled_buckets(
         for candidate in fill:
             candidate.bucket = bucket
             candidate.bucket_score = score_candidate(candidate, weights)
-        kept[bucket] = sorted(kept[bucket] + fill, key=lambda item: item.bucket_score, reverse=True)
+        # Preserve the MMR order already decided for `kept`; only the
+        # appended fill (rare: the bucket's natural pool undershot quota)
+        # gets sorted by final_score, so a resort never undoes MMR's
+        # relevance/diversity trade-off for the roles it actually picked.
+        fill.sort(key=lambda item: item.final_score, reverse=True)
+        kept[bucket] = kept[bucket] + fill
 
     return kept
 
@@ -155,6 +205,7 @@ def _to_match(candidate: Candidate) -> RoleMatch:
         signal_breakdown=RoleMatchSignalBreakdown(
             capability_vector_similarity=round(_clamp01(candidate.capability_vector_similarity), 4),
             intent_vector_similarity=round(_clamp01(candidate.intent_vector_similarity), 4),
+            identity_vector_similarity=round(_clamp01(candidate.identity_vector_similarity), 4),
             normalized_skill_overlap=round(_clamp01(candidate.normalized_skill_overlap), 4),
             interest_domain_overlap=round(_clamp01(candidate.interest_domain_overlap), 4),
             certification_overlap=round(_clamp01(candidate.certification_overlap), 4),
@@ -214,7 +265,7 @@ def recommend(
     for candidate in candidates:
         grouped[candidate.bucket].append(candidate)
     for bucket_candidates in grouped.values():
-        bucket_candidates.sort(key=lambda item: item.bucket_score, reverse=True)
+        bucket_candidates.sort(key=lambda item: item.final_score, reverse=True)
 
     quota = per_bucket if per_bucket is not None else top_k
     grouped = _backfill_underfilled_buckets(grouped, quota or 0)

@@ -50,7 +50,7 @@ function buildSkillAxes(report: RadarReport): SkillRadarAxis[] {
   const seen = new Set<string>();
 
   for (const gap of sortSkillGaps(report.skills.skill_gaps ?? [])) {
-    const label = clean(gap.required_skill || gap.skill);
+    const label = clean(gap.display || gap.required_skill || gap.skill);
     if (!label || seen.has(label.toLowerCase())) continue;
     seen.add(label.toLowerCase());
     axes.push({ label, value: clamp01(gap.transferability), state: "gap", skills: [] });

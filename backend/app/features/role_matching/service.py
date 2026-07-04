@@ -38,8 +38,8 @@ from backend.app.features.role_matching.schemas import (
     RoleSummaryBatch,
     UserCareerProfile,
 )
+from backend.app.features.role_matching.prepared_skills import PreparedSkillProfile, prepare_user_skills
 from backend.app.features.role_matching.skill_alignment import (
-    SkillEvidence,
     align_skills,
     build_skill_evidence_from_user_profile,
 )
@@ -340,11 +340,26 @@ def build_capability_text(profile: UserCareerProfile) -> str:
 
 
 def build_intent_text(profile: UserCareerProfile) -> str:
+    """Where this person could plausibly grow toward - potential_direction
+    (inferred from experience/projects) + stated interests. Compared against
+    each role's intent_embedding (its own career-direction framing)."""
     parts: list[str] = []
     interest_text = _join_unique(profile.interests, limit=20)
     if interest_text:
         parts.append(f"Interests: {interest_text}")
 
+    if _clean_text(profile.potential_direction):
+        parts.append(f"Potential direction: {_truncate(profile.potential_direction)}")
+    return "\n".join(parts).strip()
+
+
+def build_identity_text(profile: UserCareerProfile) -> str:
+    """Who this person currently, stably identifies as professionally -
+    title + summary. Compared against each role's capability_embedding (no
+    dedicated identity_embedding column exists) as a drift guardrail
+    (recommend.py's _identity_guardrail_multiplier), not a scored dimension
+    in its own right."""
+    parts: list[str] = []
     if _clean_text(profile.career_identity.title):
         parts.append(f"Career identity: {profile.career_identity.title.strip()}")
     if _clean_text(profile.career_identity.summary):
@@ -410,6 +425,7 @@ def _latest_experience_title(profile: UserCareerProfile) -> str | None:
 def _fetch_catalog(
     v_capability: list[float],
     v_intent: list[float],
+    v_identity: list[float],
 ) -> tuple[
     list[dict],
     dict[str, str],
@@ -432,7 +448,8 @@ def _fetch_catalog(
             esco.esco_title,
             esco.esco_uri,
             1 - (cr.capability_embedding <=> %(v_capability)s::vector) AS capability_vector_similarity,
-            1 - (cr.intent_embedding <=> %(v_intent)s::vector) AS intent_vector_similarity
+            1 - (cr.intent_embedding <=> %(v_intent)s::vector) AS intent_vector_similarity,
+            1 - (cr.capability_embedding <=> %(v_identity)s::vector) AS identity_vector_similarity
         FROM career_roles cr
         LEFT JOIN role_salaries rs
           ON rs.role_id = cr.role_id
@@ -448,6 +465,11 @@ def _fetch_catalog(
         WHERE cr.capability_embedding IS NOT NULL
           AND cr.intent_embedding IS NOT NULL
     """
+    # There is no dedicated role-side identity_embedding column (and no plan
+    # to add one - see career_path/service.py history): the identity guardrail
+    # compares the user's title+summary query vector against each role's
+    # existing capability_embedding, the closest available "what is this role"
+    # anchor, at zero extra schema/infra cost.
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
@@ -455,6 +477,7 @@ def _fetch_catalog(
                 {
                     "v_capability": _vec_literal(v_capability),
                     "v_intent": _vec_literal(v_intent),
+                    "v_identity": _vec_literal(v_identity),
                 },
             )
             roles = cur.fetchall()
@@ -555,7 +578,7 @@ def _candidate_from_row(
     alias_map: dict[str, str],
     role_skills: dict[str, list[str]],
     role_certs: dict[str, list[tuple[str, str]]],
-    skill_evidence: SkillEvidence,
+    prepared_skills: PreparedSkillProfile,
     profile_domains: list[str],
     profile_context_terms: set[str],
     user_cert_norms: set[str],
@@ -564,7 +587,11 @@ def _candidate_from_row(
     role_id = str(row["role_id"])
     required_skills = _role_required_skills(row, role_skills, alias_map)
     skill_weights = skill_weight_map(row.get("sort_skills"))
-    alignment = align_skills(required_skills, skill_evidence, alias_map, skill_weights)
+    # prepared_skills is computed once per /match request (see _match_roles_sync)
+    # and reused across every candidate role here, instead of re-walking the
+    # user's ontology closure hundreds of times (once per role) as the
+    # evidence+enable_ontology_tiers path would.
+    alignment = align_skills(required_skills, alias_map=alias_map, skill_weights=skill_weights, prepared=prepared_skills)
 
     role_domains = [normalize_skill_key(domain).replace(" ", "_") for domain in _listify(row.get("domain_tags"))]
     domain_overlap, matched_domains = _domain_overlap(
@@ -585,8 +612,11 @@ def _candidate_from_row(
         salary=_format_salary(row.get("salary_median_monthly_gross_eur")),
         esco_title=row.get("esco_title") or "",
         esco_uri=row.get("esco_uri") or "",
+        required_skills=required_skills,
+        domain_tags=role_domains,
         capability_vector_similarity=float(row.get("capability_vector_similarity") or 0.0),
         intent_vector_similarity=float(row.get("intent_vector_similarity") or 0.0),
+        identity_vector_similarity=float(row.get("identity_vector_similarity") or 0.0),
         normalized_skill_overlap=alignment.coverage,
         interest_domain_overlap=domain_overlap,
         certification_overlap=cert_overlap,
@@ -608,12 +638,16 @@ def _match_roles_sync(
 
     capability_text = build_capability_text(profile)
     intent_text = build_intent_text(profile)
+    identity_text = build_identity_text(profile)
 
-    v_capability, v_intent = get_embedder().encode_queries([capability_text, intent_text])
-    roles, alias_map, role_skills, role_certs = _fetch_catalog(v_capability, v_intent)
+    v_capability, v_intent, v_identity = get_embedder().encode_queries(
+        [capability_text, intent_text, identity_text]
+    )
+    roles, alias_map, role_skills, role_certs = _fetch_catalog(v_capability, v_intent, v_identity)
 
     normalized_user_skills = normalize_user_skills(_profile_skill_terms(profile), alias_map)
     skill_evidence = build_skill_evidence_from_user_profile(profile)
+    prepared_skills = prepare_user_skills(skill_evidence, alias_map)
     profile_domains = map_profile_domains(profile)
     profile_context_terms = _profile_domain_context_terms(profile)
     user_cert_norms = normalize_user_certifications(
@@ -627,7 +661,7 @@ def _match_roles_sync(
             alias_map=alias_map,
             role_skills=role_skills,
             role_certs=role_certs,
-            skill_evidence=skill_evidence,
+            prepared_skills=prepared_skills,
             profile_domains=profile_domains,
             profile_context_terms=profile_context_terms,
             user_cert_norms=user_cert_norms,

@@ -5,11 +5,13 @@ import {
   getRoleGapAnalysis,
   matchRoles,
   parseCv,
+  prepareSkills,
   submitManualCv,
   type CareerPathReport,
   type CVData,
   type EmbeddingProfile,
   type GapReport,
+  type PreparedSkillProfile,
   type RoleMatch,
 } from "@/lib/api";
 import {
@@ -96,6 +98,12 @@ type Store = {
   identityLoading: boolean;
   embeddingProfile: EmbeddingProfile | null;
 
+  /** One-time skill preparation (normalize + alias + ontology closure), cached
+   * against a content key of the CVData it was computed from so any Recap edit
+   * invalidates it by construction (no need to hook every mutation setter). */
+  preparedSkills: PreparedSkillProfile | null;
+  preparedSkillsKey: string | null;
+
   /** Role matching results. */
   roleMatches: RoleMatch[];
   matchAnalysis: string | null;
@@ -145,6 +153,43 @@ function buildOutgoingCvData(s: Store): CVData | null {
   return applyEditsToCvData(s.cvData, currentEdits(s));
 }
 
+/** Skill-relevant CVData fields, used as the prepared-skills cache key -
+ * anything that could change what SkillEvidence would derive. */
+function preparedSkillsCacheKey(cvData: CVData): string {
+  return JSON.stringify({
+    skills_extracted: cvData.skills_extracted,
+    experience: cvData.experience,
+    education: cvData.education,
+    projects: cvData.projects,
+    thesis: cvData.thesis,
+    interests: cvData.interests,
+    personal_info: cvData.personal_info,
+    profile_summary: cvData.profile_summary,
+  });
+}
+
+/** Return this session's prepared skills for `outgoing`, computing (and
+ * caching) them once per distinct content key so a Recap edit transparently
+ * invalidates the cache without needing to hook every mutation setter. */
+async function getPreparedSkills(
+  get: () => Store,
+  set: (partial: Partial<Store>) => void,
+  outgoing: CVData,
+): Promise<PreparedSkillProfile | null> {
+  const key = preparedSkillsCacheKey(outgoing);
+  const state = get();
+  if (state.preparedSkillsKey === key && state.preparedSkills) return state.preparedSkills;
+  try {
+    const prepared = await prepareSkills(outgoing);
+    set({ preparedSkills: prepared, preparedSkillsKey: key });
+    return prepared;
+  } catch {
+    // Preparation is an optimization, not a requirement - gap-analysis/
+    // career-path fall back to on-the-fly evidence building when absent.
+    return null;
+  }
+}
+
 const initialState = {
   stage: "entry" as Stage,
   cvData: null as CVData | null,
@@ -157,6 +202,8 @@ const initialState = {
   identity: null as Identity | null,
   identityLoading: false,
   embeddingProfile: null as EmbeddingProfile | null,
+  preparedSkills: null as PreparedSkillProfile | null,
+  preparedSkillsKey: null as string | null,
   roleMatches: [] as RoleMatch[],
   matchAnalysis: null as string | null,
   selectedRoleIds: [] as string[],
@@ -390,7 +437,8 @@ export const useStageStore = create<Store>((set, get) => ({
       roleGapErrors: { ...s.roleGapErrors, [roleId]: null },
     }));
     try {
-      const report = await getRoleGapAnalysis(roleId, toConfirmedCvData(outgoing, state.identity));
+      const prepared = await getPreparedSkills(get, set, outgoing);
+      const report = await getRoleGapAnalysis(roleId, toConfirmedCvData(outgoing, state.identity, prepared));
       set((s) => ({
         roleGapReports: { ...s.roleGapReports, [roleId]: report },
         roleGapLoading: { ...s.roleGapLoading, [roleId]: false },
@@ -422,7 +470,8 @@ export const useStageStore = create<Store>((set, get) => ({
       careerPathErrors: { ...s.careerPathErrors, [roleId]: null },
     }));
     try {
-      const report = await getCareerPath(roleId, toConfirmedCvData(outgoing, state.identity));
+      const prepared = await getPreparedSkills(get, set, outgoing);
+      const report = await getCareerPath(roleId, toConfirmedCvData(outgoing, state.identity, prepared));
       set((s) => ({
         careerPathReports: { ...s.careerPathReports, [roleId]: report },
         careerPathLoading: { ...s.careerPathLoading, [roleId]: false },

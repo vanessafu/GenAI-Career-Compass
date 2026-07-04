@@ -14,11 +14,11 @@ DimensionStatus = Literal["strong", "partial", "weak"]
 
 
 class ScoringWeights(BaseModel):
-    capability_vector_similarity: float = 0.18
-    intent_vector_similarity: float = 0.12
-    normalized_skill_overlap: float = 0.45
+    capability_vector_similarity: float = 0.20
+    intent_vector_similarity: float = 0.10
+    identity_vector_similarity: float = 0.30
+    normalized_skill_overlap: float = 0.23
     interest_domain_overlap: float = 0.10
-    certification_overlap: float = 0.08
     seniority_fit: float = 0.07
 
 
@@ -29,26 +29,26 @@ DEFAULT_WEIGHTS = ScoringWeights()
 BUCKET_WEIGHTS: dict[RecommendationBucket, ScoringWeights] = {
     RecommendationBucket.READY_NOW: ScoringWeights(
         capability_vector_similarity=0.30,
-        intent_vector_similarity=0.31,
+        intent_vector_similarity=0.10,
+        identity_vector_similarity=0.40,
         normalized_skill_overlap=0.23,
-        interest_domain_overlap=0.03,
-        certification_overlap=0.05,
+        interest_domain_overlap=0.09,
         seniority_fit=0.08,
     ),
     RecommendationBucket.NEXT_STEP: ScoringWeights(
         capability_vector_similarity=0.13,
-        intent_vector_similarity=0.38,
-        normalized_skill_overlap=0.17,
-        interest_domain_overlap=0.37,
-        certification_overlap=0.08,
+        intent_vector_similarity=0.25, 
+        identity_vector_similarity=0.28,
+        normalized_skill_overlap=0.13,
+        interest_domain_overlap=0.14,
         seniority_fit=0.07,
     ),
     RecommendationBucket.ASPIRATIONAL: ScoringWeights(
         capability_vector_similarity=0.10,
-        intent_vector_similarity=0.45,
+        intent_vector_similarity=0.35,
+        identity_vector_similarity=0.20,
         normalized_skill_overlap=0.15,
         interest_domain_overlap=0.15,
-        certification_overlap=0.10,
         seniority_fit=0.05,
     ),
 }
@@ -67,9 +67,23 @@ def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
 
 
-def _display_matching_score(final_score: float, bucket: RecommendationBucket) -> int:
+def _display_matching_score(
+    final_score: float,
+    bucket: RecommendationBucket,
+    *,
+    min_score: float | None = None,
+    max_score: float | None = None,
+) -> int:
+    """Rescale final_score into the bucket's display band. When the spread of
+    final_score actually returned for this bucket is known (min_score/max_score),
+    stretch that spread across the full band so distinct candidates get distinct
+    percentages instead of collapsing together under a fixed 0-1 assumption -
+    real final_score values rarely span the full range on their own."""
     low, high = _DISPLAY_SCORE_RANGES[bucket]
-    return int(round(low + _clamp01(final_score) * (high - low)))
+    if min_score is None or max_score is None or max_score - min_score < 1e-9:
+        return int(round(low + _clamp01(final_score) * (high - low)))
+    t = (final_score - min_score) / (max_score - min_score)
+    return int(round(low + _clamp01(t) * (high - low)))
 
 
 def _has_text(value: Optional[str]) -> bool:
@@ -153,6 +167,10 @@ class UserCareerProfile(BaseModel):
     interests: list[str] = Field(default_factory=list)
     certifications: list[UserCertification] = Field(default_factory=list)
     projects: list[UserProject] = Field(default_factory=list)
+    # Inferred from experience/projects (cv_parsing's potential_direction) -
+    # combined with `interests` to build the intent embedding; `career_identity`
+    # is now the dedicated source for the identity guardrail embedding instead.
+    potential_direction: str = ""
 
     @model_validator(mode="after")
     def require_capability_and_intent(self) -> "UserCareerProfile":
@@ -163,7 +181,11 @@ class UserCareerProfile(BaseModel):
             or any(item.has_signal for item in self.certifications)
             or any(item.has_signal for item in self.projects)
         )
-        has_intent = self.career_identity.has_signal or _has_any_text(self.interests)
+        has_intent = (
+            self.career_identity.has_signal
+            or _has_any_text(self.interests)
+            or _has_text(self.potential_direction)
+        )
 
         if not has_capability and not has_intent:
             raise ValueError("Profile must include at least one capability signal and one intent signal.")
@@ -180,6 +202,7 @@ class UserCareerProfile(BaseModel):
 class RoleMatchSignalBreakdown(BaseModel):
     capability_vector_similarity: float = 0.0
     intent_vector_similarity: float = 0.0
+    identity_vector_similarity: float = 0.0
     normalized_skill_overlap: float = 0.0
     interest_domain_overlap: float = 0.0
     certification_overlap: float = 0.0
@@ -224,12 +247,20 @@ class CareerResultV1(BaseModel):
     matched_certifications: list[str] = Field(default_factory=list)
 
     @classmethod
-    def from_role_match(cls, role: RoleMatch) -> "CareerResultV1":
+    def from_role_match(
+        cls,
+        role: RoleMatch,
+        *,
+        min_score: float | None = None,
+        max_score: float | None = None,
+    ) -> "CareerResultV1":
         return cls(
             role_id=role.role_id,
             bucket=role.bucket.value,
             title=role.job_title,
-            matching_score=_display_matching_score(role.final_score, role.bucket),
+            matching_score=_display_matching_score(
+                role.final_score, role.bucket, min_score=min_score, max_score=max_score
+            ),
             salary=role.salary,
             description=role.description,
             esco_title=role.esco_title,
@@ -246,12 +277,17 @@ class CareerResultsV1(BaseModel):
 
     @classmethod
     def from_bucketed_roles(cls, buckets: BucketedRoles) -> "CareerResultsV1":
-        roles = [
-            *buckets.ready_now,
-            *buckets.next_step,
-            *buckets.aspirational,
-        ]
-        return cls(results=[CareerResultV1.from_role_match(role) for role in roles])
+        results: list[CareerResultV1] = []
+        for roles in (buckets.ready_now, buckets.next_step, buckets.aspirational):
+            if not roles:
+                continue
+            scores = [role.final_score for role in roles]
+            min_score, max_score = min(scores), max(scores)
+            results.extend(
+                CareerResultV1.from_role_match(role, min_score=min_score, max_score=max_score)
+                for role in roles
+            )
+        return cls(results=results)
 
 
 class RoleSummaryItem(BaseModel):
@@ -289,6 +325,11 @@ class SkillGap(BaseModel):
     domain: str = ""
     suggestion: str = ""
     required_skill: str = ""
+    # Properly-cased display text for required_skill (e.g. "UI/UX Design" where
+    # required_skill is the normalized matching key "ui ux design") - display
+    # only, never used for matching. Falls back to required_skill when no
+    # original casing is available.
+    display: str = ""
     user_closest_skill: Optional[str] = None
     transferability: float = 0.0
     severity: str = "medium"

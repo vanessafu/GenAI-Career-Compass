@@ -89,6 +89,25 @@ class TechnicalSkill(BaseModel):
     proficiency_indication: Optional[str] = None
 
 
+class InferredSkill(BaseModel):
+    """A technical skill not explicitly stated, reasoned from a direct
+    prerequisite/composition relationship to skills the CV does state - kept
+    separate from `TechnicalSkill` so an inference can never be mistaken for
+    a skill the person actually claimed."""
+
+    name: str
+    inferred_from: list[str] = Field(default_factory=list)
+    rationale: Optional[str] = None
+
+
+class SoftSkill(BaseModel):
+    """An inferred (not literally stated) soft skill, with a confidence score
+    reflecting how strongly the CV's experience/project evidence supports it."""
+
+    name: str
+    confidence: float = 65.0
+
+
 class Language(BaseModel):
     language: str
     level: Optional[str] = None
@@ -96,7 +115,8 @@ class Language(BaseModel):
 
 class SkillsExtracted(BaseModel):
     technical_skills: list[TechnicalSkill] = Field(default_factory=list)
-    soft_skills: list[str] = Field(default_factory=list)
+    inferred_skills: list[InferredSkill] = Field(default_factory=list)
+    soft_skills: list[SoftSkill] = Field(default_factory=list)
     languages: list[Language] = Field(default_factory=list)
 
 
@@ -119,4 +139,5 @@ class CVData(BaseModel):
     thesis: list[Thesis] = Field(default_factory=list)
     skills_extracted: SkillsExtracted = Field(default_factory=SkillsExtracted)
     interests: list[str] = Field(default_factory=list)
+    potential_direction: Optional[str] = None
     unmapped_information: list[UnmappedInformation] = Field(default_factory=list)

@@ -399,7 +399,8 @@ def build_intent_embedding_text(
     description: Optional[str],
     domain_tags: Optional[str],
 ) -> str:
-    """Role-side evidence comparable to a user's identity/interests profile."""
+    """Role-side evidence comparable to a user's potential-direction/interests
+    profile (the growth direction a person could plausibly move toward)."""
     parts = [f"Career direction: {_clean_text(title)}"]
 
     domains = _clean_text(domain_tags)

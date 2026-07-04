@@ -28,3 +28,6 @@ backend/scripts/last_llm_failures.txt
 frontend/node_modules/
 frontend/dist/
 frontend/.env.local
+
+career_roles_rows.csv
+career_roles_rows_v2.csv

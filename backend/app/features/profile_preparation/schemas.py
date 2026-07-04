@@ -22,3 +22,4 @@ class EmbeddingProfile(BaseModel):
     interests: list[str] = Field(default_factory=list)
     certifications: list[dict[str, Any]] = Field(default_factory=list)
     projects: list[dict[str, Any]] = Field(default_factory=list)
+    potential_direction: str = ""

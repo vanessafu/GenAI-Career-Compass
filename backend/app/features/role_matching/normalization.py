@@ -29,6 +29,37 @@ def clean_alias_map(alias_map: dict[str, str]) -> dict[str, str]:
     }
 
 
+def compact_skill_key(value: str) -> str:
+    """Punctuation/whitespace-free lowercase form, for version-suffix variant
+    matching (e.g. "Python3" vs "Python 3")."""
+    return re.sub(r"[^a-z0-9+#]+", "", value.casefold())
+
+
+def dedupe_clean(values: Iterable[str | None]) -> list[str]:
+    """Whitespace-collapse + dedupe (by casefold) while preserving first-seen
+    order and original casing/punctuation - distinct from normalize_skill_key,
+    which is a lossy matching key."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        cleaned = " ".join(str(value or "").split())
+        if not cleaned:
+            continue
+        key = cleaned.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(cleaned)
+    return out
+
+
+def canon_skill(value: str, alias_map: dict[str, str]) -> str:
+    """normalize_skill_key + alias-map resolution -> the final matching key
+    used to compare two skill terms for equality."""
+    key = normalize_skill_key(value)
+    return alias_map.get(key, key)
+
+
 # ---------------------------------------------------------------------------
 # career_roles.sort_skills - [{"skill", "domain", "score"}], LLM-enhanced and
 # reranked by backend/scripts/role_embeddings.py. This is the primary source
@@ -75,6 +106,22 @@ def skill_domain_map(sort_skills: list[dict] | None) -> dict[str, str]:
         if key and isinstance(domain, str) and domain.strip():
             domains[key] = domain.strip()
     return domains
+
+
+def skill_display_map(sort_skills: list[dict] | None) -> dict[str, str]:
+    """sort_skills -> {normalized_skill: original display text}. sort_skills
+    stores properly-cased skill names (e.g. "UI/UX Design"); normalize_skill_key
+    is a lossy matching key, so this is the only place that casing survives for
+    downstream display (skill gaps, domain fallback names)."""
+    display: dict[str, str] = {}
+    for item in sort_skills or []:
+        if not isinstance(item, dict):
+            continue
+        key = normalize_skill_key(item.get("skill"))
+        text = item.get("skill")
+        if key and isinstance(text, str) and text.strip():
+            display.setdefault(key, text.strip())
+    return display
 
 
 # ---------------------------------------------------------------------------

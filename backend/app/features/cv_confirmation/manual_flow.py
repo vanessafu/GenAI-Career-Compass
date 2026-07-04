@@ -6,6 +6,7 @@ from backend.app.features.cv_parsing.schemas import (
     PersonalInfo,
     Project,
     SkillsExtracted,
+    SoftSkill,
     TechnicalSkill,
     Thesis,
 )
@@ -144,7 +145,10 @@ def collect_skills() -> SkillsExtracted:
         TechnicalSkill(name=skill)
         for skill in ask_comma_list("Technical skills, comma-separated: ")
     ]
-    soft_skills = ask_comma_list("Soft skills, comma-separated: ")
+    soft_skills = [
+        SoftSkill(name=skill, confidence=100.0)
+        for skill in ask_comma_list("Soft skills, comma-separated: ")
+    ]
     return SkillsExtracted(technical_skills=technical_skills, soft_skills=soft_skills)
 
 

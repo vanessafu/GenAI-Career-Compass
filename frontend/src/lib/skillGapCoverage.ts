@@ -1,10 +1,11 @@
 import type { CareerPathMilestone, SkillGap } from "./api";
 
 export function skillGapCopy(gap: SkillGap, milestones: CareerPathMilestone[] = []): string {
+  const skillLabel = gap.display || gap.required_skill;
   const hasProfileSignal = gap.transferability > 0 && gap.user_closest_skill;
   const base = hasProfileSignal
-    ? `${gap.required_skill} is partly covered by: ${gap.user_closest_skill}.`
-    : `${gap.required_skill} is not visible in your profile yet.`;
+    ? `${skillLabel} is partly covered by: ${gap.user_closest_skill}.`
+    : `${skillLabel} is not visible in your profile yet.`;
 
   const milestone = roadmapMilestoneForGap(gap, milestones);
   if (!milestone) return base;

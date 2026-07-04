@@ -2,7 +2,9 @@
 Gap analysis (decoupled). The service calls analyze_role_gap() / explain_role_gap().
 
 Dimensions:
-  1. Skills         -> ontology coverage (exact + implied + transferable) [skill_ontology]
+  1. Skills         -> alias + ontology-aware coverage (exact/token/context/
+                       ontology-implied/reverse-prerequisite) [skill_alignment,
+                       prepared_skills, skill_ontology]
   2. Certifications -> exact normalized certification overlap
   3. Seniority      -> user level/years vs the role's inferred level
   4. Readiness      -> weighted aggregate of the above
@@ -29,6 +31,7 @@ from backend.app.features.role_matching.normalization import (
     required_skills_from_sort_skills,
     seniority_gap,
     seniority_level_from_title,
+    skill_display_map,
     skill_domain_map,
     skill_weight_map,
 )
@@ -43,6 +46,10 @@ from backend.app.features.role_matching.schemas import (
     SkillDimension,
     SkillGap,
 )
+from backend.app.features.role_matching.prepared_skills import (
+    CURRENT_PREPARED_SKILLS_VERSION,
+    PreparedSkillProfile,
+)
 from backend.app.features.role_matching.service import _listify, as_cv_data
 from backend.app.features.role_matching.skill_alignment import (
     SkillEvidence,
@@ -53,7 +60,7 @@ from backend.app.features.role_matching.skill_alignment import (
 logger = logging.getLogger("CareerCompass.GapAnalysis")
 
 # --- tunables --------------------------------------------------------------
-READINESS_W = {"skills": 0.60, "certifications": 0.25, "seniority": 0.15}
+READINESS_W = {"skills": 0.70, "certifications": 0.20, "seniority": 0.10}
 MAX_GROUNDING_SKILLS = 8   # cap missing skills sent to the LLM (prompt budget)
 
 
@@ -109,7 +116,7 @@ def _fetch_role_certs(role_id: int) -> list[dict]:
             return cur.fetchall()
 
 
-def _fetch_skill_aliases() -> dict[str, str]:
+def fetch_skill_aliases() -> dict[str, str]:
     with get_db_connection() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
@@ -182,24 +189,37 @@ def _retrieve_esco_grounding(role_id: int, missing_skills: list[str]) -> tuple[O
 
 def _analyze_skills(
     required_skills: list[str],
-    user_evidence: SkillEvidence,
     alias_map: dict[str, str],
     skill_weights: dict[str, float],
     skill_domains: dict[str, str],
+    skill_display: dict[str, str],
+    *,
+    prepared: PreparedSkillProfile | None = None,
+    evidence: SkillEvidence | None = None,
 ) -> SkillDimension:
-    alignment = align_skills(required_skills, user_evidence, alias_map, skill_weights, skill_domains)
+    alignment = align_skills(
+        required_skills,
+        evidence=evidence,
+        alias_map=alias_map,
+        skill_weights=skill_weights,
+        skill_domains=skill_domains,
+        skill_display=skill_display,
+        prepared=prepared,
+        enable_ontology_tiers=True,
+    )
     return SkillDimension(
         matched_skills=alignment.matched_skills,
         missing_skills=alignment.missing_skills,
         skill_gaps=[
             SkillGap(
                 required_skill=g["required_skill"],
+                display=g.get("display") or g["required_skill"],
                 user_closest_skill=g["user_closest_skill"],
                 transferability=g["transferability"],
                 severity=g["severity"],
                 importance=g.get("importance", ""),
                 domain=g.get("domain", ""),
-                source="shared_alignment",
+                source=g.get("source") or "shared_alignment",
             )
             for g in alignment.skill_gaps
         ],
@@ -328,12 +348,11 @@ def analyze_role_gap(
     if role is None:
         raise ValueError(f"role_id {role_id} not found")
 
-    user_evidence = build_skill_evidence_from_confirmed_profile(confirmed_profile)
     user_certs = _user_certs(confirmed_profile)
     user_level, user_years = _user_seniority(confirmed_profile)
 
     sort_skills = role.get("sort_skills")
-    alias_map = _fetch_skill_aliases()
+    alias_map = fetch_skill_aliases()
     required_skills = required_skills_from_sort_skills(sort_skills)
     if not required_skills:
         required_skills = _fetch_role_skills_from_table(role_id)
@@ -341,8 +360,18 @@ def analyze_role_gap(
         required_skills = _listify(role.get("raw_skills"))
     skill_weights = skill_weight_map(sort_skills)
     skill_domains = skill_domain_map(sort_skills)
+    skill_display = skill_display_map(sort_skills)
 
-    skills = _analyze_skills(required_skills, user_evidence, alias_map, skill_weights, skill_domains)
+    prepared = confirmed_profile.prepared_skills
+    if prepared is not None and prepared.version == CURRENT_PREPARED_SKILLS_VERSION:
+        skills = _analyze_skills(
+            required_skills, alias_map, skill_weights, skill_domains, skill_display, prepared=prepared
+        )
+    else:
+        user_evidence = build_skill_evidence_from_confirmed_profile(confirmed_profile)
+        skills = _analyze_skills(
+            required_skills, alias_map, skill_weights, skill_domains, skill_display, evidence=user_evidence
+        )
     certs = _analyze_certs(_fetch_role_certs(role_id), user_certs)
     seniority, seniority_fit = _analyze_seniority(role["job_title"], user_level, user_years)
 

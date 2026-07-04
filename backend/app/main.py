@@ -16,6 +16,14 @@ FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
+
+    from backend.app.features.role_matching.embedder import get_embedder
+
+    # Load the local sentence-transformers model once at startup instead of
+    # lazily on the first /match request - avoids paying that cold-load cost
+    # (several seconds) as user-facing latency on someone's first match.
+    await asyncio.to_thread(get_embedder)
     async with openai_client_lifespan():
         yield
 
@@ -66,4 +74,10 @@ add_frontend_routes(app)
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("backend.app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "backend.app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        reload_dirs=["backend"],
+    )

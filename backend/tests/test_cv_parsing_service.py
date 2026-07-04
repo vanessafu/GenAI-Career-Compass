@@ -1,7 +1,7 @@
 import asyncio
 
 from backend.app.features.cv_parsing import service
-from backend.app.features.cv_parsing.schemas import CVData
+from backend.app.features.cv_parsing.schemas import CVData, InferredSkill, SkillsExtracted, SoftSkill
 
 
 def test_cv_parse_uses_combined_parsing_and_extraction_prompt(monkeypatch):
@@ -12,7 +12,9 @@ def test_cv_parse_uses_combined_parsing_and_extraction_prompt(monkeypatch):
         assert response_format is CVData
         return CVData(
             interests=["Cloud platforms"],
-            skills_extracted={"soft_skills": ["Cross-team collaboration"]},
+            skills_extracted={
+                "soft_skills": [{"name": "Cross-team collaboration", "confidence": 80}]
+            },
         )
 
     monkeypatch.setattr(service.openai_client, "parse_structured", fake_parse_structured)
@@ -20,7 +22,7 @@ def test_cv_parse_uses_combined_parsing_and_extraction_prompt(monkeypatch):
     result = asyncio.run(service.parse_cv_to_pydantic("Python backend developer"))
 
     assert result.interests == ["Cloud platforms"]
-    assert result.skills_extracted.soft_skills == ["Cross-team collaboration"]
+    assert [s.name for s in result.skills_extracted.soft_skills] == ["Cross-team collaboration"]
     assert len(calls) == 1
     assert calls[0][1] == "cv_parsing"
     system_prompt = calls[0][3][0]["content"]
@@ -59,6 +61,74 @@ def test_blank_parsed_interests_do_not_trigger_second_llm_call(monkeypatch):
 
     assert result.interests == []
     assert len(calls) == 1
+
+
+def test_inferred_skills_and_potential_direction_round_trip_through_cv_data():
+    cv = CVData(
+        potential_direction="Could grow toward ML engineering given the statistics/Python overlap.",
+        skills_extracted=SkillsExtracted(
+            inferred_skills=[
+                InferredSkill(
+                    name="Machine Learning Foundations",
+                    inferred_from=["Python", "Data Analysis", "Linear Algebra"],
+                    rationale="These three together are prerequisites for ML foundations.",
+                )
+            ]
+        ),
+    )
+
+    restored = CVData.model_validate_json(cv.model_dump_json())
+
+    assert restored.potential_direction == cv.potential_direction
+    assert len(restored.skills_extracted.inferred_skills) == 1
+    inferred = restored.skills_extracted.inferred_skills[0]
+    assert inferred.name == "Machine Learning Foundations"
+    assert inferred.inferred_from == ["Python", "Data Analysis", "Linear Algebra"]
+    assert inferred.rationale
+
+
+def test_inferred_skills_are_never_mixed_into_technical_skills():
+    cv = CVData(
+        skills_extracted=SkillsExtracted(
+            technical_skills=[{"name": "Python"}],
+            inferred_skills=[InferredSkill(name="Machine Learning Foundations", inferred_from=["Python"])],
+        )
+    )
+
+    assert [s.name for s in cv.skills_extracted.technical_skills] == ["Python"]
+    assert [s.name for s in cv.skills_extracted.inferred_skills] == ["Machine Learning Foundations"]
+
+
+def test_prompt_instructs_inferred_skills_and_potential_direction_rules():
+    prompt = service._CV_PARSING_AND_EXTRACTING_PROMPT
+    assert "inferred_skills" in prompt
+    assert "potential direction" in prompt.casefold()
+    assert "inferred_from" in prompt
+
+
+def test_prompt_excludes_personal_links_from_technical_skills():
+    prompt = service._CV_PARSING_AND_EXTRACTING_PROMPT.casefold()
+    assert "github" in prompt
+    assert "personal links" in prompt or "account handles" in prompt
+
+
+def test_prompt_instructs_soft_skill_confidence_and_broadened_inference():
+    prompt = service._CV_PARSING_AND_EXTRACTING_PROMPT.casefold()
+    assert "confidence" in prompt
+    assert "tool" in prompt or "knowledge area" in prompt
+
+
+def test_soft_skill_carries_a_confidence_score():
+    cv = CVData(
+        skills_extracted=SkillsExtracted(
+            soft_skills=[SoftSkill(name="Stakeholder management", confidence=72.0)]
+        )
+    )
+
+    restored = CVData.model_validate_json(cv.model_dump_json())
+
+    assert restored.skills_extracted.soft_skills[0].name == "Stakeholder management"
+    assert restored.skills_extracted.soft_skills[0].confidence == 72.0
 
 
 def test_model_override_is_used_for_single_cv_parse(monkeypatch):

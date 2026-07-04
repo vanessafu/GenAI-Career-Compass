@@ -16,16 +16,37 @@ import json
 import logging
 import re
 from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
 
+from backend.app.features.role_matching.normalization import normalize_skill_key
+
 logger = logging.getLogger("CareerCompass.SkillOntology")
 
-ONTOLOGY_PATH = Path(__file__).parent.parent.parent / "data" / "__aggregated_skills.json"
+ONTOLOGY_PATH = Path(__file__).parent.parent.parent.parent / "data" / "__aggregated_skills.json"
 
 # Credit given when the user only holds a PREREQUISITE of the required skill
 # (e.g. role wants Next.js, user has React). Tune to taste.
 PARTIAL_CREDIT = 0.4
+
+# Hop-decayed credit for skills implied by something the user explicitly holds
+# (e.g. user has Next.js -> role wants React). hop=1 -> 0.65, hop=2 -> 0.52,
+# hop=3 -> 0.416, floored at _MIN_CREDIT.
+_HOP1_CREDIT = 0.65
+_HOP_DECAY = 0.80
+_MIN_CREDIT = 0.35
+_MAX_HOPS = 3
+
+
+def hop_confidence(hop: int) -> float:
+    return max(_MIN_CREDIT, round(_HOP1_CREDIT * (_HOP_DECAY ** (hop - 1)), 4))
+
+
+@dataclass(frozen=True)
+class ImpliedSkill:
+    hop: int
+    via: str  # canonical name of the explicit skill the shortest path came from
 
 # Split role skill strings on these only. NOTE: '/' is intentionally excluded so
 # CI/CD, TCP/IP, I/O survive as single tokens.
@@ -61,6 +82,7 @@ class SkillOntology:
     def __init__(self, path: Path = ONTOLOGY_PATH) -> None:
         self._canonical_by_alias: dict[str, str] = {}   # lowercased alias -> canonical name
         self._implies: dict[str, list[str]] = {}        # canonical -> direct implied skills
+        self._domains: dict[str, list[str]] = {}         # canonical -> domain hints (technicalDomains first)
         self._closure_cache: dict[str, frozenset[str]] = {}
         self._exact_match_fallback = False
 
@@ -84,8 +106,18 @@ class SkillOntology:
             aliases = set(node.get("synonyms") or [])
             aliases.add(name)
             for alias in aliases:
-                if alias:
-                    self._canonical_by_alias[alias.strip().lower()] = name
+                key = normalize_skill_key(alias)
+                if key:
+                    self._canonical_by_alias[key] = name
+
+            domains: list[str] = []
+            seen_domains: set[str] = set()
+            for domain in [*(node.get("technicalDomains") or []), *(node.get("associatedToApplicationDomains") or [])]:
+                if domain and domain not in seen_domains:
+                    seen_domains.add(domain)
+                    domains.append(domain)
+            if domains:
+                self._domains[name] = domains
 
         logger.info("Loaded ontology: %d skills, %d aliases.",
                     len(self._implies), len(self._canonical_by_alias))
@@ -96,7 +128,12 @@ class SkillOntology:
     # ---- normalization ----
     def canonical(self, skill: str) -> Optional[str]:
         """Resolve any surface form to its canonical skill name, or None if unknown."""
-        return self._canonical_by_alias.get((skill or "").strip().lower())
+        return self._canonical_by_alias.get(normalize_skill_key(skill))
+
+    def domain_hint(self, canonical_name: str) -> list[str]:
+        """technicalDomains + associatedToApplicationDomains for canonical_name, deduped,
+        technicalDomains first. [] if unresolved or the ontology has no domain data for it."""
+        return self._domains.get(canonical_name, [])
 
     # ---- transitive implication ----
     def implied_closure(self, canonical_name: str) -> frozenset[str]:
@@ -130,6 +167,38 @@ class SkillOntology:
             for imp in self.implied_closure(c):
                 effective.setdefault(imp, "implied")
         return effective
+
+    def implied_with_hops(
+        self, user_skills: Iterable[str], max_hops: int = _MAX_HOPS
+    ) -> dict[str, ImpliedSkill]:
+        """BFS from each canonical(user_skill), hop-capped at max_hops. Returns ONLY
+        targets beyond the user's own explicit/canonical skills (those are excluded -
+        hop distance starts at 1). On conflicting paths to the same target, keeps the
+        shortest hop (first-seen wins ties)."""
+        held: set[str] = set()
+        for s in user_skills:
+            c = self.canonical(s)
+            if c:
+                held.add(c)
+
+        result: dict[str, ImpliedSkill] = {}
+        for start in held:
+            queue: deque[tuple[str, int]] = deque([(start, 0)])
+            seen: set[str] = {start}
+            while queue:
+                cur, hop = queue.popleft()
+                if hop >= max_hops:
+                    continue
+                for nxt in self._implies.get(cur, []):
+                    target = self.canonical(nxt) or nxt
+                    if target in seen:
+                        continue
+                    seen.add(target)
+                    next_hop = hop + 1
+                    if target not in held and (target not in result or next_hop < result[target].hop):
+                        result[target] = ImpliedSkill(hop=next_hop, via=start)
+                    queue.append((target, next_hop))
+        return result
 
     # ---- coverage ----
     def compute_coverage(

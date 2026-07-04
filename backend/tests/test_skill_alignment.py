@@ -3,9 +3,11 @@ from __future__ import annotations
 from backend.app.features.role_matching.skill_alignment import (
     build_skill_evidence_from_confirmed_profile,
     align_skills,
+    skill_importance_tier,
 )
 from backend.app.features.role_matching import gap_analysis
 from backend.app.features.role_matching.career_path import timeline_from_readiness
+from backend.app.features.role_matching.prepared_skills import SkillEvidence, prepare_user_skills
 from backend.app.features.role_matching.schemas import (
     CareerIdentity,
     UserCareerProfile,
@@ -144,12 +146,146 @@ def test_align_skills_domain_scores_average_per_domain_using_raw_domain_label() 
     assert result.domain_skills["DevOps"] == ["kubernetes"]
 
 
-def test_align_skills_domain_scores_fall_back_to_skill_name_when_no_domain_given() -> None:
+def test_align_skills_domain_scores_fall_back_to_ontology_domain_when_no_llm_domain_given() -> None:
+    """No LLM-curated domain tag given, but "Kubernetes" resolves in the vendored
+    MIND ontology, whose technicalDomains ("DevOps") is used as the tier-2
+    fallback instead of degenerating straight to a per-skill pseudo-domain."""
     evidence = build_skill_evidence_from_confirmed_profile(robotics_profile())
 
     result = align_skills(["Kubernetes"], evidence, alias_map={})
 
-    assert result.domain_scores == {"kubernetes": 0.0}
+    assert result.domain_scores == {"DevOps": 0.0}
+    assert result.domain_skills == {"DevOps": ["kubernetes"]}
+
+
+def test_align_skills_domain_scores_fall_back_to_skill_name_when_ontology_cannot_resolve() -> None:
+    """A skill unknown to both the LLM domain tags and the ontology falls all
+    the way back to the pre-existing per-skill pseudo-domain behavior."""
+    evidence = build_skill_evidence_from_confirmed_profile(robotics_profile())
+
+    result = align_skills(["Zzyzx Custom Internal Tool"], evidence, alias_map={})
+
+    assert result.domain_scores == {"zzyzx custom internal tool": 0.0}
+
+
+def test_skill_display_preserves_original_casing_in_domain_fallback_and_gaps() -> None:
+    """sort_skills stores properly-cased text ("UI/UX Design"); the tier-3
+    pseudo-domain fallback and each gap's `display` field should show that
+    casing instead of the lowercase normalize_skill_key matching key, while
+    the numeric coverage/domain_scores stay identical either way."""
+    evidence = build_skill_evidence_from_confirmed_profile(robotics_profile())
+    skill_display = {"ui ux design": "UI/UX Design"}
+
+    with_display = align_skills(["UI/UX Design"], evidence, alias_map={}, skill_display=skill_display)
+    without_display = align_skills(["UI/UX Design"], evidence, alias_map={})
+
+    assert with_display.domain_scores == {"UI/UX Design": without_display.domain_scores["ui ux design"]}
+    assert with_display.domain_skills == {"UI/UX Design": ["UI/UX Design"]}
+    assert with_display.skill_gaps[0]["display"] == "UI/UX Design"
+    assert with_display.coverage == without_display.coverage
+
+
+def test_canon_maps_prefer_the_self_canonical_entry_over_an_aliased_duplicate() -> None:
+    """Regression: sort_skills can list both "UI/UX Design" and "Figma" as
+    separate entries, and skill_aliases (real DB data) treats "figma" as an
+    alias of "ui ux design" for matching - so both canonicalize to the same
+    key. A plain dict comprehension keyed by _canon() would let whichever
+    entry happens to be processed last silently overwrite the other's
+    weight/domain/display; the self-canonical entry ("UI/UX Design" itself)
+    must always win regardless of iteration order."""
+    evidence = build_skill_evidence_from_confirmed_profile(robotics_profile())
+    aliases = {"figma": "ui ux design"}
+
+    # "Figma" listed after "UI/UX Design" - naive last-write-wins would keep Figma's values.
+    after = align_skills(
+        ["UI/UX Design"],
+        evidence,
+        alias_map=aliases,
+        skill_weights={"UI/UX Design": 0.90, "Figma": 0.83},
+        skill_domains={"UI/UX Design": "Frontend", "Figma": "Tools"},
+        skill_display={"UI/UX Design": "UI/UX Design", "Figma": "Figma"},
+    )
+    # "Figma" listed before "UI/UX Design" - order must not matter either.
+    before = align_skills(
+        ["UI/UX Design"],
+        evidence,
+        alias_map=aliases,
+        skill_weights={"Figma": 0.83, "UI/UX Design": 0.90},
+        skill_domains={"Figma": "Tools", "UI/UX Design": "Frontend"},
+        skill_display={"Figma": "Figma", "UI/UX Design": "UI/UX Design"},
+    )
+
+    for result in (after, before):
+        assert result.skill_gaps[0]["display"] == "UI/UX Design"
+        assert result.skill_gaps[0]["domain"] == "Frontend"
+        assert result.skill_gaps[0]["importance"] == skill_importance_tier(0.90)
+
+
+def test_skill_display_recovers_user_closest_skill_casing() -> None:
+    """The user's own explicit/context terms keep their original casing for
+    user_closest_skill, instead of the lowercase canonical matching form."""
+    evidence = SkillEvidence(explicit_terms=["Docker"], context_terms=[])
+
+    result = align_skills(
+        ["Kubernetes"], evidence=evidence, alias_map={}, enable_ontology_tiers=True
+    )
+
+    assert result.skill_gaps[0]["user_closest_skill"] == "Docker"
+
+
+def test_ontology_implied_tier_requires_opt_in() -> None:
+    """The /match recommendation flow calls align_skills(evidence=...) without
+    opting in, so it must see the exact pre-ontology two-tier behavior (no
+    ontology_implied/reverse_partial credit) even though the ontology can
+    resolve the skill."""
+    evidence = SkillEvidence(explicit_terms=["Next.js"], context_terms=[])
+
+    result = align_skills(["React"], evidence=evidence, alias_map={})
+
+    assert result.coverage == 0.0
+    assert result.skill_gaps[0]["source"] == ""
+
+
+def test_ontology_implied_tier_credits_a_hop_one_implication() -> None:
+    evidence = SkillEvidence(explicit_terms=["Next.js"], context_terms=[])
+
+    result = align_skills(
+        ["React"], evidence=evidence, alias_map={}, enable_ontology_tiers=True
+    )
+
+    assert result.skill_gaps[0]["source"] == "ontology_implied"
+    assert result.skill_gaps[0]["transferability"] == 0.65
+    assert result.coverage == 0.65
+
+
+def test_reverse_prerequisite_tier_credits_a_lesser_but_related_skill() -> None:
+    """Role wants Kubernetes, user only has Docker (a prerequisite of it) -
+    should get partial credit, not a flat miss."""
+    evidence = SkillEvidence(explicit_terms=["Docker"], context_terms=[])
+
+    result = align_skills(
+        ["Kubernetes"], evidence=evidence, alias_map={}, enable_ontology_tiers=True
+    )
+
+    assert result.skill_gaps[0]["source"] == "reverse_partial"
+    assert result.skill_gaps[0]["transferability"] == 0.40
+
+
+def test_prepared_path_matches_on_the_fly_path_for_ontology_tiers() -> None:
+    """prepare_user_skills() (computed once) must produce identical align_skills
+    results to the equivalent evidence= + enable_ontology_tiers=True call."""
+    evidence = SkillEvidence(explicit_terms=["Next.js", "Docker"], context_terms=["Fullstack team"])
+    prepared = prepare_user_skills(evidence)
+    required = ["React", "Kubernetes", "FastAPI"]
+
+    from_prepared = align_skills(required, prepared=prepared)
+    from_evidence = align_skills(required, evidence=evidence, enable_ontology_tiers=True)
+
+    assert from_prepared.coverage == from_evidence.coverage
+    assert from_prepared.matched_skills == from_evidence.matched_skills
+    assert [g["source"] for g in from_prepared.skill_gaps] == [
+        g["source"] for g in from_evidence.skill_gaps
+    ]
 
 
 def test_matching_ranks_niche_aligned_role_above_generic_ai(monkeypatch) -> None:
@@ -177,8 +313,8 @@ def test_matching_ranks_niche_aligned_role_above_generic_ai(monkeypatch) -> None
     )
 
     class FakeEmbedder:
-        def encode_queries(self, texts: list[str]) -> tuple[list[float], list[float]]:
-            return [0.1], [0.2]
+        def encode_queries(self, texts: list[str]) -> list[list[float]]:
+            return [[0.1] for _ in texts]
 
     rows = [
         {
@@ -251,7 +387,7 @@ def test_gap_analysis_uses_shared_alignment_for_niche_variants(monkeypatch) -> N
     monkeypatch.setattr(gap_analysis, "_fetch_role_certs", lambda role_id: [])
     monkeypatch.setattr(
         gap_analysis,
-        "_fetch_skill_aliases",
+        "fetch_skill_aliases",
         lambda: {"ros2": "ros", "nvidia jetson": "embedded systems"},
         raising=False,
     )
@@ -271,8 +407,86 @@ def test_gap_analysis_uses_shared_alignment_for_niche_variants(monkeypatch) -> N
     assert "ros" not in report.skills.missing_skills
 
 
+def test_gap_analysis_uses_prepared_skills_when_present_and_current(monkeypatch) -> None:
+    """A profile carrying a fresh prepared_skills payload should route through
+    align_skills(prepared=...) - ontology_implied credit for React (implied by
+    Next.js) should show up in coverage/domain_coverage, and matched_skills
+    still requires the higher explicit/token bar."""
+    profile = robotics_profile()
+    evidence = SkillEvidence(explicit_terms=["Next.js"], context_terms=[])
+    profile.prepared_skills = prepare_user_skills(evidence)
+
+    monkeypatch.setattr(
+        gap_analysis,
+        "_fetch_role",
+        lambda role_id: {
+            "role_id": role_id,
+            "job_title": "Frontend Engineer",
+            "job_description": "Builds UIs.",
+            "raw_skills": "React",
+            "domain_tags": "frontend",
+        },
+    )
+    monkeypatch.setattr(gap_analysis, "_fetch_role_certs", lambda role_id: [])
+    monkeypatch.setattr(gap_analysis, "fetch_skill_aliases", lambda: {}, raising=False)
+    monkeypatch.setattr(
+        gap_analysis, "_fetch_role_skills_from_table", lambda role_id: ["React"], raising=False
+    )
+
+    report = gap_analysis.analyze_role_gap(161, profile)
+
+    assert report.skills.coverage == 0.65
+    assert report.skills.skill_gaps[0].source == "ontology_implied"
+    assert "react" not in report.skills.matched_skills
+
+
+def test_match_endpoint_credits_ontology_implied_skills(monkeypatch) -> None:
+    """/match now opts into the ontology tiers (service.py passes
+    enable_ontology_tiers=True) - a profile that only lists "Next.js" should
+    get nonzero skill-overlap credit against a role that requires "React"."""
+    profile = UserCareerProfile(
+        career_identity=CareerIdentity(title="Frontend Engineer", summary="Builds web UIs."),
+        skills=["Next.js"],
+    )
+
+    class FakeEmbedder:
+        def encode_queries(self, texts: list[str]) -> list[list[float]]:
+            return [[0.1] for _ in texts]
+
+    rows = [
+        {
+            "role_id": "frontend",
+            "job_title": "Frontend Engineer",
+            "job_description": "Builds React UIs.",
+            "raw_skills": "",
+            "domain_tags": "frontend",
+            "salary_median_monthly_gross_eur": None,
+            "capability_vector_similarity": 0.5,
+            "intent_vector_similarity": 0.5,
+            "esco_title": "Frontend Engineer",
+            "esco_uri": "frontend",
+        },
+    ]
+
+    monkeypatch.setattr(
+        "backend.app.features.role_matching.embedder.get_embedder",
+        lambda: FakeEmbedder(),
+    )
+    monkeypatch.setattr(
+        "backend.app.features.role_matching.service._fetch_catalog",
+        lambda *_: (rows, {}, {"frontend": ["react"]}, {}),
+    )
+
+    response = _match_roles_sync(profile, top_k=1, include_debug=True)
+    role = response.buckets.ready_now[0] if response.buckets.ready_now else (
+        response.buckets.next_step[0] if response.buckets.next_step else response.buckets.aspirational[0]
+    )
+
+    assert role.signal_breakdown.normalized_skill_overlap > 0.0
+
+
 def test_roadmap_timeline_is_bounded_by_readiness() -> None:
-    assert timeline_from_readiness(0.80) == "3 months"
-    assert timeline_from_readiness(0.60) == "6 months"
-    assert timeline_from_readiness(0.45) == "9 months"
-    assert timeline_from_readiness(0.26) == "12 months"
+    assert timeline_from_readiness(0.80) == "1-3 months"
+    assert timeline_from_readiness(0.60) == "3-5 months"
+    assert timeline_from_readiness(0.45) == "3-5 months"
+    assert timeline_from_readiness(0.26) == "5-8 months"

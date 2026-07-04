@@ -80,7 +80,11 @@ function SkillRadar({ report }: { report: GapReport }) {
 }
 
 function RadarSvg({ axes }: { axes: SkillRadarAxis[] }) {
-  const center = 120;
+  // center/viewBox give the axis labels (placed at radius + 24) a full 48px
+  // of margin to the canvas edge - the previous 240x240/center=120 canvas
+  // left only ~18px, clipping longer labels like "user empathy" at the
+  // widest angles.
+  const center = 150;
   const radius = 78;
   const grid = [0.33, 0.66, 1].map((scale) => radarPoints(axes.length, radius * scale, center));
   const valuePoints = axes
@@ -92,7 +96,7 @@ function RadarSvg({ axes }: { axes: SkillRadarAxis[] }) {
 
   return (
     <svg
-      viewBox="0 0 240 240"
+      viewBox="0 0 300 300"
       role="img"
       aria-label="Skill gap radar chart"
       className="mx-auto h-64 w-64"
@@ -170,7 +174,7 @@ function GapList({
         {gaps.map((gap) => (
           <GapRow
             key={`${gap.required_skill}-${gap.user_closest_skill ?? ""}`}
-            title={gap.required_skill}
+            title={gap.display || gap.required_skill}
             meta={`${gap.severity} priority - ${effortLabel(gap)}`}
             body={skillGapCopy(gap, milestones)}
           />

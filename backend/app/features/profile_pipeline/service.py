@@ -43,10 +43,10 @@ def _skill_keywords(cv_data: CVData) -> list[str]:
             seen.add(key)
             skills.append(skill.name.strip())
     for skill in cv_data.skills_extracted.soft_skills:
-        key = skill.strip().casefold()
+        key = skill.name.strip().casefold()
         if key and key not in seen:
             seen.add(key)
-            skills.append(skill.strip())
+            skills.append(skill.name.strip())
     return skills
 
 
@@ -110,6 +110,7 @@ def build_embedding_profile(
             "start_date",
             "end_date",
         ),
+        potential_direction=privacy_stripped_cv_data.potential_direction or "",
     )
 
 

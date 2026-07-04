@@ -12,6 +12,7 @@ import type {
   Education,
   Experience,
   ManualCVInput,
+  PreparedSkillProfile,
   Project,
   UserCareerProfile,
 } from "./api";
@@ -231,7 +232,8 @@ export function cvDataToUserCareerProfile(
   const fallback = fallbackIdentity(cv);
   const skills = uniqueText([
     ...cv.skills_extracted.technical_skills.map((skill) => skill.name),
-    ...cv.skills_extracted.soft_skills,
+    ...cv.skills_extracted.inferred_skills.map((skill) => skill.name),
+    ...cv.skills_extracted.soft_skills.map((skill) => skill.name),
   ]);
 
   return {
@@ -256,6 +258,7 @@ export function cvDataToUserCareerProfile(
     })),
     skills,
     interests: normalizeInterests(cv.interests),
+    potential_direction: textOrNull(cv.potential_direction) ?? "",
     certifications: cv.certifications.map((item) => ({
       name: textOrNull(item.name),
       issuer: null,
@@ -377,7 +380,11 @@ function emptyProject(): Project {
 /* ───────────────────────────  Confirmation  ────────────────────────────── */
 
 /** Wrap a CVData in the ConfirmedCVData envelope (mirrors backend to_confirmed_cv_data). */
-export function toConfirmedCvData(cvData: CVData, identity?: Identity | null): ConfirmedCVData {
+export function toConfirmedCvData(
+  cvData: CVData,
+  identity?: Identity | null,
+  preparedSkills?: PreparedSkillProfile | null,
+): ConfirmedCVData {
   const fallback = fallbackIdentity(cvData);
   const label = textOrNull(identity?.archetype) ?? fallback.archetype;
   const summary = textOrNull(identity?.lead) ?? fallback.lead;
@@ -392,5 +399,6 @@ export function toConfirmedCvData(cvData: CVData, identity?: Identity | null): C
     },
     career_identity_statement: `${label}: ${summary}`,
     career_identity_summary: { label, summary },
+    prepared_skills: preparedSkills ?? null,
   };
 }

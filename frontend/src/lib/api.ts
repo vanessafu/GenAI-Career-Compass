@@ -86,9 +86,21 @@ export type Language = {
   level: string | null;
 };
 
+export type InferredSkill = {
+  name: string;
+  inferred_from: string[];
+  rationale: string | null;
+};
+
+export type SoftSkill = {
+  name: string;
+  confidence: number;
+};
+
 export type SkillsExtracted = {
   technical_skills: TechnicalSkill[];
-  soft_skills: string[];
+  inferred_skills: InferredSkill[];
+  soft_skills: SoftSkill[];
   languages: Language[];
 };
 
@@ -121,6 +133,7 @@ export type CVData = {
   thesis: Thesis[];
   skills_extracted: SkillsExtracted;
   interests: string[];
+  potential_direction: string | null;
   unmapped_information: UnmappedInformation[];
 };
 
@@ -138,6 +151,26 @@ export type ConfirmedCVData = {
   confirmation_metadata: ConfirmationMetadata;
   career_identity_statement?: string | null;
   career_identity_summary?: CareerIdentitySummary | null;
+  prepared_skills?: PreparedSkillProfile | null;
+};
+
+// One-time, role-agnostic skill preparation (normalize + alias-resolve +
+// ontology-canonicalize + hop-decayed closure), computed once via
+// POST /api/v1/roles/prepare-skills and reused across every role a user
+// inspects in the session - see backend role_matching/prepared_skills.py.
+export type PreparedSkillEntry = {
+  key: string;
+  display: string;
+  source: "explicit" | "context" | "ontology_implied";
+  confidence: number;
+  via: string[];
+  domains: string[];
+};
+
+export type PreparedSkillProfile = {
+  version: number;
+  generated_at: string;
+  entries: PreparedSkillEntry[];
 };
 
 // Profile pipeline
@@ -155,6 +188,7 @@ export type EmbeddingProfile = {
   interests: string[];
   certifications: Record<string, unknown>[];
   projects: Record<string, unknown>[];
+  potential_direction: string;
 };
 
 export type ProfilePipelineResponse = {
@@ -207,6 +241,10 @@ export type UserCareerProfile = {
   interests: string[];
   certifications: UserCertification[];
   projects: UserProject[];
+  // Inferred from experience/projects, combined with `interests` to build
+  // the intent embedding; `career_identity` is now the dedicated source for
+  // the identity guardrail embedding instead.
+  potential_direction: string;
 };
 
 export type RoleMatch = {
@@ -237,6 +275,9 @@ export type SkillGap = {
   domain: string;
   suggestion: string;
   required_skill: string;
+  /** Properly-cased display text for required_skill (e.g. "UI/UX Design"
+   * where required_skill is the normalized "ui ux design") - display only. */
+  display: string;
   user_closest_skill: string | null;
   transferability: number;
   severity: string;
@@ -449,6 +490,19 @@ export async function matchRoles(profile: UserCareerProfile, topK = 9): Promise<
     matched_roles: payload.results,
     analysis: null,
   };
+}
+
+/** One-time skill preparation for a confirmed CV - run once and cache the
+ * result, then thread it into every toConfirmedCvData() call afterwards so
+ * gap-analysis/career-path don't re-normalize/re-resolve/re-close it per role. */
+export async function prepareSkills(cvData: CVData): Promise<PreparedSkillProfile> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/roles/prepare-skills`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cvData),
+  });
+  if (!response.ok) await parseError(response);
+  return response.json();
 }
 
 /** Build a gap report for one selected role and confirmed profile. */

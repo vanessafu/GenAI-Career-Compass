@@ -28,6 +28,32 @@ def minimal_confirmed_profile():
     }
 
 
+def test_prepare_skills_endpoint_returns_ontology_implied_entries(monkeypatch):
+    from backend.app.features.role_matching import router as role_router
+
+    monkeypatch.setattr(role_router, "fetch_skill_aliases", lambda: {}, raising=False)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/roles/prepare-skills",
+        json={
+            "personal_info": {},
+            "profile_summary": {},
+            "skills_extracted": {
+                "technical_skills": [{"name": "Next.js"}],
+                "soft_skills": [],
+                "languages": [],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    entries = response.json()["entries"]
+    sources = {e["key"]: e["source"] for e in entries}
+    assert sources["next js"] == "explicit"
+    assert sources["react"] == "ontology_implied"
+
+
 def test_gap_analysis_endpoint_returns_report(monkeypatch):
     async def fake_explain_role_gap(role_id, confirmed_profile):
         return GapReport(

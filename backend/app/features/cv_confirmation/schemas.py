@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from backend.app.features.cv_parsing.schemas import CVData
 from backend.app.features.profile_preparation.schemas import CareerIdentitySummary
+from backend.app.features.role_matching.prepared_skills import PreparedSkillProfile
 
 ConfirmationStatus = Literal["pending", "confirmed", "edited", "skipped"]
 
@@ -31,3 +32,10 @@ class ConfirmedCVData(BaseModel):
     # embedding step.
     career_identity_statement: str | None = None
     career_identity_summary: CareerIdentitySummary | None = None
+    # One-time normalization + alias resolution + ontology closure over this
+    # profile's skills (see role_matching/prepared_skills.py), computed via
+    # POST /prepare-skills right after CV confirmation so gap-analysis/
+    # career-path requests don't redo it on every call. None for older clients
+    # or profiles that never called that endpoint - callers must fall back to
+    # on-the-fly evidence building in that case.
+    prepared_skills: PreparedSkillProfile | None = None

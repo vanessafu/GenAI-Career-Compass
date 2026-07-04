@@ -87,8 +87,13 @@ uv run python -m backend.scripts.role_embeddings
 ### API Server
 
 ```powershell
-uv run uvicorn backend.app.main:app --reload
+uv run uvicorn backend.app.main:app --reload --reload-dir backend
 ```
+
+`--reload-dir backend` restricts the file-watcher to backend source code. Without it,
+uvicorn watches the whole repo root, including `outputs/pipeline/` where every profile
+run writes debug artifacts - each write was retriggering a full server restart (and a
+full reload of the local embedding model) mid-request.
 
 The server listens on `http://localhost:8000`. Interactive docs are available at `http://localhost:8000/docs`.
 

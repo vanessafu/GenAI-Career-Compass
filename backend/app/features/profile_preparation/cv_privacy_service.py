@@ -102,6 +102,7 @@ def privacy_strip_cv_data(cv_data: CVData) -> CVData:
         ],
         skills_extracted=cv_data.skills_extracted,
         interests=cv_data.interests,
+        potential_direction=cv_data.potential_direction,
         unmapped_information=[
             item for item in cv_data.unmapped_information if not _is_pii_unmapped(item)
         ],
