@@ -1,85 +1,71 @@
 import logging
 
 import fitz
-from pydantic import BaseModel, Field
 
 from backend.app.core import openai_client
 from backend.app.features.cv_parsing.schemas import CVData
 
 logger = logging.getLogger("CareerCompass.CVParsing.Service")
 
-_SYSTEM_PROMPT = (
-    "You are a precise assistant for parsing resumes. "
-    "Extract the data from the text and fill in the provided schema. "
-    "IMPORTANT RULES: "
-    "1. COMPLETENESS IS CRITICAL: Extract EVERY SINGLE entry from each section. "
-    "Do not skip, merge, or summarise any work experience, education entry, project, certification, or thesis. "
-    "If there are four work experience entries in the CV, the experience list must contain four items. "
-    "2. Do not invent or guess any information under any circumstances. "
-    "3. If a specific piece of information is not explicitly and clearly present in the resume text, "
-    "leave the corresponding field empty (set the value to null or return an empty list). "
-    "4. Do not infer an industry from company names if it is not stated in the text. "
-    "5. Extract personal information such as name, email, phone, location, current role, and links "
-    "only when explicitly present. "
-    "6. For education entries, use entry_type to classify each entry: "
-    "'degree' for university degrees, 'semester_abroad' for exchange semesters and study abroad programmes, "
-    "'high_school' for Abitur/A-levels/secondary school, 'certification' for professional certificates, "
-    "'other' for anything else (e.g. work & travel). "
-    "7. Extract projects, certifications, and thesis or final dissertation work into their dedicated "
-    "schema sections when they are explicitly present. Do not merge them into work experience unless "
-    "the resume clearly presents them as employment. "
-    "8. For date fields (start_date, end_date, issue_date, expiration_date) use the format found in the text "
-    "(e.g. '01/2023' or '2023'). "
-    "9. If the resume contains relevant information that does not fit any schema field, preserve it "
-    "in unmapped_information instead of discarding it."
-)
+# One LLM step for CV parsing plus career signal extraction:
+# structured CV data, inferred interests, and inferred soft skills.
+_CV_PARSING_AND_EXTRACTING_PROMPT = """
+Role
+Resume parser and career signal extractor.
 
-_INTEREST_GENERATION_PROMPT = (
-    "Infer 3 to 5 concise career interests from the CV text. "
-    "Use only evidence in the text, avoid personal identifiers, and return short noun phrases. "
-    "Do not include duplicates or full sentences."
-)
+Task
+Extract structured CV data into the provided schema.
+Also normalize interests and infer soft skills when supported by CV evidence.
 
+Priority
 
-class _GeneratedInterests(BaseModel):
-    interests: list[str] = Field(default_factory=list)
+P1 Completeness
+Extract every explicitly stated entry.
+Never skip, merge, summarize, or deduplicate.
 
+P2 Faithfulness
+Use only CV evidence.
+Never invent, guess, rewrite, or complete missing facts.
+Do not infer industry, seniority, or impact unless clearly supported.
 
-def _clean_interests(values: list[str]) -> list[str]:
-    seen: set[str] = set()
-    interests: list[str] = []
-    for value in values:
-        cleaned = value.strip()
-        key = cleaned.casefold()
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        interests.append(cleaned)
-    return interests[:5]
+P3 Missing Values
+Unsupported scalar → null.
+Unsupported list → [].
 
+P4 Structure
+Keep each item in its corresponding schema section.
+Do not move entries across sections.
 
-async def _fill_blank_interests(cv_data: CVData, raw_text: str, *, model: str | None = None) -> CVData:
-    if any(item.strip() for item in cv_data.interests):
-        cv_data.interests = _clean_interests(cv_data.interests)
-        return cv_data
+P5 Formatting
+Preserve original wording unless a field-specific rule says to normalize.
+Keep dates exactly as written.
 
-    try:
-        generated = await openai_client.parse_structured(
-            messages=[
-                {"role": "system", "content": _INTEREST_GENERATION_PROMPT},
-                {"role": "user", "content": raw_text},
-            ],
-            response_format=_GeneratedInterests,
-            model_purpose="identity",
-            model=model,
-        )
-    except Exception as exc:
-        logger.warning("Interest generation failed; keeping blank interests: %s", exc)
-        return cv_data
+P6 Education
+Use `entry_type`: degree, semester_abroad, high_school, certification, other.
+Classify exchange/study abroad as `semester_abroad`; Abitur/A-levels/secondary school as `high_school`; work & travel as `other`.
+For degrees, split fields strictly:
+`degree_type` = level only; `field_of_study` = field only; `institution` = school only.
 
-    if generated is not None:
-        cv_data.interests = _clean_interests(generated.interests)
-    return cv_data
+P7 Personal Data
+Extract personal data only when explicitly stated.
+Do not use personal identifiers in generated interests or soft skills.
+
+P8 Interests
+Return 3–5 short noun phrases in `interests`; no duplicates/sentences.
+Priority: target role/career goal > recurring CV evidence > listed generic interests.
+
+P9 Soft Skills
+Return 3–5 soft skills in `skills_extracted.soft_skills`.
+Infer only from repeated responsibilities, achievements, leadership, collaboration, communication, ownership, problem-solving, or stakeholder evidence.
+Use concise noun phrases.
+Exclude technical skills, tools, languages, job titles, and unsupported personality traits.
+
+P10 Fallback
+Store relevant unmapped information in `unmapped_information`.
+
+Schema Rules
+Use schema enums exactly.
+""".strip()
 
 
 def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
@@ -99,7 +85,7 @@ async def parse_cv_to_pydantic(raw_text: str, *, model: str | None = None) -> CV
     try:
         result = await openai_client.parse_structured(
             messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": _CV_PARSING_AND_EXTRACTING_PROMPT},
                 {"role": "user", "content": raw_text},
             ],
             response_format=CVData,
@@ -109,7 +95,7 @@ async def parse_cv_to_pydantic(raw_text: str, *, model: str | None = None) -> CV
         if result is None:
             raise RuntimeError("CV parser returned no structured output")
         logger.info("CV parsed successfully.")
-        return await _fill_blank_interests(result, raw_text, model=model)
+        return result
     except Exception as exc:
         logger.exception("LLM communication error (%s): %s", type(exc).__name__, exc)
         raise RuntimeError(f"Error while processing with the LLM: {type(exc).__name__}: {exc}") from exc
