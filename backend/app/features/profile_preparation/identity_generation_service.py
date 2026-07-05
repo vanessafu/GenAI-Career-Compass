@@ -6,36 +6,29 @@ from backend.app.features.profile_preparation.schemas import CareerIdentityGener
 
 logger = logging.getLogger("CareerCompass.PromptEngineering.IdentityGenerationService")
 
-_SYSTEM_PROMPT = """  
-You are a senior IT recruiter specializing in technical career assessment.  
+_IDENTITY_GENERATION_PROMPT = """  
+Role: Senior technical recruiter.
 
-Generate a recruiter-style career identity from privacy-stripped CV data.  
+Task: Generate a recruiter-style market-facing career identity from privacy-stripped CV data.  
 
-Produce a professional profile, not a resume summary.  
-
-Output  
-- label: 2-4 words, Title Case, using the most representative market-recognized role supported by recurring experience.  
-- summary: 3-5 concise sentences.  
+Output:  
+- label: 2-4 words, Title Case, market-recognized role. 
+- summary: 3-5 concise sentences. Do not start with or repeat the label.  
 
 Build the summary in this order:  
-1. Begin with the role identity.  
-2. Primary Expertise (max 3 capability domains)  
-3. Career Progression (if evidenced)  
-4. Business Impact  
-5. One realistic next career direction  
+1. Primary expertise, max 3 domains.
+2. Career progression, if evidenced.
+3. Recurring business value.
+4. One realistic next direction.
 
-Rules  
-- Write in an objective, subject-free style.  
-- Describe capabilities, not responsibilities.  
-- Express expertise as professional domains and capabilities rather than technologies.  
-- Choose the most representative professional role supported by recurring experience.  
-- Describe progression through increasing technical ownership, scope or specialization.  
-- Summarize recurring business value rather than project outcomes.  
-- Weight evidence: recent experience > career progression > projects > education > interests.  
-- Infer only from evidence; recommend only the next logical role or specialization beyond the current position.  
-- Never include organizations, locations, personal information, links or any personal pronouns.  
-- Never exaggerate seniority or impact.  
-- Optimize for recruiter readability and rapid market positioning.  
+Rules:
+- Objective, subject-free style.
+- Capabilities, not responsibilities.
+- Professional domains over tool lists.
+- Evidence weight: recent experience > progression > projects > education > interests.
+- Infer only from evidence.
+- No organizations, locations, personal information, links, or pronouns.
+- Do not exaggerate seniority or impact.
 """.strip()
 
 
@@ -45,7 +38,7 @@ async def generate_career_identity(cv_data: CVData) -> CareerIdentityGeneration:
         logger.info("Generating career identity from privacy-stripped CV data...")
         generated = await openai_client.parse_structured(
             messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": _IDENTITY_GENERATION_PROMPT},
                 {"role": "user", "content": cv_data.model_dump_json()},
             ],
             response_format=CareerIdentityGeneration,

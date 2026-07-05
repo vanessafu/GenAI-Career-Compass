@@ -50,6 +50,7 @@ from backend.app.features.role_matching.prepared_skills import (
     CURRENT_PREPARED_SKILLS_VERSION,
     PreparedSkillProfile,
 )
+from backend.app.features.role_matching.top_skill_gaps import enrich_gap_report_with_recommendations
 from backend.app.features.role_matching.service import _listify, as_cv_data
 from backend.app.features.role_matching.skill_alignment import (
     SkillEvidence,
@@ -381,7 +382,7 @@ def analyze_role_gap(
         + READINESS_W["seniority"] * seniority_fit
     )
 
-    return GapReport(
+    report = GapReport(
         role_id=role_id,
         job_title=role["job_title"],
         job_description=role.get("job_description"),
@@ -391,6 +392,7 @@ def analyze_role_gap(
         certifications=certs,
         seniority=seniority,
     )
+    return enrich_gap_report_with_recommendations(report, confirmed_profile)
 
 
 async def explain_role_gap(

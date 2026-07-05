@@ -284,6 +284,19 @@ export type SkillGap = {
   source: string;
 };
 
+export type ActionableSkillGap = {
+  skill: string;
+  display: string;
+  domain: string;
+  priority_label: "critical" | "high" | "medium" | "low";
+  estimated_effort: "quick_win" | "moderate" | "substantial";
+  bridge_skill: string | null;
+  why_it_matters: string;
+  suggested_action: string;
+  proof_to_build: string;
+  resume_hint: string;
+};
+
 export type SkillDimension = {
   matched_skills: string[];
   missing_skills: string[];
@@ -348,6 +361,7 @@ export type GapReport = {
   seniority: SeniorityDimension;
   grounding_used: string[];
   action_plan: { title: string; description: string; effort: string; priority: string }[];
+  top_actionable_skill_gaps?: ActionableSkillGap[];
   narrative: GapNarrative | null;
 };
 

@@ -1002,9 +1002,6 @@ function gapReport({
     skills: skillDimension(matched, missing, gaps, readiness),
     certifications: certificationDimension(certifications),
     seniority: {
-      user_seniority: "Software Engineer II",
-      role_seniority: jobTitle,
-      fit: seniorityGap === "match" ? "aligned" : "stretch",
       user_level: "mid",
       role_level: seniorityGap === "under" ? "senior" : "mid",
       user_years: 5,
@@ -1046,11 +1043,32 @@ function skillDimension(
   gaps: SkillGap[],
   readiness: number,
 ): SkillDimension {
+  const domainSkills = gaps.reduce<Record<string, string[]>>((acc, gap) => {
+    const domain = gap.domain || gap.display || gap.required_skill;
+    const skill = gap.display || gap.required_skill;
+    if (!domain || !skill) return acc;
+    acc[domain] = acc[domain] ?? [];
+    if (!acc[domain].includes(skill)) acc[domain].push(skill);
+    return acc;
+  }, {});
+  const domainCoverage = gaps.reduce<Record<string, number>>((acc, gap) => {
+    const domain = gap.domain || gap.display || gap.required_skill;
+    if (!domain) return acc;
+    const domainGaps = gaps.filter(
+      (item) => (item.domain || item.display || item.required_skill) === domain,
+    );
+    const total = domainGaps.reduce((sum, item) => sum + item.transferability, 0);
+    acc[domain] = domainGaps.length ? total / domainGaps.length : 0;
+    return acc;
+  }, {});
+
   return {
     matched_skills: matched,
     missing_skills: missing,
     optional_missing_skills: missing.slice(2),
     skill_gaps: gaps,
+    domain_coverage: domainCoverage,
+    domain_skills: domainSkills,
     coverage: readiness,
     status: statusFor(readiness),
     summary: `${matched.length} visible strengths and ${missing.length} targeted gaps.`,

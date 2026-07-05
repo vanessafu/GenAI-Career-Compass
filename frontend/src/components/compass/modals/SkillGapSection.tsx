@@ -3,7 +3,20 @@ import { AnimatedPercent } from "./AnimatedPercent";
 import { motion, useReducedMotion } from "framer-motion";
 import { buildSkillRadarAxes, type SkillRadarAxis } from "@/lib/gapRadar";
 import { skillGapCopy } from "@/lib/skillGapCoverage";
-import type { CareerPathMilestone, GapReport, SeniorityDimension, SkillGap } from "@/lib/api";
+import type {
+  ActionableSkillGap,
+  CareerPathMilestone,
+  GapReport,
+  SeniorityDimension,
+  SkillGap,
+} from "@/lib/api";
+
+type GapListItem = {
+  key: string;
+  title: string;
+  meta: string;
+  body: string;
+};
 
 export function SkillGapSection({
   report,
@@ -12,12 +25,12 @@ export function SkillGapSection({
   report: GapReport;
   milestones?: CareerPathMilestone[];
 }) {
-  const topGaps = sortSkillGaps(report.skills.skill_gaps).slice(0, 3);
+  const topGaps = topGapListItems(report, milestones);
 
   return (
     <>
       <SkillRadar report={report} />
-      <GapList title="Top skill gaps" gaps={topGaps} milestones={milestones} />
+      <GapList title="Top skill gaps" gaps={topGaps} />
       <SeniorityGap seniority={report.seniority} />
     </>
   );
@@ -157,27 +170,14 @@ function RadarSvg({ axes }: { axes: SkillRadarAxis[] }) {
   );
 }
 
-function GapList({
-  title,
-  gaps,
-  milestones,
-}: {
-  title: string;
-  gaps: SkillGap[];
-  milestones: CareerPathMilestone[];
-}) {
+function GapList({ title, gaps }: { title: string; gaps: GapListItem[] }) {
   if (gaps.length === 0) return null;
   return (
     <ModalBlock className="mb-5">
       <p className="mb-2 text-[10px] uppercase tracking-[0.18em] text-foreground/45">{title}</p>
       <div className="space-y-2">
         {gaps.map((gap) => (
-          <GapRow
-            key={`${gap.required_skill}-${gap.user_closest_skill ?? ""}`}
-            title={gap.display || gap.required_skill}
-            meta={`${gap.severity} priority - ${effortLabel(gap)}`}
-            body={skillGapCopy(gap, milestones)}
-          />
+          <GapRow key={gap.key} title={gap.title} meta={gap.meta} body={gap.body} />
         ))}
       </div>
     </ModalBlock>
@@ -235,9 +235,88 @@ function sortSkillGaps(gaps: SkillGap[]): SkillGap[] {
   );
 }
 
+function topGapListItems(report: GapReport, milestones: CareerPathMilestone[]): GapListItem[] {
+  const rawGaps = report.skills.skill_gaps ?? [];
+  const fallbackItems = sortSkillGaps(rawGaps).map((gap, index) =>
+    skillGapItem(gap, milestones, index),
+  );
+  const actionableItems = (report.top_actionable_skill_gaps ?? [])
+    .map((gap, index) => actionableGapItem(gap, rawGaps, milestones, index))
+    .filter((item): item is GapListItem => Boolean(item));
+
+  if (actionableItems.length === 0) return fallbackItems.slice(0, 3);
+
+  const items: GapListItem[] = [];
+  const seen = new Set<string>();
+  for (const item of [...actionableItems, ...fallbackItems]) {
+    const key = normalizeGapKey(item.title);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    items.push(item);
+    if (items.length >= 3) break;
+  }
+  return items;
+}
+
+function skillGapItem(
+  gap: SkillGap,
+  milestones: CareerPathMilestone[],
+  index: number,
+): GapListItem {
+  const title = gap.display || gap.required_skill || gap.skill;
+  return {
+    key: `${normalizeGapKey(title) || "skill-gap"}-${index}`,
+    title,
+    meta: `${gap.severity} priority - ${effortLabel(gap)}`,
+    body: gap.suggestion || skillGapCopy(gap, milestones),
+  };
+}
+
+function actionableGapItem(
+  gap: ActionableSkillGap,
+  rawGaps: SkillGap[],
+  milestones: CareerPathMilestone[],
+  index: number,
+): GapListItem | null {
+  const title = gap.display || gap.skill;
+  if (!title) return null;
+  const rawGap = rawGapForActionable(gap, rawGaps);
+  const body =
+    [gap.why_it_matters, gap.suggested_action, gap.proof_to_build, gap.resume_hint]
+      .filter(Boolean)
+      .join("\n") || (rawGap ? rawGap.suggestion || skillGapCopy(rawGap, milestones) : "");
+
+  if (!body) return null;
+
+  return {
+    key: `${normalizeGapKey(gap.skill || title) || "actionable-gap"}-${index}`,
+    title,
+    meta: `${gap.priority_label} priority - ${actionableEffortLabel(gap.estimated_effort)}`,
+    body,
+  };
+}
+
+function rawGapForActionable(gap: ActionableSkillGap, rawGaps: SkillGap[]): SkillGap | undefined {
+  const keys = [gap.skill, gap.display].map(normalizeGapKey).filter(Boolean);
+  return rawGaps.find((rawGap) => {
+    const rawKeys = [rawGap.required_skill, rawGap.display, rawGap.skill].map(normalizeGapKey);
+    return keys.some((key) => rawKeys.includes(key));
+  });
+}
+
+function normalizeGapKey(value: string | null | undefined): string {
+  return (value || "").trim().toLowerCase().split(/\s+/).join(" ");
+}
+
 function effortLabel(gap: SkillGap): string {
   if (gap.transferability >= 0.5) return "low effort";
   if (gap.transferability > 0) return "medium effort";
+  return "high effort";
+}
+
+function actionableEffortLabel(effort: ActionableSkillGap["estimated_effort"]): string {
+  if (effort === "quick_win") return "low effort";
+  if (effort === "moderate") return "medium effort";
   return "high effort";
 }
 

@@ -5,6 +5,8 @@ import pytest
 
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
 from backend.app.features.role_matching.schemas import (
+    ActionableSkillGap,
+    ActionableSkillGapPolish,
     CertificationDimension,
     CertificationGap,
     GapReport,
@@ -252,6 +254,74 @@ def test_career_path_estimated_timeline_is_the_readiness_tiers_range(monkeypatch
     assert report.estimated_timeline == "3-5 months"
 
 
+def test_career_path_applies_llm_top_skill_gap_suggestion_polish(monkeypatch):
+    from backend.app.features.role_matching import career_path
+
+    async def fake_explain_role_gap(role_id, confirmed_profile, *, with_narrative):
+        return GapReport(
+            role_id=role_id,
+            job_title="Release Manager",
+            overall_readiness=0.48,
+            skills=SkillDimension(
+                skill_gaps=[
+                    SkillGap(
+                        required_skill="software development life cycle",
+                        display="Software Development Life Cycle (SDLC)",
+                        severity="high",
+                        suggestion="Rule-based SDLC action.",
+                    )
+                ],
+            ),
+            top_actionable_skill_gaps=[
+                ActionableSkillGap(
+                    skill="software development life cycle",
+                    display="Software Development Life Cycle (SDLC)",
+                    domain="Software Engineering",
+                    priority_label="critical",
+                    estimated_effort="substantial",
+                    why_it_matters="Rule-based why.",
+                    suggested_action="Rule-based action.",
+                    proof_to_build="Rule-based proof.",
+                    resume_hint="Rule-based resume hint.",
+                )
+            ],
+        )
+
+    async def fake_parse_structured(messages, response_format, **kwargs):
+        return career_path.CareerPathLLMDraft(
+            plan_summary="Build release ownership proof around the SDLC gap.",
+            milestones=[],
+            top_skill_gap_suggestions=[
+                ActionableSkillGapPolish(
+                    skill="software development life cycle",
+                    why_it_matters="SDLC matters because release managers need to own the path from scope to post-release review.",
+                    suggested_action="Create a release lifecycle case study with QA gates, approval owners, rollback criteria, and release notes.",
+                    proof_to_build="Build a release checklist and go/no-go summary that a hiring manager can inspect.",
+                    resume_hint="Add a bullet showing release lifecycle coordination across engineering, QA, and operations.",
+                ),
+                ActionableSkillGapPolish(
+                    skill="not a supplied skill",
+                    suggested_action="This must be ignored.",
+                ),
+            ],
+        )
+
+    monkeypatch.setattr(career_path, "explain_role_gap", fake_explain_role_gap)
+    monkeypatch.setattr(career_path, "parse_structured", fake_parse_structured)
+
+    report = asyncio.run(
+        career_path.generate_career_path(
+            42,
+            ConfirmedCVData.model_validate(minimal_confirmed_profile()),
+        )
+    )
+
+    polished = report.requirement_breakdown.top_actionable_skill_gaps[0]
+    assert polished.suggested_action.startswith("Create a release lifecycle case study")
+    assert "release managers" in polished.why_it_matters
+    assert report.requirement_breakdown.skills.skill_gaps[0].suggestion == polished.suggested_action
+
+
 def test_career_path_replaces_profile_like_plan_summary(monkeypatch):
     from backend.app.features.role_matching import career_path
 
@@ -354,8 +424,8 @@ def test_fallback_career_path_summary_is_user_focused():
 def test_career_path_prompt_requests_exact_milestone_durations():
     from backend.app.features.role_matching import career_path
 
-    assert "timeline as a single duration" in career_path._SYSTEM_PROMPT
-    assert "Do not output ranges" in career_path._SYSTEM_PROMPT
+    assert "timeline as a single duration" in career_path._CAREER_PATH_SYSTEM_PROMPT
+    assert "Do not output ranges" in career_path._CAREER_PATH_SYSTEM_PROMPT
 
 
 def test_top_skill_gaps_groups_by_domain_and_ranks_by_worst_gap():

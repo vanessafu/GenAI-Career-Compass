@@ -336,6 +336,30 @@ class SkillGap(BaseModel):
     source: str = ""
 
 
+class ActionableSkillGap(BaseModel):
+    skill: str = ""
+    display: str = ""
+    domain: str = ""
+    priority_label: Literal["critical", "high", "medium", "low"] = "medium"
+    estimated_effort: Literal["quick_win", "moderate", "substantial"] = "moderate"
+    bridge_skill: Optional[str] = None
+    why_it_matters: str = ""
+    suggested_action: str = ""
+    proof_to_build: str = ""
+    resume_hint: str = ""
+
+
+class ActionableSkillGapPolish(BaseModel):
+    skill: str = Field(
+        default="",
+        description="Must exactly match one supplied top_actionable_skill_gaps[].skill value.",
+    )
+    why_it_matters: str = ""
+    suggested_action: str = ""
+    proof_to_build: str = ""
+    resume_hint: str = ""
+
+
 class SkillDimension(BaseModel):
     matched_skills: list[str] = Field(default_factory=list)
     missing_skills: list[str] = Field(default_factory=list)
@@ -407,6 +431,7 @@ class GapReport(BaseModel):
     seniority: SeniorityDimension = Field(default_factory=SeniorityDimension)
     grounding_used: list[str] = Field(default_factory=list)
     action_plan: list[GapActionItem] = Field(default_factory=list)
+    top_actionable_skill_gaps: list[ActionableSkillGap] = Field(default_factory=list)
     narrative: Optional[GapNarrative] = None
 
 
@@ -434,14 +459,24 @@ class CareerPathDraft(BaseModel):
     plan_summary: str = Field(
         default="",
         description=(
-            "Three to four concise sentences summarizing the whole plan: readiness, main gaps, "
-            "roadmap focus, projects, and certifications. Do not relist the profile."
+            "Two to three concise user-facing sentences summarizing readiness, matched skills, "
+            "and main gaps. Do not relist the profile, milestones, or certifications."
         ),
     )
     milestones: list[CareerPathMilestone] = Field(default_factory=list)
     recommended_projects: list[str] = Field(default_factory=list)
     estimated_timeline: str = ""
     certifications: list[str] = Field(default_factory=list)
+
+
+class CareerPathLLMDraft(CareerPathDraft):
+    top_skill_gap_suggestions: list[ActionableSkillGapPolish] = Field(
+        default_factory=list,
+        description=(
+            "Optional wording polish for supplied top_actionable_skill_gaps only. "
+            "Do not add, remove, or reorder gaps."
+        ),
+    )
 
 
 class CareerPathReport(CareerPathDraft):

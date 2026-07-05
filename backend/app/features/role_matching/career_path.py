@@ -10,7 +10,10 @@ from backend.app.core.openai_client import parse_structured
 from backend.app.features.cv_confirmation.schemas import ConfirmedCVData
 from backend.app.features.role_matching.gap_analysis import explain_role_gap
 from backend.app.features.role_matching.schemas import (
+    ActionableSkillGap,
+    ActionableSkillGapPolish,
     CareerPathDraft,
+    CareerPathLLMDraft,
     CareerPathMilestone,
     CareerPathReport,
     CertificationGap,
@@ -24,23 +27,33 @@ MAX_GAPS = 5
 MAX_MILESTONES = 5
 SINGLE_TIMELINE_RE = re.compile(r"^\s*(\d+)\s*(weeks?|months?)\s*$", re.IGNORECASE)
 
-_SYSTEM_PROMPT = (
-    "You generate concise career roadmap text from a precomputed gap report. "
-    "Use only the supplied role requirements, readiness score, skill gaps, and "
-    "certification gaps. Do not invent certifications, salaries, job markets, "
-    "courses, bootcamps, or unsupported career claims. For every milestone, set "
-    "kind to exactly one of: role, skill, project, certification, experience. "
-    "Include plan_summary as two to three conversational sentences addressed to "
-    "the user. Say how close they are, which matched skills already line up, and "
-    "what they still need to strengthen. Do not list roadmap milestones, "
-    "certifications, or repeat the user's profile summary. Set each milestone "
-    "timeline as a single duration: use '1 week' through '4 weeks' for short work "
-    "and whole 'month'/'months' values for anything longer. Do not output ranges, "
-    "calendar windows, cumulative timelines, plus signs, or vague text. The API "
-    "computes the overall estimated_timeline itself from the readiness tier - "
-    "keep the milestones' combined duration roughly within the stated "
-    "target_timeline_range rather than planning far beyond or under it."
-)
+_CAREER_PATH_SYSTEM_PROMPT = """
+Role: Career roadmap writer.
+
+Task: Convert a precomputed gap report into a concise, evidence-grounded career path.
+
+Use only supplied role requirements, readiness score, matched skills, skill gaps,
+certification gaps, role description, timeline range, and actionable gap drafts.
+
+Output rules:
+- plan_summary: 2-3 conversational sentences to the user. Mention closeness,
+  matched skills, and main gaps. Do not repeat current_profile_summary or list
+  milestones/certifications.
+- milestones: 3-5 items. kind must be exactly one of role, skill, project,
+  certification, experience.
+- Set each milestone timeline as a single duration: "1 week" to "4 weeks" for
+  short work; whole "month"/"months" values after that. Do not output ranges,
+  calendar windows, cumulative timelines, plus signs, or vague text.
+- Keep milestone durations roughly within target_timeline_range; estimated_timeline
+  is computed by the API.
+- certifications: only names from certification_gaps.
+- top_skill_gap_suggestions: optional polish for supplied top_actionable_skill_gaps
+  only. Do not add, remove, rename, or reorder gaps; suggestion.skill must exactly
+  match a supplied skill. Keep fields one concise sentence; preserve priority and effort.
+
+Never invent certifications, salaries, job markets, courses, bootcamps, user
+experience, or unsupported career claims.
+""".strip()
 
 
 def _clean(value: str | None) -> str:
@@ -288,12 +301,26 @@ def _prompt_payload(
         "allowed_milestone_kinds": ["role", "skill", "project", "certification", "experience"],
         "seniority": report.seniority.model_dump(mode="json"),
         "role_description": _clean(report.job_description)[:1200],
-        "plan_summary_instruction": (
-            "Write plan_summary as 2-3 conversational, user-focused sentences. Say how close the "
-            "user is, name the matched skills that already line up, and name the most important "
-            "remaining gaps. Do not list roadmap milestones or certifications."
-        ),
+        "top_actionable_skill_gaps": _top_gap_polish_payload(report),
     }
+
+
+def _top_gap_polish_payload(report: GapReport) -> list[dict[str, str]]:
+    return [
+        {
+            "skill": gap.skill,
+            "display": gap.display,
+            "domain": gap.domain,
+            "priority_label": gap.priority_label,
+            "estimated_effort": gap.estimated_effort,
+            "bridge_skill": gap.bridge_skill or "",
+            "draft_why_it_matters": gap.why_it_matters,
+            "draft_suggested_action": gap.suggested_action,
+            "draft_proof_to_build": gap.proof_to_build,
+            "draft_resume_hint": gap.resume_hint,
+        }
+        for gap in report.top_actionable_skill_gaps[:3]
+    ]
 
 
 async def _generate_draft(
@@ -305,7 +332,7 @@ async def _generate_draft(
     try:
         draft = await parse_structured(
             messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": _CAREER_PATH_SYSTEM_PROMPT},
                 {
                     "role": "user",
                     "content": json.dumps(
@@ -314,7 +341,7 @@ async def _generate_draft(
                     ),
                 },
             ],
-            response_format=CareerPathDraft,
+            response_format=CareerPathLLMDraft,
             model_purpose="career_path",
         )
         if draft is not None:
@@ -357,6 +384,33 @@ def _normalize_milestones(milestones: list[CareerPathMilestone], gaps: list[str]
     ]
 
 
+def _apply_top_gap_polish(
+    gaps: list[ActionableSkillGap],
+    suggestions: list[ActionableSkillGapPolish],
+) -> None:
+    by_skill = {_clean(gap.skill): gap for gap in gaps}
+    for suggestion in suggestions:
+        gap = by_skill.get(_clean(suggestion.skill))
+        if gap is None:
+            continue
+        if _clean(suggestion.why_it_matters):
+            gap.why_it_matters = _clean(suggestion.why_it_matters)
+        if _clean(suggestion.suggested_action):
+            gap.suggested_action = _clean(suggestion.suggested_action)
+        if _clean(suggestion.proof_to_build):
+            gap.proof_to_build = _clean(suggestion.proof_to_build)
+        if _clean(suggestion.resume_hint):
+            gap.resume_hint = _clean(suggestion.resume_hint)
+
+
+def _sync_skill_gap_suggestions(report: GapReport) -> None:
+    suggestions = {gap.skill: gap.suggested_action for gap in report.top_actionable_skill_gaps}
+    for gap in report.skills.skill_gaps:
+        polished = suggestions.get(gap.required_skill)
+        if polished:
+            gap.suggestion = polished
+
+
 async def generate_career_path(role_id: int, confirmed_profile: ConfirmedCVData) -> CareerPathReport:
     gap_report = await explain_role_gap(role_id, confirmed_profile, with_narrative=False)
     current_profile_summary = _profile_summary(confirmed_profile)
@@ -367,6 +421,11 @@ async def generate_career_path(role_id: int, confirmed_profile: ConfirmedCVData)
 
     milestones = _normalize_milestones(draft.milestones, top_gaps)
     readiness_score = gap_report.overall_readiness or gap_report.readiness_score
+    _apply_top_gap_polish(
+        gap_report.top_actionable_skill_gaps,
+        getattr(draft, "top_skill_gap_suggestions", []),
+    )
+    _sync_skill_gap_suggestions(gap_report)
     return CareerPathReport(
         role_id=gap_report.role_id,
         plan_summary=_plan_summary(draft, fallback, current_profile_summary),

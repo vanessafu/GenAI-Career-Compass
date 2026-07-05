@@ -60,7 +60,7 @@ export function FullPlanModal({
   onToggleStepDetails: () => void;
   onClose: () => void;
 }) {
-  const fallbackGapReport = gapReport ?? report?.requirement_breakdown ?? null;
+  const fallbackGapReport = report?.requirement_breakdown ?? gapReport ?? null;
   const targetRole = report?.target_role ?? role.title;
   const readiness = report
     ? percent(report.readiness_score ?? report.requirement_breakdown.overall_readiness)
