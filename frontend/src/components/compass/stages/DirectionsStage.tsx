@@ -190,7 +190,7 @@ function RoleCard({
       </div>
 
       {role.summary && (
-        <p className="line-clamp-2 text-[12.5px] leading-snug text-foreground/65">{role.summary}</p>
+        <p className="line-clamp-3 text-[12.5px] leading-snug text-foreground/65">{role.summary}</p>
       )}
 
       {(topSkills.length > 0 || role.salary) && (

@@ -43,8 +43,6 @@ export function FullPlanModal({
   gapLoading,
   gapError,
   open,
-  showStepDetails,
-  onToggleStepDetails,
   onClose,
 }: {
   role: RoleView;
@@ -56,10 +54,9 @@ export function FullPlanModal({
   gapLoading: boolean;
   gapError: string | null;
   open: boolean;
-  showStepDetails: boolean;
-  onToggleStepDetails: () => void;
   onClose: () => void;
 }) {
+  const [showStepDetails, setShowStepDetails] = useState(false);
   const fallbackGapReport = report?.requirement_breakdown ?? gapReport ?? null;
   const targetRole = report?.target_role ?? role.title;
   const readiness = report
@@ -105,7 +102,7 @@ export function FullPlanModal({
           milestones={visibleMilestones}
           currentRole={currentRole}
           showStepDetails={showStepDetails}
-          onToggleStepDetails={onToggleStepDetails}
+          onToggleStepDetails={() => setShowStepDetails((shown) => !shown)}
         />
       )}
 

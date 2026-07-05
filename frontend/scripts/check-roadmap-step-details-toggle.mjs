@@ -14,12 +14,13 @@ function assert(condition, message) {
 }
 
 assert(
-  focusSource.includes("showPlanStepDetails") && focusSource.includes("setShowPlanStepDetails"),
-  "FocusStage should remember the roadmap detail toggle while browsing plans.",
+  !focusSource.includes("showPlanStepDetails") && !focusSource.includes("setShowPlanStepDetails"),
+  "FocusStage should not remember the roadmap detail toggle between full-plan modals.",
 );
 assert(
-  fullPlanSource.includes("showStepDetails") && fullPlanSource.includes("onToggleStepDetails"),
-  "FullPlanModal should receive the roadmap detail toggle state from its parent.",
+  fullPlanSource.includes("const [showStepDetails, setShowStepDetails] = useState(false)") &&
+    fullPlanSource.includes("onToggleStepDetails={() => setShowStepDetails((shown) => !shown)}"),
+  "FullPlanModal should own roadmap detail toggle state so each open starts collapsed.",
 );
 assert(
   fullPlanSource.includes("Show details") &&
