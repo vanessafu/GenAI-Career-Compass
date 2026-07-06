@@ -8,6 +8,7 @@ import {
   getLoadingProgressState,
   type LoadingProgressConfig,
 } from "@/lib/loadingProgress";
+import { DEGREE_LEVELS, LANGUAGE_LEVELS, ROLE_PRESETS, SKILL_PRESETS } from "@/lib/profilePresets";
 import {
   Upload,
   FileText,
@@ -24,55 +25,6 @@ import { LoadingPanel } from "../ui/LoadingPanel";
 
 const PARSE_STEPS = ["Reading your CV", "Privacy-stripping data", "Generating identity"];
 const MANUAL_STEPS = ["Structuring your profile", "Privacy-stripping data", "Generating identity"];
-
-const ROLE_PRESETS = [
-  "Senior Backend Developer",
-  "Backend Developer",
-  "Full-Stack Engineer",
-  "Frontend Engineer",
-  "DevOps Engineer",
-  "Tech Lead",
-  "Engineering Manager",
-  "Data Engineer",
-  "Cloud Engineer",
-  "Product Designer",
-];
-
-const DEGREE_LEVELS = [
-  "B.Sc.",
-  "M.Sc.",
-  "B.A.",
-  "M.A.",
-  "B.Eng.",
-  "M.Eng.",
-  "PhD",
-  "MBA",
-  "Abitur",
-  "Bootcamp",
-  "Other",
-];
-
-const LANGUAGE_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2", "Native"];
-
-const SKILL_PRESETS = [
-  "Python",
-  "Java",
-  "PostgreSQL",
-  "RESTful APIs",
-  "Docker",
-  "AWS EC2",
-  "Git",
-  "Microservices Architecture",
-  "TypeScript",
-  "React",
-  "Node.js",
-  "Go",
-  "Kubernetes",
-  "GraphQL",
-  "Redis",
-  "System Design",
-  "Mentoring",
-];
 
 export function EntryStage() {
   const setStage = useStageStore((s) => s.setStage);
@@ -819,9 +771,7 @@ export function EntryStage() {
                               title: item.name,
                               meta: item.level,
                             }))}
-                            onRemove={(idx) =>
-                              setLanguages(languages.filter((_, i) => i !== idx))
-                            }
+                            onRemove={(idx) => setLanguages(languages.filter((_, i) => i !== idx))}
                           >
                             <div className="grid gap-2.5 sm:grid-cols-2">
                               <input
