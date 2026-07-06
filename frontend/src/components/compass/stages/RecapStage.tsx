@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useStageStore } from "@/state/useStageStore";
 import { buildMissingBigSections } from "@/lib/recapMissingInfo";
+import { DEGREE_LEVELS, ROLE_PRESETS, SKILL_PRESETS } from "@/lib/profilePresets";
 import {
   ArrowRight,
   Sparkles,
@@ -34,6 +35,21 @@ function formatYearRange(start: string, end: string): string {
   const e = clean(end);
   if (s && e) return `${s}–${e}`;
   return s || e;
+}
+
+function normalizeYear(value: string): string {
+  return value.trim().match(/\d{4}/)?.[0] ?? "";
+}
+
+function invalidYearRange(start: string, end: string): boolean {
+  const s = normalizeYear(start);
+  const e = normalizeYear(end);
+  return Boolean(s && e && s > e);
+}
+
+function visibleText(value: string | undefined): string {
+  const cleaned = value?.trim() ?? "";
+  return cleaned && cleaned !== "—" ? cleaned : "";
 }
 
 const SKILL_ICONS: Record<string, LucideIcon> = {
@@ -103,6 +119,9 @@ export function RecapStage() {
 
   return (
     <div className="relative w-full px-6 pb-6 pt-[max(5rem,calc(env(safe-area-inset-top)+4rem))] sm:px-10 lg:px-14 lg:pt-20">
+      <PresetDatalist id="cc-skill-presets" options={SKILL_PRESETS} />
+      <PresetDatalist id="cc-role-presets" options={ROLE_PRESETS} />
+      <PresetDatalist id="cc-degree-presets" options={DEGREE_LEVELS} />
       <div className="mx-auto flex h-full w-full max-w-[1320px] flex-col gap-3">
         {/* Eyebrow — no name, no role line. */}
         <div className="flex items-center gap-2">
@@ -235,7 +254,7 @@ export function RecapStage() {
                         className="group removable-chip removable-chip--white inline-flex max-w-full items-center gap-1.5 rounded-full border border-[color:var(--brand)]/15 bg-white/80 px-3 py-1.5 text-[13.5px] text-foreground/85"
                       >
                         <span
-                          className="grid h-6 w-6 place-items-center rounded-full text-white"
+                          className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-white"
                           style={{ background: "var(--gradient-warm)" }}
                         >
                           <Icon size={11} />
@@ -257,6 +276,9 @@ export function RecapStage() {
                 <AddPill
                   value={newSkill}
                   setValue={setNewSkill}
+                  placeholder="Skill"
+                  label="Add skill"
+                  listId="cc-skill-presets"
                   onSubmit={() => {
                     addSkill(newSkill);
                     setNewSkill("");
@@ -299,6 +321,8 @@ export function RecapStage() {
                 <AddPill
                   value={newInterest}
                   setValue={setNewInterest}
+                  placeholder="Interest"
+                  label="Add interest"
                   onSubmit={() => {
                     addInterest(newInterest);
                     setNewInterest("");
@@ -333,7 +357,7 @@ export function RecapStage() {
                 <AddSimpleRow
                   placeholderA="Certification name"
                   placeholderB="Year"
-                  onAdd={(a, b) => addCertification({ name: a, issuer: "—", year: b })}
+                  onAdd={(a, b) => addCertification({ name: a, issuer: "", year: b })}
                 />
               </div>
             </SectionCard>
@@ -361,7 +385,7 @@ export function RecapStage() {
                 <AddSimpleRow
                   placeholderA="Project name"
                   placeholderB="Year"
-                  onAdd={(a, b) => addProject({ name: a, detail: "—", year: b })}
+                  onAdd={(a, b) => addProject({ name: a, detail: "", year: b })}
                 />
               </div>
             </SectionCard>
@@ -402,6 +426,16 @@ export function RecapStage() {
 
 /* ─────────────────────────  Building blocks  ───────────────────────── */
 
+function PresetDatalist({ id, options }: { id: string; options: string[] }) {
+  return (
+    <datalist id={id}>
+      {options.map((option) => (
+        <option key={option} value={option} />
+      ))}
+    </datalist>
+  );
+}
+
 function RowItem({
   idx,
   title,
@@ -412,8 +446,8 @@ function RowItem({
 }: {
   idx: number;
   title: string;
-  subtitle: string;
-  meta: string;
+  subtitle?: string;
+  meta?: string;
   onRemove: () => void;
   icon?: LucideIcon;
 }) {
@@ -436,9 +470,13 @@ function RowItem({
       )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-[14px] font-medium leading-tight">{title}</p>
-        <p className="truncate text-[12px] text-foreground/55">{subtitle}</p>
+        {visibleText(subtitle) && (
+          <p className="truncate text-[12px] text-foreground/55">{subtitle}</p>
+        )}
       </div>
-      <span className="shrink-0 text-[12px] tabular-nums text-foreground/60">{meta}</span>
+      {visibleText(meta) && (
+        <span className="shrink-0 text-[12px] tabular-nums text-foreground/60">{meta}</span>
+      )}
       <button onClick={onRemove} className="opacity-0 transition group-hover:opacity-100">
         <X size={12} className="text-foreground/50 hover:text-foreground" />
       </button>
@@ -450,23 +488,43 @@ function AddPill({
   value,
   setValue,
   onSubmit,
+  placeholder,
+  label,
+  listId,
 }: {
   value: string;
   setValue: (v: string) => void;
   onSubmit: () => void;
+  placeholder: string;
+  label: string;
+  listId?: string;
 }) {
+  const submit = () => {
+    if (!value.trim()) return;
+    onSubmit();
+  };
+
   return (
-    <div className="inline-flex items-center gap-1 rounded-full border border-dashed border-foreground/20 bg-white/60 px-2.5 py-1 text-[13px]">
-      <Plus size={12} className="text-foreground/45" />
+    <div className="inline-flex max-w-full items-center gap-1 rounded-full border border-dashed border-foreground/20 bg-white/60 px-2 py-1 text-[13px]">
       <input
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") onSubmit();
+          if (e.key === "Enter") submit();
         }}
-        placeholder="Add"
-        className="w-20 bg-transparent py-0.5 outline-none placeholder:text-foreground/40"
+        placeholder={placeholder}
+        list={listId}
+        className="w-24 min-w-0 bg-transparent py-0.5 outline-none placeholder:text-foreground/40"
       />
+      <button
+        type="button"
+        onClick={submit}
+        className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-white"
+        style={{ background: "var(--gradient-warm)" }}
+        aria-label={label}
+      >
+        <Plus size={11} />
+      </button>
     </div>
   );
 }
@@ -553,13 +611,19 @@ function AddExperienceRow({
   const [company, setCompany] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [error, setError] = useState("");
   const submit = () => {
     if (!role.trim() || !company.trim()) return;
+    if (invalidYearRange(start, end)) {
+      setError("End date cannot be before start date.");
+      return;
+    }
+    setError("");
     onAdd({
       role: role.trim(),
       company: company.trim(),
-      start: start.trim() || "—",
-      end: end.trim() || "Present",
+      start: normalizeYear(start),
+      end: normalizeYear(end) || "Present",
     });
     setRole("");
     setCompany("");
@@ -567,38 +631,46 @@ function AddExperienceRow({
     setEnd("");
   };
   return (
-    <div className="mt-1 grid grid-cols-[1fr_1fr_auto_auto_auto] items-center gap-1 rounded-lg border border-dashed border-foreground/15 bg-white/50 px-2 py-2 text-[13px]">
-      <input
-        value={role}
-        onChange={(e) => setRole(e.target.value)}
-        placeholder="Role"
-        className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
-      />
-      <input
-        value={company}
-        onChange={(e) => setCompany(e.target.value)}
-        placeholder="Company"
-        className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
-      />
-      <input
-        value={start}
-        onChange={(e) => setStart(e.target.value)}
-        placeholder="From"
-        className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
-      />
-      <input
-        value={end}
-        onChange={(e) => setEnd(e.target.value)}
-        placeholder="To"
-        className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
-      />
-      <button
-        onClick={submit}
-        className="grid h-6 w-6 place-items-center rounded-full text-white"
-        style={{ background: "var(--gradient-warm)" }}
-      >
-        <Plus size={11} />
-      </button>
+    <div className="mt-1 flex flex-col gap-1.5 rounded-lg border border-dashed border-foreground/15 bg-white/50 px-2 py-2 text-[13px]">
+      <div className="grid grid-cols-[1fr_1fr_auto_auto_auto] items-center gap-1">
+        <input
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          placeholder="Role"
+          list="cc-role-presets"
+          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
+        />
+        <input
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+          placeholder="Company"
+          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
+        />
+        <input
+          value={start}
+          onChange={(e) => setStart(e.target.value)}
+          placeholder="From"
+          className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
+        />
+        <input
+          value={end}
+          onChange={(e) => setEnd(e.target.value)}
+          placeholder="To"
+          className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
+        />
+        <button
+          onClick={submit}
+          className="grid h-6 w-6 place-items-center rounded-full text-white"
+          style={{ background: "var(--gradient-warm)" }}
+        >
+          <Plus size={11} />
+        </button>
+      </div>
+      {error && (
+        <p className="text-[11.5px] text-red-700" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -613,15 +685,21 @@ function AddEducationRow({
   const [school, setSchool] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [error, setError] = useState("");
   const submit = () => {
     if (!degree.trim() && !field.trim()) return;
     if (!school.trim()) return;
+    if (invalidYearRange(start, end)) {
+      setError("End date cannot be before start date.");
+      return;
+    }
+    setError("");
     onAdd({
       degree: degree.trim(),
       field: field.trim(),
       school: school.trim(),
-      start: start.trim() || "—",
-      end: end.trim() || "—",
+      start: normalizeYear(start),
+      end: normalizeYear(end),
     });
     setDegree("");
     setField("");
@@ -636,6 +714,7 @@ function AddEducationRow({
           value={degree}
           onChange={(e) => setDegree(e.target.value)}
           placeholder="Degree"
+          list="cc-degree-presets"
           className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
         />
         <input
@@ -673,6 +752,11 @@ function AddEducationRow({
           <Plus size={11} />
         </button>
       </div>
+      {error && (
+        <p className="text-[11.5px] text-red-700" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -690,7 +774,7 @@ function AddSimpleRow({
   const [b, setB] = useState("");
   const submit = () => {
     if (!a.trim()) return;
-    onAdd(a.trim(), b.trim() || "—");
+    onAdd(a.trim(), b.trim());
     setA("");
     setB("");
   };

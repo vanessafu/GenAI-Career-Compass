@@ -45,14 +45,20 @@ const domainAxes = buildSkillRadarAxes({
 });
 
 assert(domainAxes.length === 5, `Expected 5 radar axes (capped), got ${domainAxes.length}`);
-assert(domainAxes[0].label === "DevOps", `Expected weakest domain first, got ${domainAxes[0].label}`);
+assert(
+  domainAxes[0].label === "DevOps",
+  `Expected weakest domain first, got ${domainAxes[0].label}`,
+);
 assert(domainAxes[0].value === 0, `Expected DevOps value 0, got ${domainAxes[0].value}`);
 assert(domainAxes[0].state === "gap", `Expected DevOps state 'gap', got ${domainAxes[0].state}`);
 assert(
   domainAxes[0].skills.join(",") === "Kubernetes,Docker",
   `Expected DevOps skills list, got ${domainAxes[0].skills.join(",")}`,
 );
-assert(domainAxes[1].label === "AI", `Expected second-weakest domain second, got ${domainAxes[1].label}`);
+assert(
+  domainAxes[1].label === "AI",
+  `Expected second-weakest domain second, got ${domainAxes[1].label}`,
+);
 assert(domainAxes[1].value === 0.2, `Expected AI value 0.2, got ${domainAxes[1].value}`);
 assert(
   !domainAxes.some((axis) => axis.label === "Networking"),
@@ -62,7 +68,10 @@ assert(
 const fullyMatched = buildSkillRadarAxes({
   skills: { domain_coverage: { Backend: 1, Frontend: 1, DevOps: 1 } },
 });
-assert(fullyMatched[0].state === "matched", `Expected full coverage to be 'matched', got ${fullyMatched[0].state}`);
+assert(
+  fullyMatched[0].state === "matched",
+  `Expected full coverage to be 'matched', got ${fullyMatched[0].state}`,
+);
 
 // --- Too few domains (<3) -> falls back to per-skill axes -------------------
 const fallbackAxes = buildSkillRadarAxes({
@@ -83,9 +92,18 @@ assert(
   `Expected top high-severity gap first, got ${fallbackAxes[0].label}`,
 );
 assert(fallbackAxes[0].value === 0, `Expected missing skill value 0, got ${fallbackAxes[0].value}`);
-assert(fallbackAxes[1].label === "CI/CD", `Expected medium gap second, got ${fallbackAxes[1].label}`);
-assert(fallbackAxes[1].value === 0.45, `Expected transferability value 0.45, got ${fallbackAxes[1].value}`);
-assert(fallbackAxes[3].label === "Python", `Expected matched skill filler, got ${fallbackAxes[3].label}`);
+assert(
+  fallbackAxes[1].label === "CI/CD",
+  `Expected medium gap second, got ${fallbackAxes[1].label}`,
+);
+assert(
+  fallbackAxes[1].value === 0.45,
+  `Expected transferability value 0.45, got ${fallbackAxes[1].value}`,
+);
+assert(
+  fallbackAxes[3].label === "Python",
+  `Expected matched skill filler, got ${fallbackAxes[3].label}`,
+);
 assert(fallbackAxes[3].value === 1, `Expected matched skill value 1, got ${fallbackAxes[3].value}`);
 assert(
   fallbackAxes.every((axis) => axis.skills.length === 0),
@@ -103,7 +121,9 @@ const noDomainAxes = buildSkillRadarAxes({
 assert(noDomainAxes.length === 2, `Expected 2 fallback axes, got ${noDomainAxes.length}`);
 assert(noDomainAxes[0].label === "Docker", `Expected gap first, got ${noDomainAxes[0].label}`);
 
-const emptyAxes = buildSkillRadarAxes({ skills: { domain_coverage: {}, matched_skills: [], skill_gaps: [] } });
+const emptyAxes = buildSkillRadarAxes({
+  skills: { domain_coverage: {}, matched_skills: [], skill_gaps: [] },
+});
 assert(emptyAxes.length === 0, `Expected no axes for empty report, got ${emptyAxes.length}`);
 
 console.log("check-gap-radar.mjs: all assertions passed.");

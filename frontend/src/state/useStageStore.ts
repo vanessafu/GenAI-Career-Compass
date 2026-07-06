@@ -42,6 +42,7 @@ import type {
   ManualProfileForm,
   ProjectItem,
 } from "@/types";
+import { emptyManualProfileForm } from "@/types";
 
 export type Stage = "entry" | "recap" | "matching" | "directions" | "preparing_paths" | "focus";
 export type DemoStage = "recap" | "roles" | "focus";
@@ -123,6 +124,8 @@ type Store = {
   loading: boolean;
   error: string | null;
   clearError: () => void;
+  manualDraft: ManualProfileForm;
+  setManualDraft: (draft: ManualProfileForm) => void;
 
   /** Async actions. */
   loadDemo: (target: DemoStage) => void;
@@ -217,6 +220,7 @@ const initialState = {
   demoMode: false,
   loading: false,
   error: null as string | null,
+  manualDraft: emptyManualProfileForm,
 };
 
 let matchingRequest: Promise<boolean> | null = null;
@@ -273,6 +277,7 @@ export const useStageStore = create<Store>((set, get) => ({
 
   setSelectedRoleId: (id) => set({ selectedRoleId: id }),
   clearError: () => set({ error: null }),
+  setManualDraft: (manualDraft) => set({ manualDraft }),
 
   loadDemo: (target) => {
     const selectedRoleIds = target === "focus" ? DEMO_SELECTED_ROLE_IDS : [];
@@ -438,7 +443,10 @@ export const useStageStore = create<Store>((set, get) => ({
     }));
     try {
       const prepared = await getPreparedSkills(get, set, outgoing);
-      const report = await getRoleGapAnalysis(roleId, toConfirmedCvData(outgoing, state.identity, prepared));
+      const report = await getRoleGapAnalysis(
+        roleId,
+        toConfirmedCvData(outgoing, state.identity, prepared),
+      );
       set((s) => ({
         roleGapReports: { ...s.roleGapReports, [roleId]: report },
         roleGapLoading: { ...s.roleGapLoading, [roleId]: false },
@@ -471,7 +479,10 @@ export const useStageStore = create<Store>((set, get) => ({
     }));
     try {
       const prepared = await getPreparedSkills(get, set, outgoing);
-      const report = await getCareerPath(roleId, toConfirmedCvData(outgoing, state.identity, prepared));
+      const report = await getCareerPath(
+        roleId,
+        toConfirmedCvData(outgoing, state.identity, prepared),
+      );
       set((s) => ({
         careerPathReports: { ...s.careerPathReports, [roleId]: report },
         careerPathLoading: { ...s.careerPathLoading, [roleId]: false },
