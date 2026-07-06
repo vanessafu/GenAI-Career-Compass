@@ -441,6 +441,32 @@ export function EntryStage() {
       summary,
     };
 
+    setEducation(educationOut);
+    setExperience(experienceOut);
+    setLanguages(languagesOut);
+    setProjects(projectsOut);
+    setCertifications(certificationsOut);
+    if (educationDraft.degree.trim()) {
+      setEducationDraft({
+        degree: "",
+        institution: "",
+        fieldOfStudy: "",
+        startDate: "",
+        endDate: "",
+      });
+    }
+    if (experienceDraft.role.trim()) {
+      setExperienceDraft({ role: "", organization: "", startDate: "", endDate: "" });
+    }
+    if (languageDraft.name.trim()) {
+      setLanguageDraft({ name: "", level: "" });
+    }
+    if (projectDraft.title.trim()) {
+      setProjectDraft({ title: "", description: "", technologies: "", startDate: "", endDate: "" });
+    }
+    if (certificationDraft.name.trim()) {
+      setCertificationDraft({ name: "", issuingOrganization: "", issueDate: "" });
+    }
     setManualDraft(manualProfile);
     setManualError(null);
     setFormError(null);

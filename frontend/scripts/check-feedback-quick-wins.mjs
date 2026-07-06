@@ -11,9 +11,23 @@ const recap = await readFile(
 const store = await readFile(new URL("../src/state/useStageStore.ts", import.meta.url), "utf8");
 const styles = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
 const pkg = await readFile(new URL("../package.json", import.meta.url), "utf8");
+const manualSubmitStart = entry.indexOf("const buildManualProfile = async");
+const manualSubmitEnd = entry.indexOf("\n  return (", manualSubmitStart);
+const manualSubmit =
+  manualSubmitStart === -1 || manualSubmitEnd === -1
+    ? ""
+    : entry.slice(manualSubmitStart, manualSubmitEnd);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function clearsEmptyDraft(call, fields) {
+  const start = manualSubmit.indexOf(`${call}({`);
+  const end = manualSubmit.indexOf("});", start);
+  if (start === -1 || end === -1) return false;
+  const body = manualSubmit.slice(start, end);
+  return fields.every((field) => body.includes(`${field}: ""`));
 }
 
 assert(pkg.includes("test:feedback-quick-wins"), "package.json needs the quick-win test script.");
@@ -53,6 +67,34 @@ assert(!recap.includes('issuer: "—"'), "Certifications must not store placehol
 assert(!recap.includes('detail: "—"'), "Projects must not store placeholder details.");
 assert(recap.includes("invalidYearRange"), "Recap add rows must reject impossible year ranges.");
 assert(
-  /\.removable-chip-label\s*\{[^}]*max-width:\s*100%;/s.test(styles),
-  "Shared chip styles must cap long labels.",
+  manualSubmit.includes("setEducation(educationOut)") &&
+    manualSubmit.includes("setExperience(experienceOut)") &&
+    manualSubmit.includes("setLanguages(languagesOut)") &&
+    manualSubmit.includes("setProjects(projectsOut)") &&
+    manualSubmit.includes("setCertifications(certificationsOut)"),
+  "Manual submit must commit flushed draft rows into local state before retry.",
+);
+assert(
+  clearsEmptyDraft("setEducationDraft", [
+    "degree",
+    "institution",
+    "fieldOfStudy",
+    "startDate",
+    "endDate",
+  ]) &&
+    clearsEmptyDraft("setExperienceDraft", ["role", "organization", "startDate", "endDate"]) &&
+    clearsEmptyDraft("setLanguageDraft", ["name", "level"]) &&
+    clearsEmptyDraft("setProjectDraft", [
+      "title",
+      "description",
+      "technologies",
+      "startDate",
+      "endDate",
+    ]) &&
+    clearsEmptyDraft("setCertificationDraft", ["name", "issuingOrganization", "issueDate"]),
+  "Manual submit must clear flushed draft fields before retry.",
+);
+assert(
+  /\.removable-chip\s*\{[^}]*max-width:\s*100%;/s.test(styles),
+  "Shared chip styles must cap long chips.",
 );
