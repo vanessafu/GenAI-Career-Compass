@@ -256,6 +256,7 @@
     --removable-chip-fade: color-mix(in oklab, var(--brand) 10%, white 90%);
     position: relative;
     isolation: isolate;
+    min-width: 0;
     max-width: 100%;
     overflow: hidden;
   }

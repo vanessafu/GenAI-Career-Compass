@@ -56,6 +56,12 @@ assert(
   entry.includes("grid grid-cols-1 gap-2.5 sm:grid-cols-3"),
   "Manual three-column grids must collapse on mobile.",
 );
+assert(
+  entry.includes("grid w-full min-w-0 gap-5 md:grid-cols-2") &&
+    entry.includes("liquid-glass flex min-w-0 flex-col rounded-3xl p-7") &&
+    entry.includes("flex min-w-0 flex-wrap items-center gap-1.5"),
+  "Manual cards and tag fields must shrink inside the mobile column.",
+);
 assert(recap.includes("cc-skill-presets"), "Recap skills need native suggestions.");
 assert(recap.includes("cc-role-presets"), "Recap experience role input needs native suggestions.");
 assert(
@@ -95,6 +101,6 @@ assert(
   "Manual submit must clear flushed draft fields before retry.",
 );
 assert(
-  /\.removable-chip\s*\{[^}]*max-width:\s*100%;/s.test(styles),
+  /\.removable-chip\s*\{[^}]*min-width:\s*0;[^}]*max-width:\s*100%;/s.test(styles),
   "Shared chip styles must cap long chips.",
 );

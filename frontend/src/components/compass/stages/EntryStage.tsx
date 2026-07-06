@@ -570,7 +570,7 @@ export function EntryStage() {
               exit={{ opacity: 0, y: -6, scale: 0.98 }}
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
               className={cn(
-                "grid w-full gap-5 md:grid-cols-2",
+                "grid w-full min-w-0 gap-5 md:grid-cols-2",
                 manualOpen ? "items-start" : "min-h-0 flex-1 items-stretch",
               )}
             >
@@ -593,7 +593,7 @@ export function EntryStage() {
                   }
                 }}
                 className={cn(
-                  "liquid-glass flex flex-col rounded-3xl p-7 transition-colors",
+                  "liquid-glass flex min-w-0 flex-col rounded-3xl p-7 transition-colors",
                   manualOpen ? "min-h-[520px]" : "h-full min-h-0",
                   drag && "ring-2 ring-[color:var(--brand)]/50",
                 )}
@@ -671,7 +671,7 @@ export function EntryStage() {
                   if (!manualOpen) setManualOpen(true);
                 }}
                 className={cn(
-                  "liquid-glass flex flex-col rounded-3xl p-7",
+                  "liquid-glass flex min-w-0 flex-col rounded-3xl p-7",
                   manualOpen ? "gap-3.5" : "h-full min-h-0 cursor-pointer gap-3.5 overflow-hidden",
                 )}
                 aria-expanded={manualOpen}
@@ -1523,7 +1523,7 @@ function TagField({
   typeahead: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-foreground/10 bg-white/65 px-2 py-2">
+    <div className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-xl border border-foreground/10 bg-white/65 px-2 py-2">
       <AnimatePresence initial={false}>
         {tags.map((t) => (
           <motion.span
@@ -1568,7 +1568,7 @@ function PlainTagInput({
     ? placeholder
     : `Add ${placeholder}`;
   return (
-    <div className="flex min-w-[120px] flex-1 items-center gap-1">
+    <div className="flex min-w-0 flex-1 basis-[120px] items-center gap-1">
       <input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
