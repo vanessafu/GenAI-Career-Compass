@@ -30,6 +30,8 @@ export function EntryStage() {
   const setStage = useStageStore((s) => s.setStage);
   const uploadCv = useStageStore((s) => s.uploadCv);
   const submitManualProfile = useStageStore((s) => s.submitManualProfile);
+  const manualDraft = useStageStore((s) => s.manualDraft);
+  const setManualDraft = useStageStore((s) => s.setManualDraft);
 
   const [drag, setDrag] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -38,7 +40,7 @@ export function EntryStage() {
   const manualCardRef = useRef<HTMLDivElement | null>(null);
 
   // Tier 1 — quick start
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState(manualDraft.currentRole);
   const [education, setEducation] = useState<
     {
       degree: string;
@@ -47,10 +49,10 @@ export function EntryStage() {
       startDate: string;
       endDate: string;
     }[]
-  >([]);
+  >(manualDraft.education);
   const [experience, setExperience] = useState<
     { role: string; organization: string; startDate: string; endDate: string }[]
-  >([]);
+  >(manualDraft.experience);
   const [educationDraft, setEducationDraft] = useState({
     degree: "",
     institution: "",
@@ -64,17 +66,17 @@ export function EntryStage() {
     startDate: "",
     endDate: "",
   });
-  const [skills, setSkills] = useState<string[]>([]);
+  const [skills, setSkills] = useState<string[]>(manualDraft.skills);
   const [skillDraft, setSkillDraft] = useState("");
-  const [interests, setInterests] = useState<string[]>([]);
+  const [interests, setInterests] = useState<string[]>(manualDraft.interests);
   const [interestDraft, setInterestDraft] = useState("");
 
   // Tier 2 — add more context (collapsed by default)
   const [showMore, setShowMore] = useState(false);
-  const [summary, setSummary] = useState("");
-  const [softSkills, setSoftSkills] = useState<string[]>([]);
+  const [summary, setSummary] = useState(manualDraft.summary);
+  const [softSkills, setSoftSkills] = useState<string[]>(manualDraft.softSkills);
   const [softSkillDraft, setSoftSkillDraft] = useState("");
-  const [languages, setLanguages] = useState<{ name: string; level: string }[]>([]);
+  const [languages, setLanguages] = useState(manualDraft.languages);
   const [languageDraft, setLanguageDraft] = useState({ name: "", level: "" });
   const [projects, setProjects] = useState<
     {
@@ -84,7 +86,7 @@ export function EntryStage() {
       startDate: string;
       endDate: string;
     }[]
-  >([]);
+  >(manualDraft.projects);
   const [projectDraft, setProjectDraft] = useState({
     title: "",
     description: "",
@@ -94,7 +96,7 @@ export function EntryStage() {
   });
   const [certifications, setCertifications] = useState<
     { name: string; issuingOrganization: string; issueDate: string }[]
-  >([]);
+  >(manualDraft.certifications);
   const [certificationDraft, setCertificationDraft] = useState({
     name: "",
     issuingOrganization: "",
@@ -107,8 +109,49 @@ export function EntryStage() {
   const [progress, setProgress] = useState(8);
   const [done, setDone] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [manualError, setManualError] = useState<string | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    setRole(manualDraft.currentRole);
+    setEducation(manualDraft.education);
+    setExperience(manualDraft.experience);
+    setSkills(manualDraft.skills);
+    setInterests(manualDraft.interests);
+    setSoftSkills(manualDraft.softSkills);
+    setLanguages(manualDraft.languages);
+    setProjects(manualDraft.projects);
+    setCertifications(manualDraft.certifications);
+    setSummary(manualDraft.summary);
+  }, [manualDraft]);
+
+  useEffect(() => {
+    setManualDraft({
+      currentRole: role,
+      education,
+      experience,
+      skills,
+      interests,
+      softSkills,
+      languages,
+      projects,
+      certifications,
+      summary,
+    });
+  }, [
+    role,
+    education,
+    experience,
+    skills,
+    interests,
+    softSkills,
+    languages,
+    projects,
+    certifications,
+    summary,
+    setManualDraft,
+  ]);
 
   useEffect(() => {
     const timers = timersRef.current;
@@ -187,6 +230,10 @@ export function EntryStage() {
 
   const addEducation = () => {
     if (!educationDraft.degree.trim()) return;
+    if (isMonthRangeInvalid(educationDraft.startDate, educationDraft.endDate)) {
+      showManualError("Education end date cannot be before start date.");
+      return;
+    }
     setEducation([
       ...education,
       {
@@ -204,10 +251,15 @@ export function EntryStage() {
       startDate: "",
       endDate: "",
     });
+    setManualError(null);
   };
 
   const addExperience = () => {
     if (!experienceDraft.role.trim()) return;
+    if (isMonthRangeInvalid(experienceDraft.startDate, experienceDraft.endDate)) {
+      showManualError("Experience end date cannot be before start date.");
+      return;
+    }
     setExperience([
       ...experience,
       {
@@ -218,10 +270,15 @@ export function EntryStage() {
       },
     ]);
     setExperienceDraft({ role: "", organization: "", startDate: "", endDate: "" });
+    setManualError(null);
   };
 
   const addProject = () => {
     if (!projectDraft.title.trim()) return;
+    if (isMonthRangeInvalid(projectDraft.startDate, projectDraft.endDate)) {
+      showManualError("Project end date cannot be before start date.");
+      return;
+    }
     setProjects([
       ...projects,
       {
@@ -236,6 +293,7 @@ export function EntryStage() {
       },
     ]);
     setProjectDraft({ title: "", description: "", technologies: "", startDate: "", endDate: "" });
+    setManualError(null);
   };
 
   const addCertification = () => {
@@ -251,13 +309,27 @@ export function EntryStage() {
     setCertificationDraft({ name: "", issuingOrganization: "", issueDate: "" });
   };
 
+  const showManualError = (message: string) => {
+    setManualError(message);
+    setFormError(null);
+    setManualOpen(true);
+    window.setTimeout(() => {
+      manualCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  };
+
+  const isMonthRangeInvalid = (start: string, end: string) =>
+    Boolean(start.trim() && end.trim() && start.trim() > end.trim());
+
   const analyzeCv = async () => {
     if (parsing) return;
     if (!file) {
       setFormError("Please choose a PDF file first.");
+      setManualError(null);
       return;
     }
     setFormError(null);
+    setManualError(null);
     setSteps(PARSE_STEPS);
     setParsing(true);
     setDone(false);
@@ -271,21 +343,22 @@ export function EntryStage() {
       clearLoadingTimers();
       setParsing(false);
       setFormError(useStageStore.getState().error);
+      setManualError(null);
     }
   };
 
   const buildManualProfile = async () => {
     if (parsing) return;
     if (!role.trim()) {
-      setFormError("Add your current role.");
+      showManualError("Add your current role.");
       return;
     }
     if (skills.length === 0) {
-      setFormError("Add at least one technical skill.");
+      showManualError("Add at least one technical skill.");
       return;
     }
     if (interests.length === 0) {
-      setFormError("Add at least one interest.");
+      showManualError("Add at least one interest.");
       return;
     }
 
@@ -342,13 +415,20 @@ export function EntryStage() {
       ? [...languages, { name: languageDraft.name.trim(), level: languageDraft.level.trim() }]
       : languages;
 
-    setFormError(null);
-    setSteps(MANUAL_STEPS);
-    setParsing(true);
-    setDone(false);
-    startProgress(MANUAL_PROFILE_PROGRESS);
+    if (educationOut.some((item) => isMonthRangeInvalid(item.startDate, item.endDate))) {
+      showManualError("Education end date cannot be before start date.");
+      return;
+    }
+    if (experienceOut.some((item) => isMonthRangeInvalid(item.startDate, item.endDate))) {
+      showManualError("Experience end date cannot be before start date.");
+      return;
+    }
+    if (projectsOut.some((item) => isMonthRangeInvalid(item.startDate, item.endDate))) {
+      showManualError("Project end date cannot be before start date.");
+      return;
+    }
 
-    const ok = await submitManualProfile({
+    const manualProfile = {
       currentRole: role,
       education: educationOut,
       experience: experienceOut,
@@ -359,14 +439,24 @@ export function EntryStage() {
       projects: projectsOut,
       certifications: certificationsOut,
       summary,
-    });
+    };
+
+    setManualDraft(manualProfile);
+    setManualError(null);
+    setFormError(null);
+    setSteps(MANUAL_STEPS);
+    setParsing(true);
+    setDone(false);
+    startProgress(MANUAL_PROFILE_PROGRESS);
+
+    const ok = await submitManualProfile(manualProfile);
     if (ok) {
       finishProgress();
       timersRef.current.push(setTimeout(() => setStage("recap"), 600));
     } else {
       clearLoadingTimers();
       setParsing(false);
-      setFormError(useStageStore.getState().error);
+      showManualError(useStageStore.getState().error ?? "Could not build the profile.");
     }
   };
 
@@ -608,7 +698,7 @@ export function EntryStage() {
                     }))}
                     onRemove={(idx) => setEducation(education.filter((_, i) => i !== idx))}
                   >
-                    <div className="grid gap-2.5 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                       <InlineAutocomplete
                         value={educationDraft.degree}
                         onChange={(value) =>
@@ -655,7 +745,7 @@ export function EntryStage() {
                     }))}
                     onRemove={(idx) => setExperience(experience.filter((_, i) => i !== idx))}
                   >
-                    <div className="grid gap-2.5 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                       <input
                         value={experienceDraft.role}
                         onChange={(e) =>
@@ -773,7 +863,7 @@ export function EntryStage() {
                             }))}
                             onRemove={(idx) => setLanguages(languages.filter((_, i) => i !== idx))}
                           >
-                            <div className="grid gap-2.5 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                               <input
                                 value={languageDraft.name}
                                 onChange={(e) =>
@@ -803,7 +893,7 @@ export function EntryStage() {
                             }))}
                             onRemove={(idx) => setProjects(projects.filter((_, i) => i !== idx))}
                           >
-                            <div className="grid gap-2.5 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                               <input
                                 value={projectDraft.title}
                                 onChange={(e) =>
@@ -853,7 +943,7 @@ export function EntryStage() {
                               setCertifications(certifications.filter((_, i) => i !== idx))
                             }
                           >
-                            <div className="grid gap-2.5 sm:grid-cols-3">
+                            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                               <input
                                 value={certificationDraft.name}
                                 onChange={(e) =>
@@ -909,6 +999,15 @@ export function EntryStage() {
                     )}
                   </AnimatePresence>
 
+                  {manualError && manualOpen && (
+                    <div
+                      className="rounded-xl border border-red-300/60 bg-red-50/80 px-3 py-2 text-[12.5px] text-red-700"
+                      role="alert"
+                    >
+                      {manualError}
+                    </div>
+                  )}
+
                   <p className="text-[11.5px] leading-snug text-foreground/50">
                     <span className="text-[color:var(--brand)]">*</span> required field. You can
                     review and edit everything on the next screen.
@@ -943,6 +1042,9 @@ export function EntryStage() {
 
       <style>{`
         .manual-input {
+          box-sizing: border-box;
+          min-width: 0;
+          max-width: 100%;
           width: 100%;
           border: 1px solid color-mix(in oklab, currentColor 10%, transparent);
           background: rgba(255,255,255,0.7);
@@ -1067,7 +1169,7 @@ function MonthRange({
   className?: string;
 }) {
   return (
-    <div className={cn("grid grid-cols-2 gap-2.5", className)}>
+    <div className={cn("grid grid-cols-1 gap-2.5 sm:grid-cols-2", className)}>
       <MonthYearPicker value={start} onChange={onStart} placeholder="From" />
       <MonthYearPicker value={end} onChange={onEnd} placeholder="To" allowPresent />
     </div>
@@ -1334,7 +1436,6 @@ function SkillTypeahead({
   const [open, setOpen] = useState(false);
   return (
     <div className="relative flex min-w-[120px] flex-1 items-center gap-1">
-      <Plus size={12} className="text-foreground/40" />
       <input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -1347,8 +1448,16 @@ function SkillTypeahead({
           }
         }}
         placeholder="Add skill"
-        className="w-full bg-transparent py-1 text-[13px] outline-none placeholder:text-foreground/40"
+        className="min-w-0 flex-1 bg-transparent py-1 text-[13px] outline-none placeholder:text-foreground/40"
       />
+      <button
+        type="button"
+        onClick={() => onAdd(draft)}
+        className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[color:var(--brand)]/10 text-[color:var(--brand)] transition hover:bg-[color:var(--brand)]/15"
+        aria-label="Add skill"
+      >
+        <Plus size={11} />
+      </button>
       <AnimatePresence>
         {open && (
           <motion.div
@@ -1429,9 +1538,11 @@ function PlainTagInput({
   onAdd: (v: string) => void;
   placeholder: string;
 }) {
+  const addLabel = placeholder.toLowerCase().startsWith("add ")
+    ? placeholder
+    : `Add ${placeholder}`;
   return (
     <div className="flex min-w-[120px] flex-1 items-center gap-1">
-      <Plus size={12} className="text-foreground/40" />
       <input
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -1442,8 +1553,16 @@ function PlainTagInput({
           }
         }}
         placeholder={placeholder}
-        className="w-full bg-transparent py-1 text-[13px] outline-none placeholder:text-foreground/40"
+        className="min-w-0 flex-1 bg-transparent py-1 text-[13px] outline-none placeholder:text-foreground/40"
       />
+      <button
+        type="button"
+        onClick={() => onAdd(draft)}
+        className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[color:var(--brand)]/10 text-[color:var(--brand)] transition hover:bg-[color:var(--brand)]/15"
+        aria-label={addLabel}
+      >
+        <Plus size={11} />
+      </button>
     </div>
   );
 }
