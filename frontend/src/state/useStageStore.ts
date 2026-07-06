@@ -443,7 +443,10 @@ export const useStageStore = create<Store>((set, get) => ({
     }));
     try {
       const prepared = await getPreparedSkills(get, set, outgoing);
-      const report = await getRoleGapAnalysis(roleId, toConfirmedCvData(outgoing, state.identity, prepared));
+      const report = await getRoleGapAnalysis(
+        roleId,
+        toConfirmedCvData(outgoing, state.identity, prepared),
+      );
       set((s) => ({
         roleGapReports: { ...s.roleGapReports, [roleId]: report },
         roleGapLoading: { ...s.roleGapLoading, [roleId]: false },
@@ -476,7 +479,10 @@ export const useStageStore = create<Store>((set, get) => ({
     }));
     try {
       const prepared = await getPreparedSkills(get, set, outgoing);
-      const report = await getCareerPath(roleId, toConfirmedCvData(outgoing, state.identity, prepared));
+      const report = await getCareerPath(
+        roleId,
+        toConfirmedCvData(outgoing, state.identity, prepared),
+      );
       set((s) => ({
         careerPathReports: { ...s.careerPathReports, [roleId]: report },
         careerPathLoading: { ...s.careerPathLoading, [roleId]: false },
