@@ -97,6 +97,9 @@ def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
         Experience(
             role=_clean(item.role),
             organization=_clean(item.organization),
+            core_responsibilities=(
+                [description] if (description := _clean(item.description)) else []
+            ),
             start_date=_clean(item.start_date),
             end_date=_clean(item.end_date),
         )

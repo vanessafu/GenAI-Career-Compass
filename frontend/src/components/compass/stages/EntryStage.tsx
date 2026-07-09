@@ -8,20 +8,22 @@ import {
   getLoadingProgressState,
   type LoadingProgressConfig,
 } from "@/lib/loadingProgress";
-import { DEGREE_LEVELS, LANGUAGE_LEVELS, ROLE_PRESETS, SKILL_PRESETS } from "@/lib/profilePresets";
 import {
-  Upload,
-  FileText,
-  X,
-  Plus,
-  ArrowRight,
-  Sparkles,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Calendar,
-} from "lucide-react";
+  DEGREE_LEVELS,
+  FIELD_OF_STUDY_PRESETS,
+  LANGUAGE_LEVELS,
+  ROLE_PRESETS,
+  SKILL_PRESETS,
+} from "@/lib/profilePresets";
+import { Upload, FileText, X, Plus, ArrowRight, Sparkles, ChevronDown } from "lucide-react";
 import { LoadingPanel } from "../ui/LoadingPanel";
+import {
+  MonthRange,
+  MonthYearPicker,
+  formatMonthLabel,
+  formatRange,
+  isMonthRangeInvalid,
+} from "../ui/MonthPicker";
 
 const PARSE_STEPS = ["Reading your CV", "Privacy-stripping data", "Generating identity"];
 const MANUAL_STEPS = ["Structuring your profile", "Privacy-stripping data", "Generating identity"];
@@ -33,10 +35,30 @@ export function EntryStage() {
   const manualDraft = useStageStore((s) => s.manualDraft);
   const setManualDraft = useStageStore((s) => s.setManualDraft);
 
+  // Detect whether a previously entered manual draft exists so we can restore
+  // the form (expanded) when the user navigates back from a later stage.
+  const manualDraftHasContent =
+    manualDraft.currentRole.trim() !== "" ||
+    manualDraft.skills.length > 0 ||
+    manualDraft.interests.length > 0 ||
+    manualDraft.education.length > 0 ||
+    manualDraft.experience.length > 0 ||
+    manualDraft.softSkills.length > 0 ||
+    manualDraft.languages.length > 0 ||
+    manualDraft.projects.length > 0 ||
+    manualDraft.certifications.length > 0 ||
+    manualDraft.summary.trim() !== "";
+  const manualDraftHasExtra =
+    manualDraft.softSkills.length > 0 ||
+    manualDraft.languages.length > 0 ||
+    manualDraft.projects.length > 0 ||
+    manualDraft.certifications.length > 0 ||
+    manualDraft.summary.trim() !== "";
+
   const [drag, setDrag] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const fileName = file?.name ?? null;
-  const [manualOpen, setManualOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(manualDraftHasContent);
   const manualCardRef = useRef<HTMLDivElement | null>(null);
 
   // Tier 1 — quick start
@@ -51,7 +73,7 @@ export function EntryStage() {
     }[]
   >(manualDraft.education);
   const [experience, setExperience] = useState<
-    { role: string; organization: string; startDate: string; endDate: string }[]
+    { role: string; organization: string; description: string; startDate: string; endDate: string }[]
   >(manualDraft.experience);
   const [educationDraft, setEducationDraft] = useState({
     degree: "",
@@ -63,6 +85,7 @@ export function EntryStage() {
   const [experienceDraft, setExperienceDraft] = useState({
     role: "",
     organization: "",
+    description: "",
     startDate: "",
     endDate: "",
   });
@@ -71,8 +94,8 @@ export function EntryStage() {
   const [interests, setInterests] = useState<string[]>(manualDraft.interests);
   const [interestDraft, setInterestDraft] = useState("");
 
-  // Tier 2 — add more context (collapsed by default)
-  const [showMore, setShowMore] = useState(false);
+  // Tier 2 — add more context (collapsed by default, restored if draft has extras)
+  const [showMore, setShowMore] = useState(manualDraftHasExtra);
   const [summary, setSummary] = useState(manualDraft.summary);
   const [softSkills, setSoftSkills] = useState<string[]>(manualDraft.softSkills);
   const [softSkillDraft, setSoftSkillDraft] = useState("");
@@ -110,6 +133,7 @@ export function EntryStage() {
   const [done, setDone] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [manualError, setManualError] = useState<string | null>(null);
+  const [invalidField, setInvalidField] = useState<"role" | "skills" | "interests" | null>(null);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -205,6 +229,7 @@ export function EntryStage() {
     if (!val || skills.includes(val)) return;
     setSkills([...skills, val]);
     setSkillDraft("");
+    setInvalidField((f) => (f === "skills" ? null : f));
   };
 
   const addSoftSkill = (s: string) => {
@@ -219,6 +244,7 @@ export function EntryStage() {
     if (!val || interests.some((item) => item.toLowerCase() === val.toLowerCase())) return;
     setInterests([...interests, val]);
     setInterestDraft("");
+    setInvalidField((f) => (f === "interests" ? null : f));
   };
 
   const addLanguage = () => {
@@ -265,11 +291,12 @@ export function EntryStage() {
       {
         role: experienceDraft.role.trim(),
         organization: experienceDraft.organization.trim(),
+        description: experienceDraft.description.trim(),
         startDate: experienceDraft.startDate.trim(),
         endDate: experienceDraft.endDate.trim(),
       },
     ]);
-    setExperienceDraft({ role: "", organization: "", startDate: "", endDate: "" });
+    setExperienceDraft({ role: "", organization: "", description: "", startDate: "", endDate: "" });
     setManualError(null);
   };
 
@@ -318,9 +345,6 @@ export function EntryStage() {
     }, 0);
   };
 
-  const isMonthRangeInvalid = (start: string, end: string) =>
-    Boolean(start.trim() && end.trim() && start.trim() > end.trim());
-
   const analyzeCv = async () => {
     if (parsing) return;
     if (!file) {
@@ -350,17 +374,21 @@ export function EntryStage() {
   const buildManualProfile = async () => {
     if (parsing) return;
     if (!role.trim()) {
+      setInvalidField("role");
       showManualError("Add your current role.");
       return;
     }
     if (skills.length === 0) {
+      setInvalidField("skills");
       showManualError("Add at least one technical skill.");
       return;
     }
     if (interests.length === 0) {
+      setInvalidField("interests");
       showManualError("Add at least one interest.");
       return;
     }
+    setInvalidField(null);
 
     // Flush any typed-but-not-added drafts so nothing is lost on submit.
     const educationOut = educationDraft.degree.trim()
@@ -381,6 +409,7 @@ export function EntryStage() {
           {
             role: experienceDraft.role.trim(),
             organization: experienceDraft.organization.trim(),
+            description: experienceDraft.description.trim(),
             startDate: experienceDraft.startDate.trim(),
             endDate: experienceDraft.endDate.trim(),
           },
@@ -456,7 +485,7 @@ export function EntryStage() {
       });
     }
     if (experienceDraft.role.trim()) {
-      setExperienceDraft({ role: "", organization: "", startDate: "", endDate: "" });
+      setExperienceDraft({ role: "", organization: "", description: "", startDate: "", endDate: "" });
     }
     if (languageDraft.name.trim()) {
       setLanguageDraft({ name: "", level: "" });
@@ -492,13 +521,13 @@ export function EntryStage() {
         "relative flex w-full flex-col items-stretch px-6 sm:px-10 lg:px-16",
         manualOpen
           ? "min-h-dvh overflow-x-hidden pb-10 pt-[max(5rem,calc(env(safe-area-inset-top)+4.5rem))] sm:pt-[5.5rem]"
-          : "h-dvh overflow-hidden pb-7 pt-[max(5rem,calc(env(safe-area-inset-top)+4.5rem))] sm:pt-[5.25rem]",
+          : "min-h-dvh overflow-x-hidden pb-10 pt-[max(5rem,calc(env(safe-area-inset-top)+4.5rem))] sm:pt-[5.25rem] md:h-dvh md:overflow-hidden md:pb-7",
       )}
     >
       <div
         className={cn(
           "mx-auto flex w-full max-w-[1180px] flex-col gap-5",
-          manualOpen ? "min-h-0" : "min-h-0 flex-1",
+          manualOpen ? "min-h-0" : "min-h-0 md:flex-1",
         )}
       >
         {/* Headline — transform-only animation, glides centered when loading appears. */}
@@ -571,7 +600,7 @@ export function EntryStage() {
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
               className={cn(
                 "grid w-full min-w-0 gap-5 md:grid-cols-2",
-                manualOpen ? "items-start" : "min-h-0 flex-1 items-stretch",
+                manualOpen ? "items-start" : "items-stretch md:min-h-0 md:flex-1",
               )}
             >
               {/* ── Upload CV ── */}
@@ -594,7 +623,7 @@ export function EntryStage() {
                 }}
                 className={cn(
                   "liquid-glass flex min-w-0 flex-col rounded-3xl p-7 transition-colors",
-                  manualOpen ? "min-h-[520px]" : "h-full min-h-0",
+                  manualOpen ? "min-h-[520px]" : "min-h-[360px] md:h-full md:min-h-0",
                   drag && "ring-2 ring-[color:var(--brand)]/50",
                 )}
               >
@@ -672,7 +701,9 @@ export function EntryStage() {
                 }}
                 className={cn(
                   "liquid-glass flex min-w-0 flex-col rounded-3xl p-7",
-                  manualOpen ? "gap-3.5" : "h-full min-h-0 cursor-pointer gap-3.5 overflow-hidden",
+                  manualOpen
+                    ? "gap-3.5"
+                    : "min-h-[360px] cursor-pointer gap-3.5 overflow-hidden md:h-full md:min-h-0",
                 )}
                 aria-expanded={manualOpen}
               >
@@ -708,8 +739,12 @@ export function EntryStage() {
                     <AutocompleteInput
                       label="Current role"
                       required
+                      invalid={invalidField === "role"}
                       value={role}
-                      onChange={setRole}
+                      onChange={(value) => {
+                        setRole(value);
+                        setInvalidField((f) => (f === "role" && value.trim() ? null : f));
+                      }}
                       presets={ROLE_PRESETS}
                       placeholder="e.g. Senior Backend Developer"
                     />
@@ -733,13 +768,13 @@ export function EntryStage() {
                         presets={DEGREE_LEVELS}
                         placeholder="Degree, e.g. M.Sc."
                       />
-                      <input
+                      <InlineAutocomplete
                         value={educationDraft.fieldOfStudy}
-                        onChange={(e) =>
-                          setEducationDraft({ ...educationDraft, fieldOfStudy: e.target.value })
+                        onChange={(value) =>
+                          setEducationDraft({ ...educationDraft, fieldOfStudy: value })
                         }
+                        presets={FIELD_OF_STUDY_PRESETS}
                         placeholder="Field of study, e.g. Robotics"
-                        className="manual-input"
                       />
                       <input
                         value={educationDraft.institution}
@@ -766,7 +801,7 @@ export function EntryStage() {
                     title="Experience"
                     items={experience.map((item) => ({
                       title: item.role,
-                      subtitle: item.organization,
+                      subtitle: [item.organization, item.description].filter(Boolean).join(" · "),
                       meta: formatRange(item.startDate, item.endDate, "Present"),
                     }))}
                     onRemove={(idx) => setExperience(experience.filter((_, i) => i !== idx))}
@@ -788,6 +823,14 @@ export function EntryStage() {
                         placeholder="Organization"
                         className="manual-input"
                       />
+                      <input
+                        value={experienceDraft.description}
+                        onChange={(e) =>
+                          setExperienceDraft({ ...experienceDraft, description: e.target.value })
+                        }
+                        placeholder="Short description"
+                        className="manual-input sm:col-span-2"
+                      />
                       <MonthRange
                         start={experienceDraft.startDate}
                         end={experienceDraft.endDate}
@@ -808,6 +851,7 @@ export function EntryStage() {
                       Technical skills <RequiredMark />
                     </p>
                     <TagField
+                      invalid={invalidField === "skills"}
                       tags={skills}
                       onRemove={(t) => setSkills(skills.filter((x) => x !== t))}
                       typeahead={
@@ -826,6 +870,7 @@ export function EntryStage() {
                       What are you drawn to? <RequiredMark />
                     </p>
                     <TagField
+                      invalid={invalidField === "interests"}
                       tags={interests}
                       onRemove={(t) => setInterests(interests.filter((x) => x !== t))}
                       typeahead={
@@ -942,11 +987,12 @@ export function EntryStage() {
                                   setProjectDraft({ ...projectDraft, description: e.target.value })
                                 }
                                 placeholder="Short description"
-                                className="manual-input"
+                                className="manual-input sm:col-span-2"
                               />
                               <MonthRange
                                 start={projectDraft.startDate}
                                 end={projectDraft.endDate}
+                                className="sm:col-span-2"
                                 onStart={(value) =>
                                   setProjectDraft({ ...projectDraft, startDate: value })
                                 }
@@ -963,7 +1009,7 @@ export function EntryStage() {
                             items={certifications.map((item) => ({
                               title: item.name,
                               subtitle: item.issuingOrganization,
-                              meta: item.issueDate,
+                              meta: formatMonthLabel(item.issueDate),
                             }))}
                             onRemove={(idx) =>
                               setCertifications(certifications.filter((_, i) => i !== idx))
@@ -992,16 +1038,15 @@ export function EntryStage() {
                                 placeholder="Issuer"
                                 className="manual-input"
                               />
-                              <input
+                              <MonthYearPicker
                                 value={certificationDraft.issueDate}
-                                onChange={(e) =>
+                                onChange={(value) =>
                                   setCertificationDraft({
                                     ...certificationDraft,
-                                    issueDate: e.target.value,
+                                    issueDate: value,
                                   })
                                 }
-                                placeholder="Year"
-                                className="manual-input"
+                                placeholder="Issue date"
                               />
                             </div>
                             <AddRowButton onClick={addCertification} label="Add certification" />
@@ -1065,28 +1110,6 @@ export function EntryStage() {
           )}
         </AnimatePresence>
       </div>
-
-      <style>{`
-        .manual-input {
-          box-sizing: border-box;
-          min-width: 0;
-          max-width: 100%;
-          width: 100%;
-          border: 1px solid color-mix(in oklab, currentColor 10%, transparent);
-          background: rgba(255,255,255,0.7);
-          border-radius: 0.75rem;
-          padding: 0.6rem 0.8rem;
-          font-size: 13.5px;
-          color: var(--foreground);
-          outline: none;
-          transition: border-color .15s, box-shadow .15s;
-        }
-        .manual-input::placeholder { color: color-mix(in oklab, currentColor 40%, transparent); }
-        .manual-input:focus {
-          border-color: color-mix(in oklab, var(--brand) 55%, transparent);
-          box-shadow: 0 0 0 3px color-mix(in oklab, var(--brand) 14%, transparent);
-        }
-      `}</style>
     </div>
   );
 }
@@ -1146,174 +1169,6 @@ function RequiredMark() {
     <span className="text-[color:var(--brand)]" aria-hidden="true">
       *
     </span>
-  );
-}
-
-const MONTH_LABELS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
-/** Render a `YYYY-MM` value as a friendly "Mar 2024" label (or the raw value). */
-function formatMonthLabel(value: string): string {
-  const match = value.trim().match(/^(\d{4})-(\d{2})$/);
-  if (!match) return value.trim();
-  const monthIndex = Number(match[2]) - 1;
-  const month = MONTH_LABELS[monthIndex] ?? match[2];
-  return `${month} ${match[1]}`;
-}
-
-/** Join a start/end month range with a single dash, skipping empty parts. */
-function formatRange(start: string, end: string, endFallback = ""): string {
-  const startLabel = formatMonthLabel(start);
-  const endLabel = end.trim() ? formatMonthLabel(end) : endFallback;
-  if (startLabel && endLabel) return `${startLabel} – ${endLabel}`;
-  return startLabel || endLabel;
-}
-
-function MonthRange({
-  start,
-  end,
-  onStart,
-  onEnd,
-  className,
-}: {
-  start: string;
-  end: string;
-  onStart: (v: string) => void;
-  onEnd: (v: string) => void;
-  className?: string;
-}) {
-  return (
-    <div className={cn("grid grid-cols-1 gap-2.5 sm:grid-cols-2", className)}>
-      <MonthYearPicker value={start} onChange={onStart} placeholder="From" />
-      <MonthYearPicker value={end} onChange={onEnd} placeholder="To" allowPresent />
-    </div>
-  );
-}
-
-/** Modern month/year picker: a styled trigger that opens a compact popover. */
-function MonthYearPicker({
-  value,
-  onChange,
-  placeholder,
-  allowPresent,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  allowPresent?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const parsed = value.trim().match(/^(\d{4})-(\d{2})$/);
-  const selectedYear = parsed ? Number(parsed[1]) : null;
-  const selectedMonth = parsed ? Number(parsed[2]) : null;
-  const [viewYear, setViewYear] = useState(selectedYear ?? new Date().getFullYear());
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => {
-          setViewYear(selectedYear ?? new Date().getFullYear());
-          setOpen((v) => !v);
-        }}
-        className="manual-input flex items-center justify-between gap-2 text-left"
-      >
-        <span className={cn(value.trim() ? "text-foreground" : "text-foreground/40")}>
-          {value.trim() ? formatMonthLabel(value) : (placeholder ?? "Select")}
-        </span>
-        <Calendar size={14} className="shrink-0 text-foreground/40" />
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <>
-            <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden="true" />
-            <motion.div
-              initial={{ opacity: 0, y: -4, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.98 }}
-              transition={{ duration: 0.14 }}
-              className="absolute left-0 top-full z-40 mt-1.5 w-56 rounded-2xl border border-foreground/10 bg-white/95 p-2.5 shadow-xl backdrop-blur"
-            >
-              <div className="mb-2 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setViewYear((y) => y - 1)}
-                  className="grid h-7 w-7 place-items-center rounded-lg text-foreground/60 transition hover:bg-foreground/5"
-                  aria-label="Previous year"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                <span className="text-[13.5px] font-semibold tabular-nums">{viewYear}</span>
-                <button
-                  type="button"
-                  onClick={() => setViewYear((y) => y + 1)}
-                  className="grid h-7 w-7 place-items-center rounded-lg text-foreground/60 transition hover:bg-foreground/5"
-                  aria-label="Next year"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-              <div className="grid grid-cols-3 gap-1">
-                {MONTH_LABELS.map((m, i) => {
-                  const isSelected = selectedYear === viewYear && selectedMonth === i + 1;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => {
-                        onChange(`${viewYear}-${String(i + 1).padStart(2, "0")}`);
-                        setOpen(false);
-                      }}
-                      className={cn(
-                        "rounded-lg py-1.5 text-[12.5px] transition",
-                        isSelected
-                          ? "text-white"
-                          : "text-foreground/75 hover:bg-[color:var(--brand)]/10",
-                      )}
-                      style={isSelected ? { background: "var(--gradient-warm)" } : undefined}
-                    >
-                      {m}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-2 flex items-center justify-between border-t border-foreground/10 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange("");
-                    setOpen(false);
-                  }}
-                  className="rounded-md px-2 py-1 text-[12px] text-foreground/55 transition hover:bg-foreground/5"
-                >
-                  {allowPresent ? "Present" : "Clear"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-md px-2 py-1 text-[12px] font-medium text-[color:var(--brand-deep)] transition hover:bg-[color:var(--brand)]/10"
-                >
-                  Done
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </div>
   );
 }
 
@@ -1393,6 +1248,7 @@ function AutocompleteInput({
   presets,
   placeholder,
   required,
+  invalid,
   className,
 }: {
   label: string;
@@ -1401,6 +1257,7 @@ function AutocompleteInput({
   presets: string[];
   placeholder?: string;
   required?: boolean;
+  invalid?: boolean;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -1415,10 +1272,11 @@ function AutocompleteInput({
       <input
         value={value}
         placeholder={placeholder}
+        aria-invalid={invalid || undefined}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 120)}
-        className="manual-input"
+        className={cn("manual-input", invalid && "is-invalid")}
       />
       <AnimatePresence>
         {open && matches.length > 0 && (
@@ -1517,13 +1375,22 @@ function TagField({
   tags,
   onRemove,
   typeahead,
+  invalid,
 }: {
   tags: string[];
   onRemove: (tag: string) => void;
   typeahead: React.ReactNode;
+  invalid?: boolean;
 }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-xl border border-foreground/10 bg-white/65 px-2 py-2">
+    <div
+      className={cn(
+        "flex min-w-0 flex-wrap items-center gap-1.5 rounded-xl border bg-white/65 px-2 py-2",
+        invalid
+          ? "border-red-400 ring-2 ring-red-400/30"
+          : "border-foreground/10",
+      )}
+    >
       <AnimatePresence initial={false}>
         {tags.map((t) => (
           <motion.span

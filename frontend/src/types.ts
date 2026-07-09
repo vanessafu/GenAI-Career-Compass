@@ -8,7 +8,13 @@
 /** A skill with a UI-derived confidence (0..100) from its proficiency indication. */
 export type AnalyzedSkill = { name: string; confidence: number };
 
-export type ExperienceItem = { role: string; company: string; start: string; end: string };
+export type ExperienceItem = {
+  role: string;
+  company: string;
+  summary: string;
+  start: string;
+  end: string;
+};
 export type EducationItem = {
   degree: string;
   field: string;
@@ -17,7 +23,13 @@ export type EducationItem = {
   end: string;
 };
 export type CertificationItem = { name: string; issuer: string; year: string };
-export type ProjectItem = { name: string; detail: string; year: string };
+export type ProjectItem = {
+  name: string;
+  detail: string;
+  technologies: string[];
+  start: string;
+  end: string;
+};
 
 /** Career identity shown on the recap screen. */
 export type Identity = { archetype: string; lead: string };
@@ -33,6 +45,7 @@ export type ManualEducationFormItem = {
 export type ManualExperienceFormItem = {
   role: string;
   organization: string;
+  description: string;
   startDate: string;
   endDate: string;
 };

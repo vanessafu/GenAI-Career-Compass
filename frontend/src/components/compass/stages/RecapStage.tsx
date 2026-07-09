@@ -2,7 +2,19 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useStageStore } from "@/state/useStageStore";
 import { buildMissingBigSections } from "@/lib/recapMissingInfo";
-import { DEGREE_LEVELS, ROLE_PRESETS, SKILL_PRESETS } from "@/lib/profilePresets";
+import {
+  DEGREE_LEVELS,
+  FIELD_OF_STUDY_PRESETS,
+  ROLE_PRESETS,
+  SKILL_PRESETS,
+} from "@/lib/profilePresets";
+import {
+  MonthRange,
+  MonthYearPicker,
+  formatMonthLabel,
+  formatRange,
+  isMonthRangeInvalid,
+} from "../ui/MonthPicker";
 import {
   ArrowRight,
   Sparkles,
@@ -27,25 +39,6 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-/** Join two year-ish values with a single dash, dropping empty/placeholder parts. */
-function formatYearRange(start: string, end: string): string {
-  const clean = (v: string) => (v && v.trim() && v.trim() !== "—" ? v.trim() : "");
-  const s = clean(start);
-  const e = clean(end);
-  if (s && e) return `${s}–${e}`;
-  return s || e;
-}
-
-function normalizeYear(value: string): string {
-  return value.trim().match(/\d{4}/)?.[0] ?? "";
-}
-
-function invalidYearRange(start: string, end: string): boolean {
-  const s = normalizeYear(start);
-  const e = normalizeYear(end);
-  return Boolean(s && e && s > e);
-}
 
 function visibleText(value: string | undefined): string {
   const cleaned = value?.trim() ?? "";
@@ -122,6 +115,7 @@ export function RecapStage() {
       <PresetDatalist id="cc-skill-presets" options={SKILL_PRESETS} />
       <PresetDatalist id="cc-role-presets" options={ROLE_PRESETS} />
       <PresetDatalist id="cc-degree-presets" options={DEGREE_LEVELS} />
+      <PresetDatalist id="cc-field-presets" options={FIELD_OF_STUDY_PRESETS} />
       <div className="mx-auto flex h-full w-full max-w-[1320px] flex-col gap-3">
         {/* Eyebrow — no name, no role line. */}
         <div className="flex items-center gap-2">
@@ -195,7 +189,7 @@ export function RecapStage() {
                       idx={i}
                       title={[e.degree, e.field].filter(Boolean).join(" — ") || "Education"}
                       subtitle={e.school}
-                      meta={formatYearRange(e.start, e.end)}
+                      meta={formatRange(e.start, e.end)}
                       onRemove={() => removeEducation(i)}
                     />
                   ))}
@@ -216,7 +210,8 @@ export function RecapStage() {
                       idx={i}
                       title={e.role}
                       subtitle={e.company}
-                      meta={formatYearRange(e.start, e.end)}
+                      description={e.summary}
+                      meta={formatRange(e.start, e.end)}
                       onRemove={() => removeExperience(i)}
                     />
                   ))}
@@ -344,7 +339,7 @@ export function RecapStage() {
                       icon={Award}
                       title={c.name}
                       subtitle={c.issuer}
-                      meta={c.year}
+                      meta={formatMonthLabel(c.year)}
                       onRemove={() => removeCertification(i)}
                     />
                   ))}
@@ -354,10 +349,8 @@ export function RecapStage() {
                     Add certifications if you have any.
                   </EmptyPrompt>
                 )}
-                <AddSimpleRow
-                  placeholderA="Certification name"
-                  placeholderB="Year"
-                  onAdd={(a, b) => addCertification({ name: a, issuer: "", year: b })}
+                <AddCertificationRow
+                  onAdd={(c) => addCertification(c)}
                 />
               </div>
             </SectionCard>
@@ -372,7 +365,8 @@ export function RecapStage() {
                       icon={FolderGit2}
                       title={p.name}
                       subtitle={p.detail}
-                      meta={p.year}
+                      description={p.technologies.join(" · ")}
+                      meta={formatRange(p.start, p.end)}
                       onRemove={() => removeProject(i)}
                     />
                   ))}
@@ -382,11 +376,7 @@ export function RecapStage() {
                     Add projects that show your skills.
                   </EmptyPrompt>
                 )}
-                <AddSimpleRow
-                  placeholderA="Project name"
-                  placeholderB="Year"
-                  onAdd={(a, b) => addProject({ name: a, detail: "", year: b })}
-                />
+                <AddProjectRow onAdd={(p) => addProject(p)} />
               </div>
             </SectionCard>
           </div>
@@ -396,7 +386,7 @@ export function RecapStage() {
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.12 }}
-          className="flex items-center justify-between gap-3"
+          className="flex flex-wrap items-center justify-between gap-3"
         >
           <button
             onClick={() => setStage("entry")}
@@ -440,6 +430,7 @@ function RowItem({
   idx,
   title,
   subtitle,
+  description,
   meta,
   onRemove,
   icon: Icon,
@@ -447,6 +438,7 @@ function RowItem({
   idx: number;
   title: string;
   subtitle?: string;
+  description?: string;
   meta?: string;
   onRemove: () => void;
   icon?: LucideIcon;
@@ -472,6 +464,11 @@ function RowItem({
         <p className="truncate text-[14px] font-medium leading-tight">{title}</p>
         {visibleText(subtitle) && (
           <p className="truncate text-[12px] text-foreground/55">{subtitle}</p>
+        )}
+        {visibleText(description) && (
+          <p className="line-clamp-2 text-[11.5px] leading-snug text-foreground/50">
+            {description}
+          </p>
         )}
       </div>
       {visibleText(meta) && (
@@ -602,75 +599,85 @@ function MissingInfoPrompt({ items }: { items: string[] }) {
   );
 }
 
+/** Small footer shared by the richer add-rows: optional error + an Add button. */
+function AddRowFooter({ error, onSubmit }: { error: string; onSubmit: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      {error ? (
+        <p className="text-[11.5px] text-red-700" role="alert">
+          {error}
+        </p>
+      ) : (
+        <span />
+      )}
+      <button
+        onClick={onSubmit}
+        className="inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] font-medium text-white"
+        style={{ background: "var(--gradient-warm)" }}
+      >
+        <Plus size={12} />
+        Add
+      </button>
+    </div>
+  );
+}
+
 function AddExperienceRow({
   onAdd,
 }: {
-  onAdd: (e: { role: string; company: string; start: string; end: string }) => void;
+  onAdd: (e: { role: string; company: string; summary: string; start: string; end: string }) => void;
 }) {
   const [role, setRole] = useState("");
   const [company, setCompany] = useState("");
+  const [summary, setSummary] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [error, setError] = useState("");
   const submit = () => {
     if (!role.trim() || !company.trim()) return;
-    if (invalidYearRange(start, end)) {
-      setError("End date cannot be before start date.");
+    if (isMonthRangeInvalid(start, end)) {
+      setError("End date can’t be before the start date.");
       return;
     }
     setError("");
     onAdd({
       role: role.trim(),
       company: company.trim(),
-      start: normalizeYear(start),
-      end: normalizeYear(end) || "Present",
+      summary: summary.trim(),
+      start: start.trim(),
+      end: end.trim() || "Present",
     });
     setRole("");
     setCompany("");
+    setSummary("");
     setStart("");
     setEnd("");
   };
   return (
-    <div className="mt-1 flex flex-col gap-1.5 rounded-lg border border-dashed border-foreground/15 bg-white/50 px-2 py-2 text-[13px]">
-      <div className="grid grid-cols-[1fr_1fr_auto_auto_auto] items-center gap-1">
+    <div className="mt-1 flex flex-col gap-2 rounded-lg border border-dashed border-foreground/15 bg-white/50 p-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <input
           value={role}
           onChange={(e) => setRole(e.target.value)}
           placeholder="Role"
           list="cc-role-presets"
-          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
+          className="manual-input manual-input--sm"
         />
         <input
           value={company}
           onChange={(e) => setCompany(e.target.value)}
           placeholder="Company"
-          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
+          className="manual-input manual-input--sm"
         />
-        <input
-          value={start}
-          onChange={(e) => setStart(e.target.value)}
-          placeholder="From"
-          className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
-        />
-        <input
-          value={end}
-          onChange={(e) => setEnd(e.target.value)}
-          placeholder="To"
-          className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
-        />
-        <button
-          onClick={submit}
-          className="grid h-6 w-6 place-items-center rounded-full text-white"
-          style={{ background: "var(--gradient-warm)" }}
-        >
-          <Plus size={11} />
-        </button>
       </div>
-      {error && (
-        <p className="text-[11.5px] text-red-700" role="alert">
-          {error}
-        </p>
-      )}
+      <input
+        value={summary}
+        onChange={(e) => setSummary(e.target.value)}
+        placeholder="Short description"
+        className="manual-input manual-input--sm"
+      />
+      <MonthRange start={start} end={end} onStart={setStart} onEnd={setEnd} />
+      <AddRowFooter error={error} onSubmit={submit} />
     </div>
   );
 }
@@ -689,8 +696,8 @@ function AddEducationRow({
   const submit = () => {
     if (!degree.trim() && !field.trim()) return;
     if (!school.trim()) return;
-    if (invalidYearRange(start, end)) {
-      setError("End date cannot be before start date.");
+    if (isMonthRangeInvalid(start, end)) {
+      setError("End date can’t be before the start date.");
       return;
     }
     setError("");
@@ -698,8 +705,8 @@ function AddEducationRow({
       degree: degree.trim(),
       field: field.trim(),
       school: school.trim(),
-      start: normalizeYear(start),
-      end: normalizeYear(end),
+      start: start.trim(),
+      end: end.trim(),
     });
     setDegree("");
     setField("");
@@ -708,97 +715,142 @@ function AddEducationRow({
     setEnd("");
   };
   return (
-    <div className="mt-1 flex flex-col gap-1.5 rounded-lg border border-dashed border-foreground/15 bg-white/50 px-2 py-2 text-[13px]">
-      <div className="grid grid-cols-3 gap-1">
+    <div className="mt-1 flex flex-col gap-2 rounded-lg border border-dashed border-foreground/15 bg-white/50 p-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <input
           value={degree}
           onChange={(e) => setDegree(e.target.value)}
           placeholder="Degree"
           list="cc-degree-presets"
-          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
+          className="manual-input manual-input--sm"
         />
         <input
           value={field}
           onChange={(e) => setField(e.target.value)}
-          placeholder="Field"
-          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
-        />
-        <input
-          value={school}
-          onChange={(e) => setSchool(e.target.value)}
-          placeholder="School"
-          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
+          placeholder="Field of study"
+          list="cc-field-presets"
+          className="manual-input manual-input--sm"
         />
       </div>
-      <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-1 border-t border-foreground/10 pt-1.5">
-        <input
-          value={start}
-          onChange={(e) => setStart(e.target.value)}
-          placeholder="From"
-          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
-        />
-        <input
-          value={end}
-          onChange={(e) => setEnd(e.target.value)}
-          placeholder="To"
-          className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
-        />
-        <button
-          onClick={submit}
-          className="grid h-6 w-6 place-items-center rounded-full text-white"
-          style={{ background: "var(--gradient-warm)" }}
-          aria-label="Add education"
-        >
-          <Plus size={11} />
-        </button>
-      </div>
-      {error && (
-        <p className="text-[11.5px] text-red-700" role="alert">
-          {error}
-        </p>
-      )}
+      <input
+        value={school}
+        onChange={(e) => setSchool(e.target.value)}
+        placeholder="School"
+        className="manual-input manual-input--sm"
+      />
+      <MonthRange start={start} end={end} onStart={setStart} onEnd={setEnd} />
+      <AddRowFooter error={error} onSubmit={submit} />
     </div>
   );
 }
 
-function AddSimpleRow({
-  placeholderA,
-  placeholderB,
+function AddCertificationRow({
   onAdd,
 }: {
-  placeholderA: string;
-  placeholderB: string;
-  onAdd: (a: string, b: string) => void;
+  onAdd: (c: { name: string; issuer: string; year: string }) => void;
 }) {
-  const [a, setA] = useState("");
-  const [b, setB] = useState("");
+  const [name, setName] = useState("");
+  const [issuer, setIssuer] = useState("");
+  const [year, setYear] = useState("");
   const submit = () => {
-    if (!a.trim()) return;
-    onAdd(a.trim(), b.trim());
-    setA("");
-    setB("");
+    if (!name.trim()) return;
+    onAdd({ name: name.trim(), issuer: issuer.trim(), year: year.trim() });
+    setName("");
+    setIssuer("");
+    setYear("");
   };
   return (
-    <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-1 rounded-lg border border-dashed border-foreground/15 bg-white/50 px-2 py-2 text-[13px]">
+    <div className="mt-1 flex flex-col gap-2 rounded-lg border border-dashed border-foreground/15 bg-white/50 p-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+          }}
+          placeholder="Certification name"
+          className="manual-input manual-input--sm"
+        />
+        <input
+          value={issuer}
+          onChange={(e) => setIssuer(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+          }}
+          placeholder="Issuer"
+          className="manual-input manual-input--sm"
+        />
+      </div>
+      <MonthYearPicker value={year} onChange={setYear} placeholder="Issue date" compact />
+      <AddRowFooter error="" onSubmit={submit} />
+    </div>
+  );
+}
+
+function AddProjectRow({
+  onAdd,
+}: {
+  onAdd: (p: {
+    name: string;
+    detail: string;
+    technologies: string[];
+    start: string;
+    end: string;
+  }) => void;
+}) {
+  const [name, setName] = useState("");
+  const [tech, setTech] = useState("");
+  const [detail, setDetail] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [error, setError] = useState("");
+  const submit = () => {
+    if (!name.trim()) return;
+    if (isMonthRangeInvalid(start, end)) {
+      setError("End date can’t be before the start date.");
+      return;
+    }
+    setError("");
+    onAdd({
+      name: name.trim(),
+      detail: detail.trim(),
+      technologies: tech
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+      start: start.trim(),
+      end: end.trim(),
+    });
+    setName("");
+    setTech("");
+    setDetail("");
+    setStart("");
+    setEnd("");
+  };
+  return (
+    <div className="mt-1 flex flex-col gap-2 rounded-lg border border-dashed border-foreground/15 bg-white/50 p-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Project name"
+          className="manual-input manual-input--sm"
+        />
+        <input
+          value={tech}
+          onChange={(e) => setTech(e.target.value)}
+          placeholder="Technologies, comma-separated"
+          className="manual-input manual-input--sm"
+        />
+      </div>
       <input
-        value={a}
-        onChange={(e) => setA(e.target.value)}
-        placeholder={placeholderA}
-        className="min-w-0 bg-transparent outline-none placeholder:text-foreground/40"
+        value={detail}
+        onChange={(e) => setDetail(e.target.value)}
+        placeholder="Short description"
+        className="manual-input manual-input--sm"
       />
-      <input
-        value={b}
-        onChange={(e) => setB(e.target.value)}
-        placeholder={placeholderB}
-        className="w-12 bg-transparent text-center outline-none placeholder:text-foreground/40"
-      />
-      <button
-        onClick={submit}
-        className="grid h-6 w-6 place-items-center rounded-full text-white"
-        style={{ background: "var(--gradient-warm)" }}
-      >
-        <Plus size={11} />
-      </button>
+      <MonthRange start={start} end={end} onStart={setStart} onEnd={setEnd} />
+      <AddRowFooter error={error} onSubmit={submit} />
     </div>
   );
 }

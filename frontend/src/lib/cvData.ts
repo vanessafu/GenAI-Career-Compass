@@ -74,6 +74,7 @@ export function manualFormToInput(form: ManualProfileForm): ManualCVInput {
       .map((item) => ({
         role: item.role.trim(),
         organization: item.organization.trim() || null,
+        description: item.description.trim() || null,
         start_date: item.startDate.trim() || null,
         end_date: item.endDate.trim() || null,
       })),
@@ -135,6 +136,7 @@ export function cvDataToExperiences(cv: CVData): ExperienceItem[] {
   return cv.experience.map((e) => ({
     role: e.role ?? "Role",
     company: e.organization ?? "—",
+    summary: (e.core_responsibilities ?? []).map((s) => s.trim()).filter(Boolean).join("; "),
     start: yearOf(e.start_date),
     end: yearOf(e.end_date, "Present"),
   }));
@@ -162,7 +164,9 @@ export function cvDataToProjects(cv: CVData): ProjectItem[] {
   return cv.projects.map((p) => ({
     name: p.title ?? "Project",
     detail: p.description ?? "—",
-    year: yearOf(p.start_date ?? p.end_date),
+    technologies: (p.technologies ?? []).map((t) => t.trim()).filter(Boolean),
+    start: yearOf(p.start_date),
+    end: yearOf(p.end_date),
   }));
 }
 
@@ -261,7 +265,7 @@ export function cvDataToUserCareerProfile(
     potential_direction: textOrNull(cv.potential_direction) ?? "",
     certifications: cv.certifications.map((item) => ({
       name: textOrNull(item.name),
-      issuer: null,
+      issuer: textOrNull(item.issuing_organization),
       year: yearOrNull(item.issue_date),
     })),
     projects: cv.projects.map((item) => ({
@@ -284,6 +288,7 @@ export function applyEditsToCvData(base: CVData, edits: RecapEdits): CVData {
     ...(base.experience[i] ?? emptyExperience()),
     role: e.role,
     organization: e.company,
+    core_responsibilities: e.summary?.trim() ? [e.summary.trim()] : [],
     start_date: e.start === "—" ? null : e.start,
     end_date: e.end === "Present" || e.end === "—" ? null : e.end,
   }));
@@ -300,8 +305,10 @@ export function applyEditsToCvData(base: CVData, edits: RecapEdits): CVData {
   const projects: Project[] = edits.projects.map((p, i) => ({
     ...(base.projects[i] ?? emptyProject()),
     title: p.name,
-    description: p.detail === "—" ? null : p.detail,
-    start_date: p.year === "—" ? null : p.year,
+    description: p.detail === "—" ? null : p.detail.trim() || null,
+    technologies: p.technologies ?? [],
+    start_date: p.start === "—" ? null : p.start.trim() || null,
+    end_date: p.end === "—" ? null : p.end.trim() || null,
   }));
 
   return {
