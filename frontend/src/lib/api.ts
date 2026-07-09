@@ -407,6 +407,7 @@ export type ManualEducationInput = {
 export type ManualExperienceInput = {
   role: string;
   organization?: string | null;
+  description?: string | null;
   start_date?: string | null;
   end_date?: string | null;
 };

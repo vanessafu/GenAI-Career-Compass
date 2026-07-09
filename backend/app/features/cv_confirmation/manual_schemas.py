@@ -14,6 +14,7 @@ class ManualEducationInput(BaseModel):
 class ManualExperienceInput(BaseModel):
     role: str
     organization: str | None = None
+    description: str | None = None
     start_date: str | None = None
     end_date: str | None = None
 
