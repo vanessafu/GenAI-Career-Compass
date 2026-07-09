@@ -136,7 +136,10 @@ export function cvDataToExperiences(cv: CVData): ExperienceItem[] {
   return cv.experience.map((e) => ({
     role: e.role ?? "Role",
     company: e.organization ?? "—",
-    summary: (e.core_responsibilities ?? []).map((s) => s.trim()).filter(Boolean).join("; "),
+    summary: (e.core_responsibilities ?? [])
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join("; "),
     start: yearOf(e.start_date),
     end: yearOf(e.end_date, "Present"),
   }));

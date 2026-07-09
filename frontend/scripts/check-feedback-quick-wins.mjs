@@ -47,7 +47,10 @@ assert(
   entry.includes("isMonthRangeInvalid"),
   "EntryStage must reject end months before start months.",
 );
-assert(entry.includes("box-sizing: border-box;"), "Manual inputs need border-box sizing.");
+assert(
+  /\.manual-input\s*\{[^}]*box-sizing:\s*border-box;/s.test(styles),
+  "Manual inputs need border-box sizing.",
+);
 assert(
   entry.includes("grid grid-cols-1 gap-2.5 sm:grid-cols-2"),
   "Manual two-column grids must collapse on mobile.",
@@ -71,7 +74,10 @@ assert(
 assert(recap.includes("aria-label={label}"), "Recap add inputs need a real add button.");
 assert(!recap.includes('issuer: "—"'), "Certifications must not store placeholder issuers.");
 assert(!recap.includes('detail: "—"'), "Projects must not store placeholder details.");
-assert(recap.includes("invalidYearRange"), "Recap add rows must reject impossible year ranges.");
+assert(
+  (recap.match(/isMonthRangeInvalid\(start, end\)/g) ?? []).length >= 3,
+  "Recap add rows must reject impossible year ranges.",
+);
 assert(
   manualSubmit.includes("setEducation(educationOut)") &&
     manualSubmit.includes("setExperience(experienceOut)") &&

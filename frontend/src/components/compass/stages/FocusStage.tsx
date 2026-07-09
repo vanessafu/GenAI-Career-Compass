@@ -207,31 +207,33 @@ function PathCard({
 
 function RoadmapPreview({ nodes, loading }: { nodes: RoadmapPreviewNode[]; loading: boolean }) {
   return (
-    <div className="overflow-x-auto pb-1" aria-busy={loading}>
-      <div className="grid min-w-[520px] grid-cols-4 gap-3">
+    <div className="min-w-0 pb-1 sm:overflow-x-auto" aria-busy={loading}>
+      <div className="grid grid-cols-1 gap-2 sm:min-w-[520px] sm:grid-cols-4 sm:gap-3">
         {nodes.map((node, index) => (
           <div
             key={`${node.label}-${index}`}
-            className="relative flex min-w-0 flex-col items-center text-center"
+            className="relative flex min-w-0 items-start gap-3 text-left sm:flex-col sm:items-center sm:gap-0 sm:text-center"
           >
             {index < nodes.length - 1 && (
-              <span className="absolute left-1/2 top-5 h-px w-full translate-x-5 border-t border-dotted border-[color:var(--brand)]/50" />
+              <span className="absolute left-5 top-10 h-[calc(100%+0.5rem)] border-l border-dotted border-[color:var(--brand)]/45 sm:left-1/2 sm:top-5 sm:h-px sm:w-full sm:translate-x-5 sm:border-l-0 sm:border-t sm:border-[color:var(--brand)]/50" />
             )}
             <span
               className={
                 index === 0 || index === nodes.length - 1
-                  ? "relative z-10 grid h-10 w-10 place-items-center rounded-full bg-[color:var(--brand)] text-white shadow-[0_12px_24px_-14px_color-mix(in_oklab,var(--brand-deep)_70%,transparent)]"
-                  : "relative z-10 grid h-10 w-10 place-items-center rounded-full border border-[color:var(--brand)]/20 bg-white text-[color:var(--brand-deep)]"
+                  ? "relative z-10 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[color:var(--brand)] text-white shadow-[0_12px_24px_-14px_color-mix(in_oklab,var(--brand-deep)_70%,transparent)]"
+                  : "relative z-10 grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[color:var(--brand)]/20 bg-white text-[color:var(--brand-deep)]"
               }
             >
               <RoadmapNodeIcon kind={node.kind} size={15} />
             </span>
-            <p className="mt-2 text-[10px] uppercase tracking-[0.16em] text-foreground/45">
-              {node.label}
-            </p>
-            <p className="mt-1 line-clamp-2 text-[12.5px] font-medium leading-snug text-foreground/82">
-              {loading && index > 0 && index < nodes.length - 1 ? "Preparing..." : node.title}
-            </p>
+            <div className="min-w-0 flex-1 sm:flex-none">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-foreground/45 sm:mt-2">
+                {node.label}
+              </p>
+              <p className="mt-1 line-clamp-2 break-words text-[12.5px] font-medium leading-snug text-foreground/82">
+                {loading && index > 0 && index < nodes.length - 1 ? "Preparing..." : node.title}
+              </p>
+            </div>
           </div>
         ))}
       </div>

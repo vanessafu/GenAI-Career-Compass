@@ -3,53 +3,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-export const MONTH_LABELS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
-/** Treat empty / placeholder dash values as blank. */
-function cleanDate(value: string | undefined): string {
-  const trimmed = value?.trim() ?? "";
-  return trimmed && trimmed !== "\u2014" ? trimmed : "";
-}
-
-/** Render a `YYYY-MM` value as a friendly "Mar 2024" label (or the raw value). */
-export function formatMonthLabel(value: string): string {
-  const match = value.trim().match(/^(\d{4})-(\d{2})$/);
-  if (!match) return value.trim();
-  const monthIndex = Number(match[2]) - 1;
-  const month = MONTH_LABELS[monthIndex] ?? match[2];
-  return `${month} ${match[1]}`;
-}
-
-/** Join a start/end month range with a single dash, skipping empty parts. */
-export function formatRange(start: string, end: string, endFallback = ""): string {
-  const s = cleanDate(start);
-  const e = cleanDate(end);
-  const startLabel = s ? formatMonthLabel(s) : "";
-  const endLabel = e ? formatMonthLabel(e) : endFallback;
-  if (startLabel && endLabel) return `${startLabel} – ${endLabel}`;
-  return startLabel || endLabel;
-}
-
-/** True when both dates are set and the start is after the end. */
-export function isMonthRangeInvalid(start: string, end: string): boolean {
-  const s = cleanDate(start);
-  const e = cleanDate(end);
-  return Boolean(s && e && s > e);
-}
+import { MONTH_LABELS, formatMonthLabel, isMonthRangeInvalid } from "./monthPickerUtils";
 
 /** A pair of month/year pickers with an inline "end before start" hint. */
 export function MonthRange({
@@ -69,7 +23,13 @@ export function MonthRange({
   return (
     <div className={cn("grid grid-cols-1 gap-2.5 sm:grid-cols-2", className)}>
       <MonthYearPicker value={start} onChange={onStart} placeholder="From" invalid={invalid} />
-      <MonthYearPicker value={end} onChange={onEnd} placeholder="To" allowPresent invalid={invalid} />
+      <MonthYearPicker
+        value={end}
+        onChange={onEnd}
+        placeholder="To"
+        allowPresent
+        invalid={invalid}
+      />
       {invalid && (
         <p className="text-[11.5px] text-red-700 sm:col-span-2" role="alert">
           End date can’t be before the start date.
@@ -161,71 +121,71 @@ export function MonthYearPicker({
                 style={{ position: "fixed", top: coords.top, left: coords.left }}
                 className="z-[61] w-56 rounded-2xl border border-foreground/10 bg-white/95 p-2.5 shadow-xl backdrop-blur"
               >
-              <div className="mb-2 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setViewYear((y) => y - 1)}
-                  className="grid h-7 w-7 place-items-center rounded-lg text-foreground/60 transition hover:bg-foreground/5"
-                  aria-label="Previous year"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                <span className="text-[13.5px] font-semibold tabular-nums">{viewYear}</span>
-                <button
-                  type="button"
-                  onClick={() => setViewYear((y) => y + 1)}
-                  className="grid h-7 w-7 place-items-center rounded-lg text-foreground/60 transition hover:bg-foreground/5"
-                  aria-label="Next year"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-              <div className="grid grid-cols-3 gap-1">
-                {MONTH_LABELS.map((m, i) => {
-                  const isSelected = selectedYear === viewYear && selectedMonth === i + 1;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => {
-                        onChange(`${viewYear}-${String(i + 1).padStart(2, "0")}`);
-                        setOpen(false);
-                      }}
-                      className={cn(
-                        "rounded-lg py-1.5 text-[12.5px] transition",
-                        isSelected
-                          ? "text-white"
-                          : "text-foreground/75 hover:bg-[color:var(--brand)]/10",
-                      )}
-                      style={isSelected ? { background: "var(--gradient-warm)" } : undefined}
-                    >
-                      {m}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-2 flex items-center justify-between border-t border-foreground/10 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onChange("");
-                    setOpen(false);
-                  }}
-                  className="rounded-md px-2 py-1 text-[12px] text-foreground/55 transition hover:bg-foreground/5"
-                >
-                  {allowPresent ? "Present" : "Clear"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-md px-2 py-1 text-[12px] font-medium text-[color:var(--brand-deep)] transition hover:bg-[color:var(--brand)]/10"
-                >
-                  Done
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
+                <div className="mb-2 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setViewYear((y) => y - 1)}
+                    className="grid h-7 w-7 place-items-center rounded-lg text-foreground/60 transition hover:bg-foreground/5"
+                    aria-label="Previous year"
+                  >
+                    <ChevronLeft size={15} />
+                  </button>
+                  <span className="text-[13.5px] font-semibold tabular-nums">{viewYear}</span>
+                  <button
+                    type="button"
+                    onClick={() => setViewYear((y) => y + 1)}
+                    className="grid h-7 w-7 place-items-center rounded-lg text-foreground/60 transition hover:bg-foreground/5"
+                    aria-label="Next year"
+                  >
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  {MONTH_LABELS.map((m, i) => {
+                    const isSelected = selectedYear === viewYear && selectedMonth === i + 1;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          onChange(`${viewYear}-${String(i + 1).padStart(2, "0")}`);
+                          setOpen(false);
+                        }}
+                        className={cn(
+                          "rounded-lg py-1.5 text-[12.5px] transition",
+                          isSelected
+                            ? "text-white"
+                            : "text-foreground/75 hover:bg-[color:var(--brand)]/10",
+                        )}
+                        style={isSelected ? { background: "var(--gradient-warm)" } : undefined}
+                      >
+                        {m}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 flex items-center justify-between border-t border-foreground/10 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange("");
+                      setOpen(false);
+                    }}
+                    className="rounded-md px-2 py-1 text-[12px] text-foreground/55 transition hover:bg-foreground/5"
+                  >
+                    {allowPresent ? "Present" : "Clear"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="rounded-md px-2 py-1 text-[12px] font-medium text-[color:var(--brand-deep)] transition hover:bg-[color:var(--brand)]/10"
+                  >
+                    Done
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
         </AnimatePresence>,
         document.body,
       )}

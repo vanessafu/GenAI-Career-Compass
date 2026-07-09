@@ -59,6 +59,13 @@ assert(
   "Paths page should use career identity before falling back to current role.",
 );
 assert(
+  focusStageSource.includes("grid-cols-1 gap-2 sm:min-w-[520px] sm:grid-cols-4") &&
+    focusStageSource.includes("items-start gap-3 text-left sm:flex-col") &&
+    focusStageSource.includes("sm:overflow-x-auto") &&
+    !focusStageSource.includes('className="overflow-x-auto pb-1"'),
+  "Focus roadmap preview should stack on mobile instead of clipping horizontal tracks.",
+);
+assert(
   modalSource.includes("headerDescription"),
   "DeepDiveModal should support headerDescription for wide modal intro text.",
 );

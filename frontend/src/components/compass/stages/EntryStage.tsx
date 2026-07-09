@@ -17,13 +17,8 @@ import {
 } from "@/lib/profilePresets";
 import { Upload, FileText, X, Plus, ArrowRight, Sparkles, ChevronDown } from "lucide-react";
 import { LoadingPanel } from "../ui/LoadingPanel";
-import {
-  MonthRange,
-  MonthYearPicker,
-  formatMonthLabel,
-  formatRange,
-  isMonthRangeInvalid,
-} from "../ui/MonthPicker";
+import { MonthRange, MonthYearPicker } from "../ui/MonthPicker";
+import { formatMonthLabel, formatRange, isMonthRangeInvalid } from "../ui/monthPickerUtils";
 
 const PARSE_STEPS = ["Reading your CV", "Privacy-stripping data", "Generating identity"];
 const MANUAL_STEPS = ["Structuring your profile", "Privacy-stripping data", "Generating identity"];
@@ -73,7 +68,13 @@ export function EntryStage() {
     }[]
   >(manualDraft.education);
   const [experience, setExperience] = useState<
-    { role: string; organization: string; description: string; startDate: string; endDate: string }[]
+    {
+      role: string;
+      organization: string;
+      description: string;
+      startDate: string;
+      endDate: string;
+    }[]
   >(manualDraft.experience);
   const [educationDraft, setEducationDraft] = useState({
     degree: "",
@@ -485,7 +486,13 @@ export function EntryStage() {
       });
     }
     if (experienceDraft.role.trim()) {
-      setExperienceDraft({ role: "", organization: "", description: "", startDate: "", endDate: "" });
+      setExperienceDraft({
+        role: "",
+        organization: "",
+        description: "",
+        startDate: "",
+        endDate: "",
+      });
     }
     if (languageDraft.name.trim()) {
       setLanguageDraft({ name: "", level: "" });
@@ -1386,9 +1393,7 @@ function TagField({
     <div
       className={cn(
         "flex min-w-0 flex-wrap items-center gap-1.5 rounded-xl border bg-white/65 px-2 py-2",
-        invalid
-          ? "border-red-400 ring-2 ring-red-400/30"
-          : "border-foreground/10",
+        invalid ? "border-red-400 ring-2 ring-red-400/30" : "border-foreground/10",
       )}
     >
       <AnimatePresence initial={false}>

@@ -8,13 +8,8 @@ import {
   ROLE_PRESETS,
   SKILL_PRESETS,
 } from "@/lib/profilePresets";
-import {
-  MonthRange,
-  MonthYearPicker,
-  formatMonthLabel,
-  formatRange,
-  isMonthRangeInvalid,
-} from "../ui/MonthPicker";
+import { MonthRange, MonthYearPicker } from "../ui/MonthPicker";
+import { formatMonthLabel, formatRange, isMonthRangeInvalid } from "../ui/monthPickerUtils";
 import {
   ArrowRight,
   Sparkles,
@@ -349,9 +344,7 @@ export function RecapStage() {
                     Add certifications if you have any.
                   </EmptyPrompt>
                 )}
-                <AddCertificationRow
-                  onAdd={(c) => addCertification(c)}
-                />
+                <AddCertificationRow onAdd={(c) => addCertification(c)} />
               </div>
             </SectionCard>
 
@@ -625,7 +618,13 @@ function AddRowFooter({ error, onSubmit }: { error: string; onSubmit: () => void
 function AddExperienceRow({
   onAdd,
 }: {
-  onAdd: (e: { role: string; company: string; summary: string; start: string; end: string }) => void;
+  onAdd: (e: {
+    role: string;
+    company: string;
+    summary: string;
+    start: string;
+    end: string;
+  }) => void;
 }) {
   const [role, setRole] = useState("");
   const [company, setCompany] = useState("");
