@@ -150,7 +150,7 @@ function PlanTitle({ currentRole, targetRole }: { currentRole: string; targetRol
 
 function PlanStats({ readiness, timeline }: { readiness: number; timeline?: string }) {
   return (
-    <div className="flex min-w-[150px] flex-col items-end gap-3 pt-3 text-right">
+    <div className="flex w-full min-w-0 items-end justify-between gap-3 pt-3 text-left md:min-w-[150px] md:flex-col md:items-end md:text-right">
       <Stat label="Readiness" value={<AnimatedPercent value={readiness} />} />
       {timeline && <Stat label="Timeline" value={timeline} />}
     </div>

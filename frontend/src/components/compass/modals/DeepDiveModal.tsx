@@ -63,12 +63,12 @@ export function DeepDiveModal({
                 : "fixed inset-x-3 bottom-3 z-50 max-h-[88dvh]"
             }
           >
-            <div className="soft-card-elevated relative flex h-full flex-col overflow-hidden rounded-3xl">
+            <div className="soft-card-elevated relative flex h-full max-h-[88dvh] flex-col overflow-y-auto rounded-3xl overscroll-y-contain md:max-h-none md:overflow-hidden">
               {!desktop && (
                 <div className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-foreground/15" />
               )}
-              <div className="flex shrink-0 items-start justify-between gap-3 p-6 pb-4 sm:p-8 sm:pb-5">
-                <div className="min-w-0 flex-1">
+              <div className="relative grid shrink-0 grid-cols-1 items-start gap-x-3 gap-y-2 p-6 pb-4 sm:p-8 sm:pb-5 md:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="min-w-0 pr-10 md:pr-0">
                   {subtitle && (
                     <p className="text-[10px] uppercase tracking-[0.18em] text-foreground/45">
                       {subtitle}
@@ -77,18 +77,24 @@ export function DeepDiveModal({
                   <h3 className="mt-1 text-balance font-display text-2xl leading-[1.12] tracking-tight sm:text-3xl">
                     {title}
                   </h3>
-                  {headerDescription && <div className="mt-7">{headerDescription}</div>}
                 </div>
-                <div className="flex shrink-0 items-start gap-3">
-                  {headerAside}
-                  <button
-                    onClick={onClose}
-                    aria-label="Close"
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-foreground/55 hover:bg-foreground/[0.06] hover:text-foreground"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
+                {headerAside && (
+                  <div className="min-w-0 md:col-start-2 md:row-start-1 md:pr-12">
+                    {headerAside}
+                  </div>
+                )}
+                <button
+                  onClick={onClose}
+                  aria-label="Close"
+                  className="absolute right-6 top-6 grid h-9 w-9 place-items-center rounded-full text-foreground/55 hover:bg-foreground/[0.06] hover:text-foreground sm:right-8 sm:top-8"
+                >
+                  <X size={16} />
+                </button>
+                {headerDescription && (
+                  <div className="min-w-0 pt-2 md:col-start-1 md:row-start-2 md:pt-4">
+                    {headerDescription}
+                  </div>
+                )}
               </div>
               <motion.div
                 initial="hidden"
@@ -96,7 +102,7 @@ export function DeepDiveModal({
                 variants={{
                   show: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
                 }}
-                className="flex-1 overflow-y-auto px-6 pb-6 sm:px-7 sm:pb-7"
+                className="flex-none overflow-y-visible px-6 pb-6 sm:px-7 sm:pb-7 md:min-h-0 md:flex-1 md:overflow-y-auto"
               >
                 {children}
               </motion.div>

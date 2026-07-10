@@ -57,21 +57,27 @@ export function MonthYearPicker({
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const parsed = value.trim().match(/^(\d{4})-(\d{2})$/);
   const selectedYear = parsed ? Number(parsed[1]) : null;
   const selectedMonth = parsed ? Number(parsed[2]) : null;
   const [viewYear, setViewYear] = useState(selectedYear ?? new Date().getFullYear());
 
-  // Position the portalled popover just under the trigger, clamped to the viewport.
+  // Position the portalled popover beside the trigger and keep it inside the viewport.
   useLayoutEffect(() => {
     if (!open) return;
     const POPOVER_WIDTH = 224;
     const update = () => {
       const rect = triggerRef.current?.getBoundingClientRect();
       if (!rect) return;
+      const popoverHeight = popoverRef.current?.offsetHeight ?? 236;
       const left = Math.max(8, Math.min(rect.left, window.innerWidth - POPOVER_WIDTH - 8));
-      setCoords({ top: rect.bottom + 6, left });
+      const below = rect.bottom + 6;
+      const preferredTop =
+        below + popoverHeight <= window.innerHeight - 8 ? below : rect.top - popoverHeight - 6;
+      const top = Math.max(8, Math.min(preferredTop, window.innerHeight - popoverHeight - 8));
+      setCoords({ top, left });
     };
     update();
     window.addEventListener("scroll", update, true);
@@ -114,12 +120,13 @@ export function MonthYearPicker({
                 aria-hidden="true"
               />
               <motion.div
+                ref={popoverRef}
                 initial={{ opacity: 0, y: -4, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -4, scale: 0.98 }}
                 transition={{ duration: 0.14 }}
                 style={{ position: "fixed", top: coords.top, left: coords.left }}
-                className="z-[61] w-56 rounded-2xl border border-foreground/10 bg-white/95 p-2.5 shadow-xl backdrop-blur"
+                className="z-[61] max-h-[calc(100dvh-1rem)] w-56 overflow-y-auto rounded-2xl border border-foreground/10 bg-white/95 p-2.5 shadow-xl backdrop-blur"
               >
                 <div className="mb-2 flex items-center justify-between">
                   <button
