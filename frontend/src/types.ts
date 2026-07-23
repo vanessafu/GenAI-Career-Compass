@@ -1,7 +1,7 @@
 /**
  * UI view-model types shared across stages and the store.
  *
- * These are presentation shapes (formerly defined in the deleted mock layer),
+ * These are presentation shapes used by the application UI,
  * derived from backend `CVData` / `RoleMatch` via the mappers in `src/lib/`.
  */
 
@@ -9,6 +9,7 @@
 export type AnalyzedSkill = { name: string; confidence: number };
 
 export type ExperienceItem = {
+  sourceIndex?: number;
   role: string;
   company: string;
   summary: string;
@@ -16,14 +17,21 @@ export type ExperienceItem = {
   end: string;
 };
 export type EducationItem = {
+  sourceIndex?: number;
   degree: string;
   field: string;
   school: string;
   start: string;
   end: string;
 };
-export type CertificationItem = { name: string; issuer: string; year: string };
+export type CertificationItem = {
+  sourceIndex?: number;
+  name: string;
+  issuer: string;
+  year: string;
+};
 export type ProjectItem = {
+  sourceIndex?: number;
   name: string;
   detail: string;
   technologies: string[];

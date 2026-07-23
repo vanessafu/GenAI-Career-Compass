@@ -1,27 +1,16 @@
-from datetime import datetime
-from typing import Literal
-
+from datetime import UTC, datetime
 from pydantic import BaseModel, Field
 
+from backend.app.core.validation import LongText, MAX_ITEMS, ShortText
 from backend.app.features.cv_parsing.schemas import CVData
 from backend.app.features.profile_preparation.schemas import CareerIdentitySummary
-from backend.app.features.role_matching.prepared_skills import PreparedSkillProfile
-
-ConfirmationStatus = Literal["pending", "confirmed", "edited", "skipped"]
-
-
-class ConfirmationSection(BaseModel):
-    section_id: str
-    title: str
-    path: list[str | int]
-    status: ConfirmationStatus = "pending"
 
 
 class ConfirmationMetadata(BaseModel):
-    confirmed_at: datetime = Field(default_factory=datetime.utcnow)
-    confirmed_sections: list[str] = Field(default_factory=list)
-    skipped_sections: list[str] = Field(default_factory=list)
-    edited_fields: list[str] = Field(default_factory=list)
+    confirmed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    confirmed_sections: list[ShortText] = Field(default_factory=list, max_length=MAX_ITEMS)
+    skipped_sections: list[ShortText] = Field(default_factory=list, max_length=MAX_ITEMS)
+    edited_fields: list[ShortText] = Field(default_factory=list, max_length=MAX_ITEMS)
 
 
 class ConfirmedCVData(BaseModel):
@@ -30,12 +19,5 @@ class ConfirmedCVData(BaseModel):
     # Set by the profile-preparation step once the profile is privacy-stripped and
     # enriched with a generated career identity. This is the object handed to the
     # embedding step.
-    career_identity_statement: str | None = None
+    career_identity_statement: LongText | None = None
     career_identity_summary: CareerIdentitySummary | None = None
-    # One-time normalization + alias resolution + ontology closure over this
-    # profile's skills (see role_matching/prepared_skills.py), computed via
-    # POST /prepare-skills right after CV confirmation so gap-analysis/
-    # career-path requests don't redo it on every call. None for older clients
-    # or profiles that never called that endpoint - callers must fall back to
-    # on-the-fly evidence building in that case.
-    prepared_skills: PreparedSkillProfile | None = None

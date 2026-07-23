@@ -50,7 +50,7 @@ async def openai_client_lifespan() -> AsyncGenerator[None, None]:
     if not OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY is not set in the environment variables.")
 
-    _client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+    _client = AsyncOpenAI(api_key=OPENAI_API_KEY, timeout=180.0, max_retries=0)
     logger.info("OpenAI client initialized.")
 
     try:
@@ -85,23 +85,3 @@ async def parse_structured(
             message.refusal,
         )
     return message.parsed
-
-
-async def complete(
-    messages: Iterable[ChatCompletionMessageParam],
-    *,
-    model_purpose: str | None = None,
-) -> str | None:
-    """Call the LLM and return the response as a plain string."""
-    response = await get_client().chat.completions.create(
-        model=select_model(model_purpose),
-        messages=messages,
-        temperature=OPENAI_TEMPERATURE,
-    )
-    return response.choices[0].message.content
-
-
-async def embed(text: str, model: str) -> list[float]:
-    """Embed a single text string and return the embedding vector."""
-    response = await get_client().embeddings.create(model=model, input=[text])
-    return response.data[0].embedding

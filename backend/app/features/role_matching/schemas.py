@@ -3,6 +3,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from backend.app.core.validation import LongText, MAX_ITEMS, ShortText
+
 
 class RecommendationBucket(str, Enum):
     READY_NOW = "ready_now"
@@ -22,69 +24,15 @@ class ScoringWeights(BaseModel):
     seniority_fit: float = 0.07
 
 
-# Used only to compute the score shown to the user, independent of which
-# bucket-specific weights won the candidate its bucket assignment.
+# The normalized score shown to users and used to rank candidates.
 DEFAULT_WEIGHTS = ScoringWeights()
-
-BUCKET_WEIGHTS: dict[RecommendationBucket, ScoringWeights] = {
-    RecommendationBucket.READY_NOW: ScoringWeights(
-        capability_vector_similarity=0.30,
-        intent_vector_similarity=0.10,
-        identity_vector_similarity=0.40,
-        normalized_skill_overlap=0.23,
-        interest_domain_overlap=0.09,
-        seniority_fit=0.08,
-    ),
-    RecommendationBucket.NEXT_STEP: ScoringWeights(
-        capability_vector_similarity=0.13,
-        intent_vector_similarity=0.25, 
-        identity_vector_similarity=0.28,
-        normalized_skill_overlap=0.13,
-        interest_domain_overlap=0.14,
-        seniority_fit=0.07,
-    ),
-    RecommendationBucket.ASPIRATIONAL: ScoringWeights(
-        capability_vector_similarity=0.10,
-        intent_vector_similarity=0.40,
-        identity_vector_similarity=0.20,
-        normalized_skill_overlap=0.10,
-        interest_domain_overlap=0.15,
-        seniority_fit=0.05,
-    ),
-}
-
-# Bucket-calibrated display ranges: guarantees ready_now always displays above
-# next_step, which always displays above aspirational, regardless of the raw
-# final_score (which is computed with one shared formula across all buckets).
-_DISPLAY_SCORE_RANGES: dict[RecommendationBucket, tuple[int, int]] = {
-    RecommendationBucket.READY_NOW: (85, 98),
-    RecommendationBucket.NEXT_STEP: (70, 84),
-    RecommendationBucket.ASPIRATIONAL: (50, 69),
-}
-
 
 def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
 
 
-def _display_matching_score(
-    final_score: float,
-    bucket: RecommendationBucket,
-    *,
-    min_score: float | None = None,
-    max_score: float | None = None,
-) -> int:
-    """Rescale final_score into the bucket's display band. When the spread of
-    final_score actually returned for this bucket is known (min_score/max_score),
-    stretch that spread across the full band so distinct candidates get distinct
-    percentages instead of collapsing together under a fixed 0-1 assumption -
-    real final_score values rarely span the full range on their own."""
-    low, high = _DISPLAY_SCORE_RANGES[bucket]
-    if min_score is None or max_score is None or max_score - min_score < 1e-9:
-        return int(round(low + _clamp01(final_score) * (high - low)))
-    t = (final_score - min_score) / (max_score - min_score)
-    return int(round(low + _clamp01(t) * (high - low)))
-
+def _display_matching_score(final_score: float) -> int:
+    return int(round(_clamp01(final_score) * 100))
 
 def _has_text(value: Optional[str]) -> bool:
     return bool(value and value.strip())
@@ -95,8 +43,8 @@ def _has_any_text(values: list[str]) -> bool:
 
 
 class CareerIdentity(BaseModel):
-    title: Optional[str] = None
-    summary: Optional[str] = None
+    title: Optional[ShortText] = None
+    summary: Optional[LongText] = None
 
     @property
     def has_signal(self) -> bool:
@@ -104,10 +52,10 @@ class CareerIdentity(BaseModel):
 
 
 class UserEducation(BaseModel):
-    degree: Optional[str] = None
-    institution: Optional[str] = None
-    start_year: Optional[str] = None
-    end_year: Optional[str] = None
+    degree: Optional[ShortText] = None
+    institution: Optional[ShortText] = None
+    start_year: Optional[ShortText] = None
+    end_year: Optional[ShortText] = None
 
     @property
     def has_signal(self) -> bool:
@@ -117,12 +65,12 @@ class UserEducation(BaseModel):
 
 
 class UserExperience(BaseModel):
-    role: Optional[str] = None
-    organization: Optional[str] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    summary: Optional[str] = None
-    skills: list[str] = Field(default_factory=list)
+    role: Optional[ShortText] = None
+    organization: Optional[ShortText] = None
+    start_date: Optional[ShortText] = None
+    end_date: Optional[ShortText] = None
+    summary: Optional[LongText] = None
+    skills: list[ShortText] = Field(default_factory=list, max_length=MAX_ITEMS)
 
     @property
     def has_signal(self) -> bool:
@@ -139,9 +87,9 @@ class UserExperience(BaseModel):
 
 
 class UserCertification(BaseModel):
-    name: Optional[str] = None
-    issuer: Optional[str] = None
-    year: Optional[str] = None
+    name: Optional[ShortText] = None
+    issuer: Optional[ShortText] = None
+    year: Optional[ShortText] = None
 
     @property
     def has_signal(self) -> bool:
@@ -149,10 +97,10 @@ class UserCertification(BaseModel):
 
 
 class UserProject(BaseModel):
-    title: Optional[str] = None
-    summary: Optional[str] = None
-    technologies: list[str] = Field(default_factory=list)
-    year: Optional[str] = None
+    title: Optional[ShortText] = None
+    summary: Optional[LongText] = None
+    technologies: list[ShortText] = Field(default_factory=list, max_length=MAX_ITEMS)
+    year: Optional[ShortText] = None
 
     @property
     def has_signal(self) -> bool:
@@ -161,16 +109,13 @@ class UserProject(BaseModel):
 
 class UserCareerProfile(BaseModel):
     career_identity: CareerIdentity = Field(default_factory=CareerIdentity)
-    education: list[UserEducation] = Field(default_factory=list)
-    experience: list[UserExperience] = Field(default_factory=list)
-    skills: list[str] = Field(default_factory=list)
-    interests: list[str] = Field(default_factory=list)
-    certifications: list[UserCertification] = Field(default_factory=list)
-    projects: list[UserProject] = Field(default_factory=list)
-    # Inferred from experience/projects (cv_parsing's potential_direction) -
-    # combined with `interests` to build the intent embedding; `career_identity`
-    # is now the dedicated source for the identity guardrail embedding instead.
-    potential_direction: str = ""
+    education: list[UserEducation] = Field(default_factory=list, max_length=MAX_ITEMS)
+    experience: list[UserExperience] = Field(default_factory=list, max_length=MAX_ITEMS)
+    skills: list[ShortText] = Field(default_factory=list, max_length=MAX_ITEMS)
+    interests: list[ShortText] = Field(default_factory=list, max_length=MAX_ITEMS)
+    certifications: list[UserCertification] = Field(default_factory=list, max_length=MAX_ITEMS)
+    projects: list[UserProject] = Field(default_factory=list, max_length=MAX_ITEMS)
+    potential_direction: LongText = ""
 
     @model_validator(mode="after")
     def require_capability_and_intent(self) -> "UserCareerProfile":
@@ -197,7 +142,6 @@ class UserCareerProfile(BaseModel):
         if not has_intent:
             raise ValueError("Profile must include at least one intent signal from career identity or interests.")
         return self
-
 
 class RoleMatchSignalBreakdown(BaseModel):
     capability_vector_similarity: float = 0.0
@@ -247,20 +191,12 @@ class CareerResultV1(BaseModel):
     matched_certifications: list[str] = Field(default_factory=list)
 
     @classmethod
-    def from_role_match(
-        cls,
-        role: RoleMatch,
-        *,
-        min_score: float | None = None,
-        max_score: float | None = None,
-    ) -> "CareerResultV1":
+    def from_role_match(cls, role: RoleMatch) -> "CareerResultV1":
         return cls(
             role_id=role.role_id,
             bucket=role.bucket.value,
             title=role.job_title,
-            matching_score=_display_matching_score(
-                role.final_score, role.bucket, min_score=min_score, max_score=max_score
-            ),
+            matching_score=_display_matching_score(role.final_score),
             salary=role.salary,
             description=role.description,
             esco_title=role.esco_title,
@@ -277,17 +213,8 @@ class CareerResultsV1(BaseModel):
 
     @classmethod
     def from_bucketed_roles(cls, buckets: BucketedRoles) -> "CareerResultsV1":
-        results: list[CareerResultV1] = []
-        for roles in (buckets.ready_now, buckets.next_step, buckets.aspirational):
-            if not roles:
-                continue
-            scores = [role.final_score for role in roles]
-            min_score, max_score = min(scores), max(scores)
-            results.extend(
-                CareerResultV1.from_role_match(role, min_score=min_score, max_score=max_score)
-                for role in roles
-            )
-        return cls(results=results)
+        roles = [*buckets.ready_now, *buckets.next_step, *buckets.aspirational]
+        return cls(results=[CareerResultV1.from_role_match(role) for role in roles])
 
 
 class RoleSummaryItem(BaseModel):
@@ -310,8 +237,7 @@ class RoleMatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     profile: UserCareerProfile
-    top_k: int = Field(default=9, ge=1, le=20)
-    include_debug: bool = False
+    top_k: int = Field(default=9, ge=1, le=9)
 
 
 class RoleMatchResponse(BaseModel):

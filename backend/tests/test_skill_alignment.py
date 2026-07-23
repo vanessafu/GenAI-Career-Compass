@@ -407,14 +407,10 @@ def test_gap_analysis_uses_shared_alignment_for_niche_variants(monkeypatch) -> N
     assert "ros" not in report.skills.missing_skills
 
 
-def test_gap_analysis_uses_prepared_skills_when_present_and_current(monkeypatch) -> None:
-    """A profile carrying a fresh prepared_skills payload should route through
-    align_skills(prepared=...) - ontology_implied credit for React (implied by
-    Next.js) should show up in coverage/domain_coverage, and matched_skills
-    still requires the higher explicit/token bar."""
+def test_gap_analysis_computes_ontology_evidence_internally(monkeypatch) -> None:
+    """Gap analysis derives MIND evidence from the confirmed CV itself."""
     profile = robotics_profile()
-    evidence = SkillEvidence(explicit_terms=["Next.js"], context_terms=[])
-    profile.prepared_skills = prepare_user_skills(evidence)
+    profile.confirmed_cv_data.skills_extracted.technical_skills = [TechnicalSkill(name="Next.js")]
 
     monkeypatch.setattr(
         gap_analysis,

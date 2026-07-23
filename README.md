@@ -1,162 +1,150 @@
 # Career Compass
 
-An AI-powered career exploration tool that takes a user's CV and current background, then suggests realistic next-step roles, generates personalized career paths, and highlights the skill gaps between where they are and where they want to go.
+Career Compass turns a CV or manually entered profile into career-role recommendations, skill-gap analysis, and a practical career roadmap. The deployed Cloud Run service hosts both the React frontend and FastAPI backend.
 
-See [docs/proposal.md](docs/proposal.md) for the full project proposal.
+## Evaluate in two minutes
 
-## Tech Stack
+Live application: [career-compass-hqrdul4iqa-ey.a.run.app](https://career-compass-hqrdul4iqa-ey.a.run.app)
 
-- **Backend:** FastAPI, Pydantic, OpenAI Python SDK, PyMuPDF
-- **Vector search:** PostgreSQL + [pgvector](https://github.com/pgvector/pgvector) over the ESCO occupations database
-- **Frontend:** React 19 + TypeScript + Vite
-- **CLI:** `argparse`-based CLI for running parse, confirm, and manual-profile flows locally
-- **Package manager:** [uv](https://docs.astral.sh/uv/)
+1. Choose **Upload CV** and use one of the synthetic PDFs below, or choose **Enter manually**.
+2. Review the extracted profile and correct anything that is wrong.
+3. Generate recommendations and select up to three roles.
+4. Open a selected role to inspect its requirement breakdown and roadmap.
 
-## Repository Layout
+The hosted backend already has its own budget-capped OpenAI key and read-only database connection. Evaluators do not need credentials.
 
-```text
-.
-|-- backend/
-|   `-- app/
-|       |-- main.py
-|       |-- cli.py
-|       |-- core/config.py
-|       |-- features/
-|       |   |-- cv_parsing/
-|       |   |-- cv_confirmation/
-|       |   |-- profile_pipeline/
-|       |   |-- role_matching/
-|       |   `-- profile_preparation/
-|       `-- scripts/
-|-- database/
-|   `-- supabase/migrations/
-|-- frontend/
-|-- docs/
-|-- test_data/
-|-- pyproject.toml
-|-- uv.lock
-`-- .env.example
-```
+## Run the frontend locally
 
-## Setup
+This is the recommended local setup. It uses the hosted backend and does not require an OpenAI key, database URL, Supabase API key, or service-role key.
 
-### 1. Python Environment
+Prerequisites: Node.js 20.19+ or 22.12+.
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if you do not have it, then:
-
-```powershell
-uv sync
-```
-
-This creates `.venv/`, resolves all dependencies from `uv.lock`, and installs the project itself as an editable package.
-
-### 2. Environment Variables
-
-Copy `.env.example` to `.env` and fill in your values:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Required keys:
-
-| Variable | Purpose |
-|---|---|
-| `OPENAI_API_KEY` | API key used for CV parsing, identity generation, role summaries, and roadmaps |
-| `OPENAI_MODEL` | Fallback chat model for unclassified LLM calls |
-| `OPENAI_CV_PARSING_MODEL` | Strong model for CV parsing, default `gpt-5.5` |
-| `OPENAI_IDENTITY_MODEL` | Cheaper model for identity/context generation, default `gpt-5.4-mini` |
-| `OPENAI_ROLE_DESCRIPTION_MODEL` | Cheaper model for role card summaries, default `gpt-5.4-mini` |
-| `OPENAI_CAREER_PATH_MODEL` | Middle/strong model for career path generation, default `gpt-5.4` |
-| `OPENAI_TEMPERATURE` | Sampling temperature, default `0.0` |
-| `DATABASE_URL` | Postgres/Supabase connection string used by matching, gap analysis, and career paths |
-
-### 3. Database
-
-The role-matching feature expects a Postgres/Supabase database with `pgvector`
-enabled, populated `career_roles`, ESCO mapping/skill tables, certification
-tables, and split role embeddings. Apply the SQL migrations in
-`database/supabase/migrations/`, then rebuild role embeddings with:
-
-```powershell
-uv run python -m backend.scripts.role_embeddings
-```
-
-## Running The Backend
-
-### API Server
-
-```powershell
-uv run uvicorn backend.app.main:app --reload --reload-dir backend
-```
-
-`--reload-dir backend` restricts the file-watcher to backend source code. Without it,
-uvicorn watches the whole repo root, including `outputs/pipeline/` where every profile
-run writes debug artifacts - each write was retriggering a full server restart (and a
-full reload of the local embedding model) mid-request.
-
-The server listens on `http://localhost:8000`. Interactive docs are available at `http://localhost:8000/docs`.
-
-Key endpoints used by the frontend:
-
-- `POST /api/v1/profile-pipeline/parse-cv` uploads a PDF, parses it, privacy-strips it, and returns `ProfilePipelineResponse`
-- `POST /api/v1/profile-pipeline/manual-cv` builds the same pipeline response from manual profile input
-- `POST /api/v1/roles/match` submits the frontend-converted career profile and returns up to 9 bucketed ESCO role matches
-- `POST /api/v1/roles/{role_id}/gap-analysis` returns the selected role's gap report for a confirmed profile
-- `POST /api/v1/roles/{role_id}/career-path` returns the selected role's grounded roadmap, including the gap report as `requirement_breakdown`
-
-The main app flow is:
-
-```text
-profile-pipeline/* -> frontend profile conversion -> /roles/match -> gap API -> path API
-```
-
-The older `POST /api/v1/parse-cv` and `POST /api/v1/manual-cv` routes still
-exist for lower-level parsing/manual DTO work, but the frontend uses the
-profile-pipeline routes.
-
-### CLI
-
-The `career-compass` script is registered as an entry point, so after `uv sync` you can call it directly:
-
-```powershell
-uv run career-compass extract-text test_data/cvs/your_cv.pdf
-uv run career-compass parse-cv test_data/cvs/your_cv.pdf
-uv run career-compass confirm-cv test_data/cvs/your_cv.pdf
-uv run career-compass confirm-json outputs/your_cv_parsed.json
-uv run career-compass manual-profile
-```
-
-The manual and CV-based flows both collect or confirm current role, education, work experience, projects, certifications, thesis, skills, languages, interests, and unmapped information into the same confirmed JSON format.
-
-## Running The Frontend
+PowerShell:
 
 ```powershell
 cd frontend
-npm install
+npm ci
+$env:VITE_API_BASE_URL="https://career-compass-hqrdul4iqa-ey.a.run.app"
 npm run dev
 ```
 
-The dev server runs on `http://localhost:5173` and talks to the backend at `http://localhost:8000`.
+macOS/Linux:
 
-### Demo Data
+```bash
+cd frontend
+npm ci
+VITE_API_BASE_URL="https://career-compass-hqrdul4iqa-ey.a.run.app" npm run dev
+```
 
-For frontend-only demo data, start the Vite dev server and open one of:
+Open [http://localhost:5173](http://localhost:5173). There is no dummy-data or query-parameter demo mode; this runs the real application against the hosted API.
 
-- `http://localhost:5173/?demo=recap`
-- `http://localhost:5173/?demo=roles`
-- `http://localhost:5173/?demo=focus`
+## Test CVs
 
-These fixture screens are useful for layout/demo work and do not require the backend flow.
+Synthetic fixtures:
 
-See [frontend/README.md](frontend/README.md) for more details.
+- [Anna Schmidt — Data Analyst](test_data/cvs/anna_schmidt_data_analyst_cv.pdf)
+- [Benjamin Weber — Backend Engineer](test_data/cvs/benjamin_weber_backend_engineer_cv.pdf)
+- [Clara Meyer — UX Researcher](test_data/cvs/clara_meyer_ux_researcher_cv.pdf)
+- [David Klein — Cybersecurity](test_data/cvs/david_klein_cybersecurity_cv.pdf)
+- [Maya Rodriguez — Product Data](test_data/cvs/maya_rodriguez_product_data_cv.pdf)
+- [Nathan Lee — Cloud Security](test_data/cvs/nathan_lee_cloud_security_cv.pdf)
 
-## Deployment
+Personal fixtures included with the contributors' consent:
 
-For the temporary feedback deployment on Cloud Run, see [DEPLOYMENT.md](DEPLOYMENT.md).
-After code changes are pushed to GitHub, redeploy from the repo root with the
-command in that file.
+- [Alison Thorpe](test_data/cvs/alison_thorpe.pdf)
+- [Ben Theurich](test_data/cvs/ben_theurich_12_25.pdf)
+- [Semjon Eschweiler](test_data/cvs/semjon_eschweiler_04_26.pdf)
 
-## License
+## Privacy
 
-MIT. See [LICENSE](LICENSE).
+CV/profile text is sent to OpenAI for structured extraction, identity generation, and roadmap text. Structured contact and link fields are removed before matching; free-text fields are not a general-purpose PII scrubber. The application does not retain uploaded PDFs, extracted CV text, or generated profile artifacts. The browser keeps the current session in memory and clears it on refresh.
+
+Use a synthetic fixture or manual entry if you do not want to submit a personal CV.
+
+## How it works
+
+1. FastAPI validates and extracts an uploaded PDF, or accepts the bounded manual-profile form.
+2. OpenAI converts the input into a structured profile. Contact and link fields are removed before the profile continues through matching.
+3. The bundled [MIND tech-skills ontology](https://github.com/MIND-TechAI/MIND-tech-ontology) canonicalizes technical skills and supplies synonym and prerequisite relationships.
+4. PostgreSQL/pgvector retrieves roles from the hosted catalog using capability, intent, and identity embeddings. Skill overlap, interests, identity, and seniority refine the normalized score; certification matches enrich the explanation.
+5. Results are divided into **Ready now**, **Next step**, and **Aspirational** buckets. `top_k` is the total result limit, and duplicate roles are removed.
+6. Career-path generation uses the selected catalog role, ESCO grounding, and computed requirement gaps rather than inventing role requirements.
+
+MIND is pinned to commit [`2367527d1a2f5665f595d6e0518294cc69dfb0fe`](https://github.com/MIND-TechAI/MIND-tech-ontology/tree/2367527d1a2f5665f595d6e0518294cc69dfb0fe). See [third-party notices](THIRD_PARTY_NOTICES.md) for licenses and data provenance.
+
+## Optional: run the full backend locally
+
+This is a maintainer workflow. It requires Python 3.11+, [uv](https://docs.astral.sh/uv/), a private OpenAI key, and a read-only connection to the existing populated Supabase catalog. Credentials are delivered outside GitLab.
+
+The checked-in SQL files are incremental changes and runtime-access configuration. They do **not** reconstruct or populate the production database from an empty Postgres instance.
+
+```powershell
+Copy-Item .env.example .env
+# Fill OPENAI_API_KEY and the read-only DATABASE_URL in .env.
+uv sync --frozen
+uv run uvicorn backend.app.main:app --reload --reload-dir backend
+```
+
+In a second terminal:
+
+```powershell
+cd frontend
+npm ci
+$env:VITE_API_BASE_URL="http://localhost:8000"
+npm run dev
+```
+
+The runtime uses only the Postgres `DATABASE_URL`; it does not use a Supabase API or service-role key. Maintainers provision the least-privilege login with [`database/supabase/runtime_reader.sql`](database/supabase/runtime_reader.sql) as described in [DEPLOYMENT.md](DEPLOYMENT.md).
+
+## Verification
+
+Backend and metrics:
+
+```powershell
+uv sync --frozen
+uv run pytest -q
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm ci
+npm test
+npm run lint
+npm run build
+Get-ChildItem scripts/*.mjs | Sort-Object Name | ForEach-Object {
+  node $_.FullName
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+```
+
+Repository whitespace check:
+
+```powershell
+git diff --check
+```
+
+## Repository layout
+
+```text
+backend/    FastAPI API, CV processing, MIND integration, and role matching
+frontend/   React 19, TypeScript, and Vite interface
+database/   Incremental Supabase SQL and read-only runtime-role template
+metrics/    Evaluation fixtures and aggregate results
+test_data/  Six synthetic and three consented personal CV fixtures
+```
+
+## Data, models, and limitations
+
+This service uses the ESCO classification of the European Commission.
+
+The user-facing role catalog began with the [IT Job Roles Skills Dataset](https://www.kaggle.com/datasets/dhivyadharunaba/it-job-roles-skills-dataset) and was mapped to ESCO occupation and skill records. German salary bands use Bundesagentur für Arbeit/KldB occupational-group statistics. Local embeddings use [`BAAI/bge-base-en-v1.5`](https://huggingface.co/BAAI/bge-base-en-v1.5); OpenAI models perform profile parsing, summaries, and roadmap generation.
+
+Recommendations are guidance, not hiring or financial advice. The role catalog is static, salary values are broad German occupational-group estimates, scanned/image-only PDFs may not contain extractable text, and generated wording can vary between requests.
+
+## Contributors and license
+
+Zitong Fu, Yuxuan Qian, Benjamin Theurich, Anh Tu Ly, Moritz Busch, Anthea Kleiner, Semjon Eschweiler, and Vanessa Fu.
+
+Career Compass code is licensed under the [MIT License](LICENSE). Third-party data, models, and the MIND ontology remain under their respective terms in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

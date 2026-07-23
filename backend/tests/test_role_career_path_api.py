@@ -39,6 +39,24 @@ def minimal_confirmed_profile():
         },
     }
 
+def test_career_path_endpoint_rejects_oversized_confirmed_profile():
+    client = TestClient(app)
+
+    oversized_identity = minimal_confirmed_profile()
+    oversized_identity["career_identity_statement"] = "x" * 5_001
+    assert client.post(
+        "/api/v1/roles/42/career-path", json=oversized_identity
+    ).status_code == 422
+
+    oversized_metadata = minimal_confirmed_profile()
+    oversized_metadata["confirmation_metadata"]["confirmed_sections"] = [
+        f"section-{index}" for index in range(51)
+    ]
+    assert client.post(
+        "/api/v1/roles/42/career-path", json=oversized_metadata
+    ).status_code == 422
+
+
 
 def test_career_path_endpoint_returns_report(monkeypatch):
     async def fake_generate_career_path(role_id, confirmed_profile):
@@ -99,7 +117,7 @@ def test_career_path_endpoint_returns_404_for_missing_role(monkeypatch):
     response = client.post("/api/v1/roles/404/career-path", json=minimal_confirmed_profile())
 
     assert response.status_code == 404
-    assert response.json()["detail"] == "role_id 404 not found"
+    assert response.json()["detail"] == "Role not found."
 
 
 def test_career_path_endpoint_returns_503_for_service_failure(monkeypatch):
@@ -114,7 +132,7 @@ def test_career_path_endpoint_returns_503_for_service_failure(monkeypatch):
     response = client.post("/api/v1/roles/42/career-path", json=minimal_confirmed_profile())
 
     assert response.status_code == 503
-    assert response.json()["detail"] == "path service unavailable"
+    assert response.json()["detail"] == "Career path generation is temporarily unavailable."
 
 
 def test_career_path_filters_llm_certifications_to_gap_report(monkeypatch):

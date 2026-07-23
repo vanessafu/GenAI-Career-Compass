@@ -1,5 +1,6 @@
 """Map a frontend manual-entry payload onto the full CVData schema."""
 
+from backend.app.core.validation import MAX_ITEMS
 from backend.app.features.cv_confirmation.manual_schemas import ManualCVInput
 from backend.app.features.cv_parsing.schemas import (
     Certification,
@@ -17,7 +18,6 @@ from backend.app.features.cv_parsing.schemas import (
     TechnicalSkill,
 )
 
-MAX_LIST_ITEMS = 50
 
 
 class ManualCVValidationError(ValueError):
@@ -44,7 +44,7 @@ def _dedupe_strings(values: list[str]) -> list[str]:
             continue
         seen.add(key)
         result.append(trimmed)
-    return result[:MAX_LIST_ITEMS]
+    return result[:MAX_ITEMS]
 
 
 def _dedupe_languages(values: list[Language]) -> list[Language]:
@@ -59,7 +59,7 @@ def _dedupe_languages(values: list[Language]) -> list[Language]:
             continue
         seen.add(key)
         result.append(Language(language=name, level=_clean(lang.level)))
-    return result[:MAX_LIST_ITEMS]
+    return result[:MAX_ITEMS]
 
 
 def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
@@ -89,7 +89,7 @@ def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
             start_date=_clean(item.start_date),
             end_date=_clean(item.end_date),
         )
-        for item in request.education[:MAX_LIST_ITEMS]
+        for item in request.education[:MAX_ITEMS]
         if _clean(item.degree_type)
     ]
 
@@ -103,7 +103,7 @@ def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
             start_date=_clean(item.start_date),
             end_date=_clean(item.end_date),
         )
-        for item in request.experience[:MAX_LIST_ITEMS]
+        for item in request.experience[:MAX_ITEMS]
         if _clean(item.role)
     ]
 
@@ -115,7 +115,7 @@ def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
             start_date=_clean(item.start_date),
             end_date=_clean(item.end_date),
         )
-        for item in request.projects[:MAX_LIST_ITEMS]
+        for item in request.projects[:MAX_ITEMS]
         if _clean(item.title)
     ]
 
@@ -125,7 +125,7 @@ def build_cv_data_from_manual_input(request: ManualCVInput) -> CVData:
             issuing_organization=_clean(item.issuing_organization),
             issue_date=_clean(item.issue_date),
         )
-        for item in request.certifications[:MAX_LIST_ITEMS]
+        for item in request.certifications[:MAX_ITEMS]
         if _clean(item.name)
     ]
 

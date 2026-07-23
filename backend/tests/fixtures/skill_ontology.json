@@ -1,0 +1,7 @@
+{
+  "javascript": {"name": "JavaScript", "synonyms": ["JS"]},
+  "react": {"name": "React", "synonyms": ["React.js"], "impliesKnowingSkills": ["JavaScript"]},
+  "nextjs": {"name": "Next.js", "synonyms": ["NextJS"], "impliesKnowingSkills": ["React"]},
+  "docker": {"name": "Docker"},
+  "kubernetes": {"name": "Kubernetes", "impliesKnowingSkills": ["Docker"], "technicalDomains": ["DevOps"]}
+}

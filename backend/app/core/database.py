@@ -7,20 +7,20 @@ from typing import Iterator, Optional
 
 import psycopg2
 from pgvector.psycopg2 import register_vector
-from psycopg2.pool import SimpleConnectionPool
+from psycopg2.pool import ThreadedConnectionPool
 
 from backend.app.core.config import DATABASE_URL
 
 logger = logging.getLogger("CareerCompass.Database")
 
-db_pool: Optional[SimpleConnectionPool] = None
+db_pool: Optional[ThreadedConnectionPool] = None
 
 if DATABASE_URL:
     try:
-        db_pool = SimpleConnectionPool(
+        db_pool = ThreadedConnectionPool(
             minconn=2, maxconn=15, dsn=DATABASE_URL, keepalives=1
         )
-        logger.info("Initialized SimpleConnectionPool (Supabase pooler mode).")
+        logger.info("Initialized database connection pool.")
     except Exception as exc:  # noqa: BLE001
         logger.error("Failed to create database connection pool: %s", exc)
 else:
@@ -36,8 +36,8 @@ def get_db_connection() -> Iterator[psycopg2.extensions.connection]:
     try:
         register_vector(conn)
         yield conn
-    except Exception:
-        conn.rollback()
-        raise
     finally:
-        db_pool.putconn(conn)
+        try:
+            conn.rollback()
+        finally:
+            db_pool.putconn(conn)

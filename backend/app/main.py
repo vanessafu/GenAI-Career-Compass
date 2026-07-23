@@ -5,9 +5,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 
+from backend.app.core.http_security import secure_requests
 from backend.app.core.openai_client import openai_client_lifespan
-from backend.app.features.cv_confirmation.router import router as cv_confirmation_router
-from backend.app.features.cv_parsing.router import router as cv_parsing_router
 from backend.app.features.profile_pipeline.router import router as profile_pipeline_router
 from backend.app.features.role_matching.router import router as role_matching_router
 
@@ -19,16 +18,16 @@ async def lifespan(app: FastAPI):
     import asyncio
 
     from backend.app.features.role_matching.embedder import get_embedder
+    from backend.app.features.role_matching.skill_ontology import get_ontology
 
-    # Load the local sentence-transformers model once at startup instead of
-    # lazily on the first /match request - avoids paying that cold-load cost
-    # (several seconds) as user-facing latency on someone's first match.
+    await asyncio.to_thread(get_ontology)
     await asyncio.to_thread(get_embedder)
     async with openai_client_lifespan():
         yield
 
 
 app = FastAPI(title="Career Compass API", lifespan=lifespan)
+app.middleware("http")(secure_requests)
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,8 +37,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(cv_parsing_router)
-app.include_router(cv_confirmation_router)
 app.include_router(profile_pipeline_router)
 app.include_router(role_matching_router)
 
@@ -48,6 +45,14 @@ def add_frontend_routes(app: FastAPI, dist_dir: Path = FRONTEND_DIST) -> None:
     """Serve the built Vite app when frontend/dist is present."""
     dist_dir = dist_dir.resolve()
     index_path = dist_dir / "index.html"
+
+    @app.api_route(
+        "/api/{path:path}",
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        include_in_schema=False,
+    )
+    async def unknown_api(path: str):
+        raise HTTPException(status_code=404)
 
     @app.get("/", include_in_schema=False)
     async def root():

@@ -18,9 +18,12 @@ from backend.app.features.role_matching.normalization import (
 from backend.app.features.role_matching.prepared_skills import (
     PreparedSkillProfile,
     SkillEvidence,
-    prepare_user_skills,
 )
-from backend.app.features.role_matching.skill_ontology import get_ontology, hop_confidence
+from backend.app.features.role_matching.skill_ontology import (
+    canonical_skill_key,
+    get_ontology,
+    hop_confidence,
+)
 
 FULL_CREDIT = 1.0
 TOKEN_CREDIT = 0.75
@@ -257,7 +260,9 @@ def _reverse_prereq_match(required_skill: str, held_canonical: set[str], aliases
     return next(iter(hit)) if hit else None
 
 
-def _canon_value_map(items: dict[str, _T], aliases: dict[str, str]) -> dict[str, _T]:
+def _canon_value_map(
+    items: dict[str, _T], aliases: dict[str, str], *, use_ontology: bool = False
+) -> dict[str, _T]:
     """Canon-map a {raw_skill_key: value} dict to {canonical_key: value},
     preferring the entry whose own key IS the canonical form when multiple
     raw keys alias into the same canonical bucket (e.g. sort_skills lists both
@@ -269,7 +274,11 @@ def _canon_value_map(items: dict[str, _T], aliases: dict[str, str]) -> dict[str,
     result: dict[str, _T] = {}
     for raw_key, value in items.items():
         own_key = normalize_skill_key(raw_key)
-        canon_key = aliases.get(own_key, own_key)
+        canon_key = (
+            canonical_skill_key(raw_key, aliases)
+            if use_ontology
+            else aliases.get(own_key, own_key)
+        )
         if canon_key == own_key or canon_key not in result:
             result[canon_key] = value
     return result
@@ -306,17 +315,22 @@ def align_skills(
     `enable_ontology_tiers` so existing callers (the /match recommendation
     flow) keep their exact current scoring unless they ask for the new tiers."""
     aliases = clean_alias_map(alias_map or {})
-    required = _dedupe(_canon(skill, aliases) for skill in required_skills)
+    use_ontology_tiers = enable_ontology_tiers or prepared is not None
+
+    def alignment_key(skill: str) -> str:
+        if use_ontology_tiers:
+            return canonical_skill_key(skill, aliases)
+        return _canon(skill, aliases)
+
+    required = _dedupe(alignment_key(skill) for skill in required_skills)
     if not required:
         return SkillAlignment(coverage=0.0, matched_skills=[], missing_skills=[], skill_gaps=[])
 
-    weights = _canon_value_map(skill_weights or {}, aliases)
-    domains = _canon_value_map(skill_domains or {}, aliases)
-    display_map = _canon_value_map(skill_display or {}, aliases)
+    weights = _canon_value_map(skill_weights or {}, aliases, use_ontology=use_ontology_tiers)
+    domains = _canon_value_map(skill_domains or {}, aliases, use_ontology=use_ontology_tiers)
+    display_map = _canon_value_map(skill_display or {}, aliases, use_ontology=use_ontology_tiers)
 
-    use_ontology_tiers = enable_ontology_tiers
     if prepared is not None:
-        use_ontology_tiers = True
         explicit = [entry.key for entry in prepared.entries if entry.source == "explicit"]
         context_pool: list[str] = [entry.key for entry in prepared.entries if entry.source == "context"]
         implied_lookup = _implied_lookup_from_prepared(prepared)
@@ -326,8 +340,8 @@ def align_skills(
         user_display = {entry.key: entry.display for entry in prepared.entries}
     else:
         evidence = evidence or SkillEvidence()
-        explicit = _dedupe(_canon(skill, aliases) for skill in evidence.explicit_terms)
-        context_pool = list(evidence.context_terms)
+        explicit = _dedupe(alignment_key(skill) for skill in evidence.explicit_terms)
+        context_pool = [alignment_key(term) for term in evidence.context_terms]
         if use_ontology_tiers:
             implied_lookup = _implied_lookup_from_evidence(evidence.explicit_terms, aliases)
             held_canonical = set(explicit) | set(implied_lookup)
@@ -336,7 +350,7 @@ def align_skills(
             held_canonical = set()
         user_display = {}
         for term in (*evidence.explicit_terms, *evidence.context_terms):
-            user_display.setdefault(_canon(term, aliases), term)
+            user_display.setdefault(alignment_key(term), term)
 
     matched: list[str] = []
     missing: list[str] = []
@@ -420,13 +434,3 @@ def align_skills(
         domain_scores=domain_scores,
         domain_skills=domain_skills,
     )
-
-
-def prepare_confirmed_profile_skills(
-    profile: ConfirmedCVData | CVData, alias_map: dict[str, str] | None = None
-) -> PreparedSkillProfile:
-    """Convenience wrapper for the /prepare-skills endpoint: build the same
-    evidence pools align_skills() would derive from a confirmed CV, then run
-    the one-time ontology-aware preparation over them."""
-    evidence = build_skill_evidence_from_confirmed_profile(profile)
-    return prepare_user_skills(evidence, alias_map)

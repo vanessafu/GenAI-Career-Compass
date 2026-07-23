@@ -3,8 +3,7 @@ Gap analysis (decoupled). The service calls analyze_role_gap() / explain_role_ga
 
 Dimensions:
   1. Skills         -> alias + ontology-aware coverage (exact/token/context/
-                       ontology-implied/reverse-prerequisite) [skill_alignment,
-                       prepared_skills, skill_ontology]
+                       ontology-implied/reverse-prerequisite) [skill_alignment, skill_ontology]
   2. Certifications -> exact normalized certification overlap
   3. Seniority      -> user level/years vs the role's inferred level
   4. Readiness      -> weighted aggregate of the above
@@ -45,10 +44,6 @@ from backend.app.features.role_matching.schemas import (
     SeniorityDimension,
     SkillDimension,
     SkillGap,
-)
-from backend.app.features.role_matching.prepared_skills import (
-    CURRENT_PREPARED_SKILLS_VERSION,
-    PreparedSkillProfile,
 )
 from backend.app.features.role_matching.top_skill_gaps import enrich_gap_report_with_recommendations
 from backend.app.features.role_matching.service import _listify, as_cv_data
@@ -195,7 +190,6 @@ def _analyze_skills(
     skill_domains: dict[str, str],
     skill_display: dict[str, str],
     *,
-    prepared: PreparedSkillProfile | None = None,
     evidence: SkillEvidence | None = None,
 ) -> SkillDimension:
     alignment = align_skills(
@@ -205,7 +199,6 @@ def _analyze_skills(
         skill_weights=skill_weights,
         skill_domains=skill_domains,
         skill_display=skill_display,
-        prepared=prepared,
         enable_ontology_tiers=True,
     )
     return SkillDimension(
@@ -363,16 +356,10 @@ def analyze_role_gap(
     skill_domains = skill_domain_map(sort_skills)
     skill_display = skill_display_map(sort_skills)
 
-    prepared = confirmed_profile.prepared_skills
-    if prepared is not None and prepared.version == CURRENT_PREPARED_SKILLS_VERSION:
-        skills = _analyze_skills(
-            required_skills, alias_map, skill_weights, skill_domains, skill_display, prepared=prepared
-        )
-    else:
-        user_evidence = build_skill_evidence_from_confirmed_profile(confirmed_profile)
-        skills = _analyze_skills(
-            required_skills, alias_map, skill_weights, skill_domains, skill_display, evidence=user_evidence
-        )
+    user_evidence = build_skill_evidence_from_confirmed_profile(confirmed_profile)
+    skills = _analyze_skills(
+        required_skills, alias_map, skill_weights, skill_domains, skill_display, evidence=user_evidence
+    )
     certs = _analyze_certs(_fetch_role_certs(role_id), user_certs)
     seniority, seniority_fit = _analyze_seniority(role["job_title"], user_level, user_years)
 

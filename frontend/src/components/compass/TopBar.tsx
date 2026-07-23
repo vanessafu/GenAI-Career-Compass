@@ -15,6 +15,13 @@ export function TopBar() {
   const setStage = useStageStore((s) => s.setStage);
   const reset = useStageStore((s) => s.reset);
   const hasCv = useStageStore((s) => s.cvData !== null);
+  const hasMatches = useStageStore((s) => s.roleMatches.length > 0);
+  const selectedRoleIds = useStageStore((s) => s.selectedRoleIds);
+  const careerPathReports = useStageStore((s) => s.careerPathReports);
+  const careerPathErrors = useStageStore((s) => s.careerPathErrors);
+  const pathsReady =
+    selectedRoleIds.length > 0 &&
+    selectedRoleIds.every((id) => careerPathReports[id] || careerPathErrors[id]);
 
   const visibleStage = stage === "preparing_paths" ? "focus" : stage;
   const currentIdx = STAGES.findIndex((s) => s.key === visibleStage);
@@ -43,7 +50,11 @@ export function TopBar() {
         {/* Desktop: full stage rail */}
         <nav className="hidden items-center gap-1 sm:flex">
           {STAGES.map((s, i) => {
-            const reachable = i === 0 || hasCv;
+            const reachable =
+              s.key === "entry" ||
+              (s.key === "recap" && hasCv) ||
+              (s.key === "directions" && hasMatches) ||
+              (s.key === "focus" && pathsReady);
             const active = s.key === visibleStage;
             const visited = i < currentIdx;
             return (

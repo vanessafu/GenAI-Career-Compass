@@ -48,8 +48,8 @@ def test_list_score_uses_set_f1_for_partial_match():
 
 def test_list_score_accepts_extra_detail():
     result = score_list_field(
-        ["github.com/alithorpe/game"],
-        ["https://github.com/alithorpe/game"],
+        ["github.com/example/project"],
+        ["https://github.com/example/project"],
     )
 
     assert result["score"] == 1.0
@@ -73,7 +73,7 @@ def test_comparable_cv_fields_include_dates_and_detail_fields():
             "personal_info": {
                 "full_name": "Maya Rodriguez",
                 "email": "maya@example.com",
-                "links": ["linkedin.com/in/maya"],
+                "links": ["linkedin.com/in/example-user"],
             },
             "experience": [
                 {
@@ -112,7 +112,7 @@ def test_comparable_cv_fields_include_dates_and_detail_fields():
 
     assert result["full_name"] == "Maya Rodriguez"
     assert result["email"] == "maya@example.com"
-    assert result["links"] == ["linkedin.com/in/maya"]
+    assert result["links"] == ["linkedin.com/in/example-user"]
     assert result["experience_organizations"] == ["MarketFleet AG"]
     assert result["experience_date_ranges"] == ["2020 2022"]
     assert result["experience_responsibilities"] == ["Built dashboards"]

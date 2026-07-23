@@ -18,19 +18,37 @@ from backend.app.features.profile_pipeline.service import run_profile_pipeline
 router = APIRouter(prefix="/api/v1/profile-pipeline", tags=["Profile Pipeline"])
 logger = logging.getLogger("CareerCompass.ProfilePipeline.Router")
 
+MAX_PDF_BYTES = 5 * 1024 * 1024
+MAX_FILENAME_CHARS = 200
+
+
+async def _read_pdf(file: UploadFile) -> bytes:
+    filename = file.filename or ""
+    if not filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
+    if len(filename) > MAX_FILENAME_CHARS:
+        raise HTTPException(
+            status_code=400,
+            detail="PDF filenames must be 200 characters or fewer.",
+        )
+
+    file_bytes = await file.read(MAX_PDF_BYTES + 1)
+    if len(file_bytes) > MAX_PDF_BYTES:
+        raise HTTPException(status_code=413, detail="PDF files must be 5 MB or smaller.")
+    if not file_bytes.startswith(b"%PDF-"):
+        raise HTTPException(status_code=400, detail="The uploaded file is not a valid PDF.")
+    return file_bytes
+
 
 @router.post("/parse-cv", response_model=ProfilePipelineResponse)
 async def upload_parse_and_prepare_profile(
     file: UploadFile = File(...),
 ) -> ProfilePipelineResponse:
-    """Upload a PDF, parse the CV, privacy-strip it, and build embedding profile data."""
-    if not file.filename.endswith(".pdf") and file.content_type != "application/pdf":
-        logger.warning("Rejected unsupported file format: %s", file.filename)
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
-
+    """Parse a bounded PDF upload and build privacy-safe matching data."""
     try:
-        file_bytes = await file.read()
-        raw_text = extract_text_from_pdf_bytes(file_bytes)
+        raw_text = extract_text_from_pdf_bytes(await _read_pdf(file))
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -39,19 +57,26 @@ async def upload_parse_and_prepare_profile(
 
     try:
         parsed = await parse_cv_to_pydantic(raw_text)
-        parsed.source = SourceDocument(filename=file.filename, extracted_text=raw_text)
-        return await run_profile_pipeline(parsed, artifact_name=file.filename)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        parsed.source = SourceDocument(filename=file.filename)
+        return await run_profile_pipeline(parsed)
+    except Exception as exc:
+        logger.exception("CV profile pipeline failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="CV processing is temporarily unavailable.",
+        ) from exc
 
 
 @router.post("/manual-cv", response_model=ProfilePipelineResponse)
 async def create_manual_profile_pipeline(request: ManualCVInput) -> ProfilePipelineResponse:
-    """Build CVData from manual input, privacy-strip it, and build embedding profile data."""
+    """Build privacy-safe matching data from bounded manual input."""
     try:
-        cv_data = build_cv_data_from_manual_input(request)
-        return await run_profile_pipeline(cv_data, artifact_name="manual_entry")
+        return await run_profile_pipeline(build_cv_data_from_manual_input(request))
     except ManualCVValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Manual profile pipeline failed: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="Profile processing is temporarily unavailable.",
+        ) from exc

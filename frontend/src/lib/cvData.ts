@@ -12,7 +12,6 @@ import type {
   Education,
   Experience,
   ManualCVInput,
-  PreparedSkillProfile,
   Project,
   UserCareerProfile,
 } from "./api";
@@ -38,6 +37,10 @@ const CV_SECTIONS = [
   "skills_extracted",
   "interests",
 ] as const;
+
+const MAX_ITEMS = 50;
+const MAX_SHORT_TEXT_LENGTH = 200;
+const MAX_LONG_TEXT_LENGTH = 5_000;
 
 /** Recap editable lists, kept in the store and merged back into CVData. */
 export type RecapEdits = {
@@ -118,11 +121,8 @@ export function deriveConfidence(proficiency: string | null | undefined): number
   return hit ? hit.score : 65;
 }
 
-/** Extract a 4-digit year from an ISO-ish date string, or fall back to the raw value. */
-function yearOf(date: string | null | undefined, fallback = "—"): string {
-  if (!date) return fallback;
-  const match = date.match(/\d{4}/);
-  return match ? match[0] : date;
+function dateOr(date: string | null | undefined, fallback = "—"): string {
+  return date || fallback;
 }
 
 export function cvDataToSkills(cv: CVData): AnalyzedSkill[] {
@@ -133,43 +133,44 @@ export function cvDataToSkills(cv: CVData): AnalyzedSkill[] {
 }
 
 export function cvDataToExperiences(cv: CVData): ExperienceItem[] {
-  return cv.experience.map((e) => ({
+  return cv.experience.map((e, sourceIndex) => ({
+    sourceIndex,
     role: e.role ?? "Role",
     company: e.organization ?? "—",
-    summary: (e.core_responsibilities ?? [])
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .join("; "),
-    start: yearOf(e.start_date),
-    end: yearOf(e.end_date, "Present"),
+    summary: joinedLongText(e.core_responsibilities ?? []) ?? "",
+    start: dateOr(e.start_date),
+    end: dateOr(e.end_date, "Present"),
   }));
 }
 
 export function cvDataToEducations(cv: CVData): EducationItem[] {
-  return cv.education.map((e) => ({
+  return cv.education.map((e, sourceIndex) => ({
+    sourceIndex,
     degree: e.degree_type ?? "",
     field: e.field_of_study ?? "",
     school: e.institution ?? "—",
-    start: yearOf(e.start_date),
-    end: yearOf(e.end_date),
+    start: dateOr(e.start_date),
+    end: dateOr(e.end_date),
   }));
 }
 
 export function cvDataToCertifications(cv: CVData): CertificationItem[] {
-  return cv.certifications.map((c) => ({
+  return cv.certifications.map((c, sourceIndex) => ({
+    sourceIndex,
     name: c.name ?? "Certification",
     issuer: c.issuing_organization ?? "—",
-    year: yearOf(c.issue_date),
+    year: dateOr(c.issue_date),
   }));
 }
 
 export function cvDataToProjects(cv: CVData): ProjectItem[] {
-  return cv.projects.map((p) => ({
+  return cv.projects.map((p, sourceIndex) => ({
+    sourceIndex,
     name: p.title ?? "Project",
     detail: p.description ?? "—",
     technologies: (p.technologies ?? []).map((t) => t.trim()).filter(Boolean),
-    start: yearOf(p.start_date),
-    end: yearOf(p.end_date),
+    start: dateOr(p.start_date),
+    end: dateOr(p.end_date),
   }));
 }
 
@@ -207,10 +208,23 @@ function textOrNull(value: string | null | undefined): string | null {
   return cleaned;
 }
 
+function boundedText(value: string | null | undefined, maxLength: number): string | null {
+  const cleaned = textOrNull(value);
+  return cleaned?.slice(0, maxLength) ?? null;
+}
+
+function shortTextOrNull(value: string | null | undefined): string | null {
+  return boundedText(value, MAX_SHORT_TEXT_LENGTH);
+}
+
+function longTextOrNull(value: string | null | undefined): string | null {
+  return boundedText(value, MAX_LONG_TEXT_LENGTH);
+}
+
 function yearOrNull(value: string | null | undefined): string | null {
   const cleaned = textOrNull(value);
   if (!cleaned) return null;
-  return cleaned.match(/\d{4}/)?.[0] ?? cleaned;
+  return cleaned.match(/\d{4}/)?.[0] ?? cleaned.slice(0, MAX_SHORT_TEXT_LENGTH);
 }
 
 function uniqueText(values: Iterable<string | null | undefined>): string[] {
@@ -227,8 +241,18 @@ function uniqueText(values: Iterable<string | null | undefined>): string[] {
   return out;
 }
 
+function boundedTextList(values: Iterable<string | null | undefined>): string[] {
+  return uniqueText(values)
+    .map((value) => value.slice(0, MAX_SHORT_TEXT_LENGTH))
+    .slice(0, MAX_ITEMS);
+}
+
+function joinedLongText(values: Iterable<string | null | undefined>): string | null {
+  return longTextOrNull(uniqueText(values).join("; "));
+}
+
 function normalizeInterests(values: Iterable<string | null | undefined>): string[] {
-  return uniqueText(Array.from(values).flatMap((value) => (value ?? "").split(/[,;\n]/)));
+  return boundedTextList(Array.from(values).flatMap((value) => (value ?? "").split(/[,;\n]/)));
 }
 
 /** Project edited CVData into the clean profile schema expected by role matching. */
@@ -237,7 +261,7 @@ export function cvDataToUserCareerProfile(
   identity: Identity | null,
 ): UserCareerProfile {
   const fallback = fallbackIdentity(cv);
-  const skills = uniqueText([
+  const skills = boundedTextList([
     ...cv.skills_extracted.technical_skills.map((skill) => skill.name),
     ...cv.skills_extracted.inferred_skills.map((skill) => skill.name),
     ...cv.skills_extracted.soft_skills.map((skill) => skill.name),
@@ -245,39 +269,42 @@ export function cvDataToUserCareerProfile(
 
   return {
     career_identity: {
-      title: textOrNull(identity?.archetype) ?? fallback.archetype,
+      title:
+        shortTextOrNull(identity?.archetype) ??
+        shortTextOrNull(fallback.archetype) ??
+        "Emerging professional",
       summary:
-        textOrNull(identity?.lead) ?? textOrNull(cv.profile_summary.summary) ?? fallback.lead,
+        longTextOrNull(identity?.lead) ??
+        longTextOrNull(cv.profile_summary.summary) ??
+        longTextOrNull(fallback.lead) ??
+        "We mapped your profile to realistic next roles.",
     },
     education: cv.education.map((item) => ({
-      degree: uniqueText([item.degree_type, item.field_of_study]).join(" in ") || null,
+      degree: shortTextOrNull(uniqueText([item.degree_type, item.field_of_study]).join(" in ")),
       institution: null,
       start_year: yearOrNull(item.start_date),
       end_year: yearOrNull(item.end_date),
     })),
     experience: cv.experience.map((item) => ({
-      role: textOrNull(item.role),
+      role: shortTextOrNull(item.role),
       organization: null,
-      start_date: textOrNull(item.start_date),
-      end_date: textOrNull(item.end_date),
-      summary: uniqueText(item.core_responsibilities).join("; ") || null,
-      skills: uniqueText(item.contextual_skills),
+      start_date: shortTextOrNull(item.start_date),
+      end_date: shortTextOrNull(item.end_date),
+      summary: joinedLongText(item.core_responsibilities),
+      skills: boundedTextList(item.contextual_skills),
     })),
     skills,
     interests: normalizeInterests(cv.interests),
-    potential_direction: textOrNull(cv.potential_direction) ?? "",
+    potential_direction: longTextOrNull(cv.potential_direction) ?? "",
     certifications: cv.certifications.map((item) => ({
-      name: textOrNull(item.name),
-      issuer: textOrNull(item.issuing_organization),
+      name: shortTextOrNull(item.name),
+      issuer: shortTextOrNull(item.issuing_organization),
       year: yearOrNull(item.issue_date),
     })),
     projects: cv.projects.map((item) => ({
-      title: textOrNull(item.title),
-      summary:
-        uniqueText([item.description, item.outcomes.length ? item.outcomes.join("; ") : null]).join(
-          "; ",
-        ) || null,
-      technologies: uniqueText(item.technologies),
+      title: shortTextOrNull(item.title),
+      summary: joinedLongText([item.description, ...item.outcomes]),
+      technologies: boundedTextList(item.technologies),
       year: yearOrNull(item.start_date ?? item.end_date),
     })),
   };
@@ -287,17 +314,23 @@ export function cvDataToUserCareerProfile(
 
 /** Merge edited recap lists back into a base CVData, preserving unedited fields. */
 export function applyEditsToCvData(base: CVData, edits: RecapEdits): CVData {
-  const experience: Experience[] = edits.experiences.map((e, i) => ({
-    ...(base.experience[i] ?? emptyExperience()),
+  const experience: Experience[] = edits.experiences.map((e) => ({
+    ...(e.sourceIndex === undefined
+      ? emptyExperience()
+      : (base.experience[e.sourceIndex] ?? emptyExperience())),
     role: e.role,
     organization: e.company,
-    core_responsibilities: e.summary?.trim() ? [e.summary.trim()] : [],
+    core_responsibilities: e.summary?.trim()
+      ? [e.summary.trim().slice(0, MAX_LONG_TEXT_LENGTH)]
+      : [],
     start_date: e.start === "—" ? null : e.start,
     end_date: e.end === "Present" || e.end === "—" ? null : e.end,
   }));
 
-  const education: Education[] = edits.educations.map((e, i) => ({
-    ...(base.education[i] ?? emptyEducation()),
+  const education: Education[] = edits.educations.map((e) => ({
+    ...(e.sourceIndex === undefined
+      ? emptyEducation()
+      : (base.education[e.sourceIndex] ?? emptyEducation())),
     degree_type: e.degree.trim() || null,
     field_of_study: e.field.trim() || null,
     institution: e.school,
@@ -305,10 +338,12 @@ export function applyEditsToCvData(base: CVData, edits: RecapEdits): CVData {
     end_date: e.end === "—" ? null : e.end,
   }));
 
-  const projects: Project[] = edits.projects.map((p, i) => ({
-    ...(base.projects[i] ?? emptyProject()),
+  const projects: Project[] = edits.projects.map((p) => ({
+    ...(p.sourceIndex === undefined
+      ? emptyProject()
+      : (base.projects[p.sourceIndex] ?? emptyProject())),
     title: p.name,
-    description: p.detail === "—" ? null : p.detail.trim() || null,
+    description: p.detail === "—" ? null : longTextOrNull(p.detail),
     technologies: p.technologies ?? [],
     start_date: p.start === "—" ? null : p.start.trim() || null,
     end_date: p.end === "—" ? null : p.end.trim() || null,
@@ -320,15 +355,24 @@ export function applyEditsToCvData(base: CVData, edits: RecapEdits): CVData {
     experience,
     education,
     projects,
-    certifications: edits.certifications.map((c, i) => ({
-      ...(base.certifications[i] ?? {
-        name: null,
-        issuing_organization: null,
-        issue_date: null,
-        expiration_date: null,
-        credential_id: null,
-        credential_url: null,
-      }),
+    certifications: edits.certifications.map((c) => ({
+      ...(c.sourceIndex === undefined
+        ? {
+            name: null,
+            issuing_organization: null,
+            issue_date: null,
+            expiration_date: null,
+            credential_id: null,
+            credential_url: null,
+          }
+        : (base.certifications[c.sourceIndex] ?? {
+            name: null,
+            issuing_organization: null,
+            issue_date: null,
+            expiration_date: null,
+            credential_id: null,
+            credential_url: null,
+          })),
       name: c.name,
       issuing_organization: c.issuer === "—" ? null : c.issuer,
       issue_date: c.year === "—" ? null : c.year,
@@ -390,14 +434,16 @@ function emptyProject(): Project {
 /* ───────────────────────────  Confirmation  ────────────────────────────── */
 
 /** Wrap a CVData in the ConfirmedCVData envelope (mirrors backend to_confirmed_cv_data). */
-export function toConfirmedCvData(
-  cvData: CVData,
-  identity?: Identity | null,
-  preparedSkills?: PreparedSkillProfile | null,
-): ConfirmedCVData {
+export function toConfirmedCvData(cvData: CVData, identity?: Identity | null): ConfirmedCVData {
   const fallback = fallbackIdentity(cvData);
-  const label = textOrNull(identity?.archetype) ?? fallback.archetype;
-  const summary = textOrNull(identity?.lead) ?? fallback.lead;
+  const label =
+    shortTextOrNull(identity?.archetype) ??
+    shortTextOrNull(fallback.archetype) ??
+    "Emerging professional";
+  const summary =
+    longTextOrNull(identity?.lead) ??
+    longTextOrNull(fallback.lead) ??
+    "We mapped your profile to realistic next roles.";
 
   return {
     confirmed_cv_data: cvData,
@@ -407,8 +453,7 @@ export function toConfirmedCvData(
       skipped_sections: [],
       edited_fields: [],
     },
-    career_identity_statement: `${label}: ${summary}`,
+    career_identity_statement: longTextOrNull(`${label}: ${summary}`),
     career_identity_summary: { label, summary },
-    prepared_skills: preparedSkills ?? null,
   };
 }

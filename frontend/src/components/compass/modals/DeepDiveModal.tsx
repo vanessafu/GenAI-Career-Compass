@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 export function DeepDiveModal({
   open,
@@ -22,6 +22,9 @@ export function DeepDiveModal({
   children: React.ReactNode;
 }) {
   const [desktop, setDesktop] = useState(true);
+  const titleId = useId();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
     const update = () => setDesktop(mq.matches);
@@ -32,9 +35,16 @@ export function DeepDiveModal({
 
   useEffect(() => {
     if (!open) return;
+    previouslyFocusedRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButtonRef.current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      previouslyFocusedRef.current?.focus();
+      previouslyFocusedRef.current = null;
+    };
   }, [open, onClose]);
 
   const initial = desktop ? { opacity: 0, x: 60 } : { opacity: 0, y: 80 };
@@ -48,6 +58,7 @@ export function DeepDiveModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
+            aria-hidden="true"
             className="fixed inset-0 z-40 bg-foreground/15 backdrop-blur-[3px]"
           />
           <motion.div
@@ -55,6 +66,9 @@ export function DeepDiveModal({
             animate={{ opacity: 1, x: 0, y: 0 }}
             exit={initial}
             transition={{ type: "spring", stiffness: 260, damping: 28 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
             className={
               desktop
                 ? wide
@@ -74,7 +88,10 @@ export function DeepDiveModal({
                       {subtitle}
                     </p>
                   )}
-                  <h3 className="mt-1 text-balance font-display text-2xl leading-[1.12] tracking-tight sm:text-3xl">
+                  <h3
+                    id={titleId}
+                    className="mt-1 text-balance font-display text-2xl leading-[1.12] tracking-tight sm:text-3xl"
+                  >
                     {title}
                   </h3>
                 </div>
@@ -84,6 +101,7 @@ export function DeepDiveModal({
                   </div>
                 )}
                 <button
+                  ref={closeButtonRef}
                   onClick={onClose}
                   aria-label="Close"
                   className="absolute right-6 top-6 grid h-9 w-9 place-items-center rounded-full text-foreground/55 hover:bg-foreground/[0.06] hover:text-foreground sm:right-8 sm:top-8"

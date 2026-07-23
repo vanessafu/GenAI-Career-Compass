@@ -2,7 +2,7 @@
 Skill normalization + coverage using the MIND tech-skills ontology (MIT).
 
 Vendor the ontology's aggregated file into your repo, e.g.:
-    data/__aggregated_skills.json
+    backend/data/__aggregated_skills.json.gz
 (download from https://github.com/MIND-TechAI/MIND-tech-ontology , MIT-licensed)
 
 Two ideas drive correct coverage:
@@ -12,23 +12,21 @@ Two ideas drive correct coverage:
 """
 from __future__ import annotations
 
+import gzip
+import hashlib
 import json
 import logging
-import re
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
 
-from backend.app.features.role_matching.normalization import normalize_skill_key
+from backend.app.features.role_matching.normalization import canon_skill, normalize_skill_key
 
 logger = logging.getLogger("CareerCompass.SkillOntology")
 
-ONTOLOGY_PATH = Path(__file__).parent.parent.parent.parent / "data" / "__aggregated_skills.json"
-
-# Credit given when the user only holds a PREREQUISITE of the required skill
-# (e.g. role wants Next.js, user has React). Tune to taste.
-PARTIAL_CREDIT = 0.4
+ONTOLOGY_PATH = Path(__file__).parent.parent.parent.parent / "data" / "__aggregated_skills.json.gz"
+ONTOLOGY_SHA256 = "5ba9aedda04a5052a6b8cdec796ab4350d507a2696986259541950351f4b2e14"
 
 # Hop-decayed credit for skills implied by something the user explicitly holds
 # (e.g. user has Next.js -> role wants React). hop=1 -> 0.65, hop=2 -> 0.52,
@@ -48,34 +46,30 @@ class ImpliedSkill:
     hop: int
     via: str  # canonical name of the explicit skill the shortest path came from
 
-# Split role skill strings on these only. NOTE: '/' is intentionally excluded so
-# CI/CD, TCP/IP, I/O survive as single tokens.
-_SPLIT = re.compile(r"[;,|\n\u2022]+")
+def _load_ontology(path: Path) -> dict | list:
+    if not path.is_file():
+        raise RuntimeError(f"Required MIND ontology file is missing: {path}")
+    try:
+        if path.suffix == ".gz":
+            with gzip.open(path, "rb") as source:
+                payload = source.read()
+        else:
+            payload = path.read_bytes()
+    except OSError as exc:
+        raise RuntimeError(f"MIND ontology file could not be read: {path}") from exc
 
+    if path.resolve() == ONTOLOGY_PATH.resolve():
+        actual = hashlib.sha256(payload).hexdigest()
+        if actual != ONTOLOGY_SHA256:
+            raise RuntimeError("MIND ontology checksum mismatch.")
 
-def parse_raw_skills(raw: Optional[str]) -> list[str]:
-    """career_roles.raw_skills (str) -> deduped list, order preserved."""
-    if not raw:
-        return []
-    out: list[str] = []
-    seen: set[str] = set()
-    for part in _SPLIT.split(raw):
-        s = part.strip()
-        key = s.lower()
-        if s and key not in seen:
-            seen.add(key)
-            out.append(s)
-    return out
-
-
-def severity_from(credit: float) -> str:
-    if credit >= 1.0:
-        return "matched"
-    if credit >= 0.5:
-        return "low"
-    if credit > 0.0:
-        return "medium"
-    return "high"
+    try:
+        raw = json.loads(payload)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise RuntimeError(f"MIND ontology contains invalid JSON: {path}") from exc
+    if not isinstance(raw, (dict, list)):
+        raise RuntimeError(f"MIND ontology has an invalid root value: {path}")
+    return raw
 
 
 class SkillOntology:
@@ -84,19 +78,12 @@ class SkillOntology:
         self._implies: dict[str, list[str]] = {}        # canonical -> direct implied skills
         self._domains: dict[str, list[str]] = {}         # canonical -> domain hints (technicalDomains first)
         self._closure_cache: dict[str, frozenset[str]] = {}
-        self._exact_match_fallback = False
 
         ontology_path = Path(path)
-        if not ontology_path.exists():
-            self._exact_match_fallback = True
-            logger.warning(
-                "Skill ontology file %s not found. Falling back to exact skill matching.",
-                ontology_path,
-            )
-            return
-
-        raw = json.loads(ontology_path.read_text(encoding="utf-8"))
-        nodes = raw.values() if isinstance(raw, dict) else raw  # tolerate list OR dict
+        raw = _load_ontology(ontology_path)
+        nodes = raw.values() if isinstance(raw, dict) else raw
+        if any(not isinstance(node, dict) for node in nodes):
+            raise RuntimeError(f"MIND ontology contains an invalid skill entry: {ontology_path}")
 
         for node in nodes:
             name = node.get("name")
@@ -119,11 +106,10 @@ class SkillOntology:
             if domains:
                 self._domains[name] = domains
 
+        if not self._canonical_by_alias:
+            raise RuntimeError(f"MIND ontology contains no skills: {ontology_path}")
         logger.info("Loaded ontology: %d skills, %d aliases.",
                     len(self._implies), len(self._canonical_by_alias))
-
-    def _fallback_key(self, skill: str) -> str:
-        return re.sub(r"\s+", " ", (skill or "").strip()).casefold()
 
     # ---- normalization ----
     def canonical(self, skill: str) -> Optional[str]:
@@ -155,18 +141,6 @@ class SkillOntology:
         frozen = frozenset(seen)
         self._closure_cache[canonical_name] = frozen
         return frozen
-
-    def expand_user_skills(self, user_skills: Iterable[str]) -> dict[str, str]:
-        """User skills + everything they imply -> {canonical: 'have' | 'implied'}."""
-        effective: dict[str, str] = {}
-        for s in user_skills:
-            c = self.canonical(s)
-            if not c:
-                continue
-            effective.setdefault(c, "have")
-            for imp in self.implied_closure(c):
-                effective.setdefault(imp, "implied")
-        return effective
 
     def implied_with_hops(
         self, user_skills: Iterable[str], max_hops: int = _MAX_HOPS
@@ -200,77 +174,6 @@ class SkillOntology:
                     queue.append((target, next_hop))
         return result
 
-    # ---- coverage ----
-    def compute_coverage(
-        self, required_raw: Optional[str], user_skills: Iterable[str]
-    ) -> tuple[float, list[str], list[dict]]:
-        """
-        Returns (weighted_coverage, matched_canonical_skills, gaps).
-        Each gap: {required_skill, user_closest_skill, transferability, severity}.
-        """
-        user_skills = list(user_skills)
-        if self._exact_match_fallback:
-            required = parse_raw_skills(required_raw)
-            if not required:
-                return 0.0, [], []
-
-            user_keys = {self._fallback_key(skill) for skill in user_skills}
-            matched: list[str] = []
-            gaps: list[dict] = []
-            for req in required:
-                if self._fallback_key(req) in user_keys:
-                    matched.append(req)
-                else:
-                    gaps.append({
-                        "required_skill": req,
-                        "user_closest_skill": None,
-                        "transferability": 0.0,
-                        "severity": severity_from(0.0),
-                    })
-            return len(matched) / len(required), matched, gaps
-
-        required = [self.canonical(r) or r for r in parse_raw_skills(required_raw)]
-        required = list(dict.fromkeys(required))  # dedup, keep order
-        if not required:
-            return 0.0, [], []
-
-        effective = self.expand_user_skills(user_skills)
-        user_canon = {self.canonical(s) or s for s in user_skills}
-
-        matched: list[str] = []
-        gaps: list[dict] = []
-        weight_sum = 0.0
-
-        for req in required:
-            if req in effective:                       # exact or implied -> full credit
-                matched.append(req)
-                weight_sum += 1.0
-                continue
-            # partial: does the user hold a prerequisite of req?
-            prereqs = self.implied_closure(req) - {req}
-            hit = user_canon & prereqs
-            if hit:
-                credit = PARTIAL_CREDIT
-                weight_sum += credit
-                closest = next(iter(hit))
-                gaps.append({
-                    "required_skill": req,
-                    "user_closest_skill": closest,
-                    "transferability": credit,
-                    "severity": severity_from(credit),
-                })
-            else:                                       # true gap
-                gaps.append({
-                    "required_skill": req,
-                    "user_closest_skill": None,
-                    "transferability": 0.0,
-                    "severity": severity_from(0.0),
-                })
-
-        coverage = weight_sum / len(required)
-        return coverage, matched, gaps
-
-
 _ontology: Optional[SkillOntology] = None
 
 
@@ -280,3 +183,10 @@ def get_ontology() -> SkillOntology:
     if _ontology is None:
         _ontology = SkillOntology()
     return _ontology
+
+
+def canonical_skill_key(skill: str, alias_map: dict[str, str]) -> str:
+    """Resolve the database alias map first, then MIND synonyms."""
+    alias_key = canon_skill(skill, alias_map)
+    mind_name = get_ontology().canonical(alias_key)
+    return canon_skill(mind_name, alias_map) if mind_name else alias_key

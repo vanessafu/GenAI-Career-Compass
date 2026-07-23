@@ -1,21 +1,19 @@
+import logging
 from typing import Any
 
-from backend.app.core.pipeline_debug import derive_profile_stem, save_pipeline_artifact
-from backend.app.features.cv_confirmation.schemas import (
-    ConfirmationMetadata,
-    ConfirmedCVData,
-)
-from backend.app.features.cv_parsing.debug_output import save_cv_debug_artifact
+from backend.app.core.validation import MAX_ITEMS
 from backend.app.features.cv_parsing.schemas import CVData
+from backend.app.features.profile_preparation.cv_privacy_service import privacy_strip_cv_data
 from backend.app.features.profile_preparation.identity_generation_service import (
     generate_career_identity,
 )
-from backend.app.features.profile_preparation.cv_privacy_service import privacy_strip_cv_data
 from backend.app.features.profile_preparation.schemas import (
     CareerIdentitySummary,
     EmbeddingProfile,
 )
 from backend.app.features.profile_pipeline.schemas import ProfilePipelineResponse
+
+logger = logging.getLogger("CareerCompass.ProfilePipeline.Service")
 
 
 def _clean_dict(payload: dict[str, Any]) -> dict[str, Any]:
@@ -47,7 +45,7 @@ def _skill_keywords(cv_data: CVData) -> list[str]:
         if key and key not in seen:
             seen.add(key)
             skills.append(skill.name.strip())
-    return skills
+    return skills[:MAX_ITEMS]
 
 
 def build_fallback_career_identity(cv_data: CVData) -> CareerIdentitySummary:
@@ -58,13 +56,15 @@ def build_fallback_career_identity(cv_data: CVData) -> CareerIdentitySummary:
     )
     summary = cv_data.profile_summary.summary
     if not summary:
-        skills = _skill_keywords(cv_data)[:4]
-        interests = [item for item in cv_data.interests if item.strip()][:3]
-        signals = [*skills, *interests]
-        if signals:
-            summary = "Profile combines career signals across " + ", ".join(signals) + "."
-        else:
-            summary = "Profile contains enough career signal to begin role matching."
+        signals = [
+            *_skill_keywords(cv_data)[:4],
+            *[item for item in cv_data.interests if item.strip()][:3],
+        ]
+        summary = (
+            "Profile combines career signals across " + ", ".join(signals) + "."
+            if signals
+            else "Profile contains enough career signal to begin role matching."
+        )
     return CareerIdentitySummary(label=role, summary=summary)
 
 
@@ -94,7 +94,13 @@ def build_embedding_profile(
             "contextual_skills",
         ),
         skills=_skill_keywords(privacy_stripped_cv_data),
-        interests=list(dict.fromkeys(item.strip() for item in privacy_stripped_cv_data.interests if item.strip())),
+        interests=list(
+            dict.fromkeys(
+                item.strip()
+                for item in privacy_stripped_cv_data.interests
+                if item.strip()
+            )
+        ),
         certifications=_section_dicts(
             privacy_stripped_cv_data.certifications,
             "name",
@@ -114,70 +120,19 @@ def build_embedding_profile(
     )
 
 
-async def run_profile_pipeline(cv_data: CVData, *, artifact_name: str | None = None) -> ProfilePipelineResponse:
-    save_cv_debug_artifact(cv_data, name=artifact_name)
-    profile_stem = derive_profile_stem(cv_data, fallback=artifact_name or "profile")
-
+async def run_profile_pipeline(cv_data: CVData) -> ProfilePipelineResponse:
     privacy_stripped_cv_data = privacy_strip_cv_data(cv_data)
-    save_pipeline_artifact(
-        "02_privacy_stripped",
-        privacy_stripped_cv_data,
-        profile_stem=profile_stem,
-    )
-
     try:
         career_identity_summary = await generate_career_identity(privacy_stripped_cv_data)
     except RuntimeError as exc:
+        logger.warning("Career identity generation failed; using fallback: %s", exc)
         career_identity_summary = build_fallback_career_identity(privacy_stripped_cv_data)
-        save_pipeline_artifact(
-            "03_identity_summary_error",
-            {"error": str(exc), "fallback_used": True},
-            profile_stem=profile_stem,
-        )
-    save_pipeline_artifact(
-        "03_identity_summary",
-        {"career_identity_summary": career_identity_summary.model_dump(mode="json")},
-        profile_stem=profile_stem,
-    )
-
-    embedding_profile = build_embedding_profile(
-        privacy_stripped_cv_data,
-        career_identity_summary,
-    )
-    save_pipeline_artifact(
-        "04_embedding_profile",
-        embedding_profile,
-        profile_stem=profile_stem,
-    )
-
-    save_pipeline_artifact(
-        "05_confirmed_with_identity",
-        ConfirmedCVData(
-            confirmed_cv_data=privacy_stripped_cv_data,
-            confirmation_metadata=ConfirmationMetadata(
-                confirmed_sections=[
-                    "personal_info",
-                    "profile_summary",
-                    "experience",
-                    "education",
-                    "projects",
-                    "certifications",
-                    "thesis",
-                    "skills_extracted",
-                    "interests",
-                    "unmapped_information",
-                ],
-            ),
-            career_identity_statement=(
-                f"{career_identity_summary.label}: {career_identity_summary.summary}"
-            ),
-            career_identity_summary=career_identity_summary,
-        ),
-        profile_stem=profile_stem,
-    )
 
     return ProfilePipelineResponse(
         cv_data=cv_data,
         privacy_stripped_cv_data=privacy_stripped_cv_data,
-        embedding_profile=embedding_profile,
+        embedding_profile=build_embedding_profile(
+            privacy_stripped_cv_data,
+            career_identity_summary,
+        ),
     )

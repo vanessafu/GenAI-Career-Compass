@@ -118,7 +118,6 @@ export type Metadata = {
 
 export type SourceDocument = {
   filename: string | null;
-  extracted_text: string | null;
 };
 
 export type CVData = {
@@ -151,26 +150,6 @@ export type ConfirmedCVData = {
   confirmation_metadata: ConfirmationMetadata;
   career_identity_statement?: string | null;
   career_identity_summary?: CareerIdentitySummary | null;
-  prepared_skills?: PreparedSkillProfile | null;
-};
-
-// One-time, role-agnostic skill preparation (normalize + alias-resolve +
-// ontology-canonicalize + hop-decayed closure), computed once via
-// POST /api/v1/roles/prepare-skills and reused across every role a user
-// inspects in the session - see backend role_matching/prepared_skills.py.
-export type PreparedSkillEntry = {
-  key: string;
-  display: string;
-  source: "explicit" | "context" | "ontology_implied";
-  confidence: number;
-  via: string[];
-  domains: string[];
-};
-
-export type PreparedSkillProfile = {
-  version: number;
-  generated_at: string;
-  entries: PreparedSkillEntry[];
 };
 
 // Profile pipeline
@@ -443,6 +422,8 @@ export type ManualCVInput = {
 
 // HTTP helpers
 
+const REQUEST_TIMEOUT_MS = 240_000;
+
 export class ApiError extends Error {
   status: number;
 
@@ -472,6 +453,7 @@ export async function parseCv(file: File): Promise<ProfilePipelineResponse> {
   const response = await fetch(`${API_BASE_URL}/api/v1/profile-pipeline/parse-cv`, {
     method: "POST",
     body: formData,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) await parseError(response);
   return response.json();
@@ -483,6 +465,7 @@ export async function submitManualCv(input: ManualCVInput): Promise<ProfilePipel
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) await parseError(response);
   return response.json();
@@ -496,8 +479,8 @@ export async function matchRoles(profile: UserCareerProfile, topK = 9): Promise<
     body: JSON.stringify({
       profile,
       top_k: topK,
-      include_debug: false,
     }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) await parseError(response);
   const payload: CareerResultsV1 = await response.json();
@@ -505,36 +488,6 @@ export async function matchRoles(profile: UserCareerProfile, topK = 9): Promise<
     matched_roles: payload.results,
     analysis: null,
   };
-}
-
-/** One-time skill preparation for a confirmed CV - run once and cache the
- * result, then thread it into every toConfirmedCvData() call afterwards so
- * gap-analysis/career-path don't re-normalize/re-resolve/re-close it per role. */
-export async function prepareSkills(cvData: CVData): Promise<PreparedSkillProfile> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/roles/prepare-skills`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(cvData),
-  });
-  if (!response.ok) await parseError(response);
-  return response.json();
-}
-
-/** Build a gap report for one selected role and confirmed profile. */
-export async function getRoleGapAnalysis(
-  roleId: string | number,
-  confirmedProfile: ConfirmedCVData,
-): Promise<GapReport> {
-  const response = await fetch(
-    `${API_BASE_URL}/api/v1/roles/${encodeURIComponent(String(roleId))}/gap-analysis`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(confirmedProfile),
-    },
-  );
-  if (!response.ok) await parseError(response);
-  return response.json();
 }
 
 /** Build a grounded career roadmap for one selected role and confirmed profile. */
@@ -548,6 +501,7 @@ export async function getCareerPath(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(confirmedProfile),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     },
   );
   if (!response.ok) await parseError(response);

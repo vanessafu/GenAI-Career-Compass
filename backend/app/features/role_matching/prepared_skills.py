@@ -1,25 +1,22 @@
 """Precomputed, role-agnostic user-skill preparation.
 
-Runs once, right after a CV is confirmed (see role_matching/router.py's
-POST /prepare-skills), so gap-analysis/career-path requests don't have to
-re-normalize + re-resolve aliases + re-walk the ontology closure on every call.
-
-Leaf module: only imports from skill_ontology.py and normalization.py, never
-from skill_alignment.py or cv_confirmation - cv_confirmation/schemas.py needs
-PreparedSkillProfile, and skill_alignment.py already imports ConfirmedCVData
-from cv_confirmation/schemas.py, so this module must not import either of
-those to avoid a cycle.
+Used internally to normalize a profile and walk the MIND ontology once per
+role-matching request rather than once per catalog role.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from backend.app.features.role_matching.normalization import canon_skill, dedupe_clean
-from backend.app.features.role_matching.skill_ontology import get_ontology, hop_confidence
+from backend.app.features.role_matching.skill_ontology import (
+    canonical_skill_key,
+    get_ontology,
+    hop_confidence,
+)
 
 CURRENT_PREPARED_SKILLS_VERSION = 1
 
@@ -46,7 +43,7 @@ class PreparedSkillEntry(BaseModel):
 
 class PreparedSkillProfile(BaseModel):
     version: int = CURRENT_PREPARED_SKILLS_VERSION
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     entries: list[PreparedSkillEntry] = Field(default_factory=list)
 
 
@@ -63,7 +60,7 @@ def prepare_user_skills(
 
     explicit_clean = dedupe_clean(evidence.explicit_terms)
     for term in explicit_clean:
-        key = canon_skill(term, aliases)
+        key = canonical_skill_key(term, aliases)
         if not key or key in seen_keys:
             continue
         seen_keys.add(key)
@@ -71,7 +68,7 @@ def prepare_user_skills(
 
     context_clean = dedupe_clean(evidence.context_terms)
     for term in context_clean:
-        key = canon_skill(term, aliases)
+        key = canonical_skill_key(term, aliases)
         if not key or key in seen_keys:
             continue
         seen_keys.add(key)

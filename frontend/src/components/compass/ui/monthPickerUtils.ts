@@ -19,9 +19,9 @@ function cleanDate(value: string | undefined): string {
   return trimmed && trimmed !== "\u2014" ? trimmed : "";
 }
 
-/** Render a `YYYY-MM` value as a friendly "Mar 2024" label, or the raw value. */
+/** Render an ISO-ish month as a friendly "Mar 2024" label, or the raw value. */
 export function formatMonthLabel(value: string): string {
-  const match = value.trim().match(/^(\d{4})-(\d{2})$/);
+  const match = value.trim().match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
   if (!match) return value.trim();
   const monthIndex = Number(match[2]) - 1;
   const month = MONTH_LABELS[monthIndex] ?? match[2];

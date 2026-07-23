@@ -1,15 +1,15 @@
 __pycache__/
 .venv/
-data/
+/data/
+/database/data/
 .env
+.env.*
+!.env.example
 .vscode/
 .idea/
 outputs/
 output/
-metrics/outputs/**
-!metrics/outputs/
-!metrics/outputs/**/
-!metrics/outputs/**/*.md
+metrics/outputs/
 .DS_Store
 
 # Test/tool artifacts
@@ -31,3 +31,4 @@ frontend/.env.local
 
 career_roles_rows.csv
 career_roles_rows_v2.csv
+/tmp_test_runs/

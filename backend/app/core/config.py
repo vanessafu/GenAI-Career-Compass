@@ -1,6 +1,5 @@
 import logging
 import os
-from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -19,10 +18,8 @@ OPENAI_ROLE_DESCRIPTION_MODEL = os.getenv("OPENAI_ROLE_DESCRIPTION_MODEL", "gpt-
 OPENAI_CAREER_PATH_MODEL = os.getenv("OPENAI_CAREER_PATH_MODEL", "gpt-5.4")
 OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.0"))
 
+# Only the offline role-catalog enrichment script uses Gemini.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-
-# Pipeline artifacts: every step persists its output under this directory.
-PIPELINE_OUTPUT_DIR = Path(os.getenv("PIPELINE_OUTPUT_DIR", "outputs/pipeline"))

@@ -16,13 +16,9 @@ export function FocusStage() {
   const roleMatches = useStageStore((s) => s.roleMatches);
   const cvData = useStageStore((s) => s.cvData);
   const identity = useStageStore((s) => s.identity);
-  const roleGapReports = useStageStore((s) => s.roleGapReports);
-  const roleGapLoading = useStageStore((s) => s.roleGapLoading);
-  const roleGapErrors = useStageStore((s) => s.roleGapErrors);
   const careerPathReports = useStageStore((s) => s.careerPathReports);
   const careerPathLoading = useStageStore((s) => s.careerPathLoading);
   const careerPathErrors = useStageStore((s) => s.careerPathErrors);
-  const loadRoleGapAnalysis = useStageStore((s) => s.loadRoleGapAnalysis);
   const loadCareerPath = useStageStore((s) => s.loadCareerPath);
   const [planRole, setPlanRole] = useState<RoleView | null>(null);
 
@@ -38,12 +34,6 @@ export function FocusStage() {
   useEffect(() => {
     paths.forEach((role) => void loadCareerPath(role.id));
   }, [loadCareerPath, paths]);
-
-  useEffect(() => {
-    if (!planRole) return;
-    void loadCareerPath(planRole.id);
-    void loadRoleGapAnalysis(planRole.id);
-  }, [loadCareerPath, loadRoleGapAnalysis, planRole]);
 
   return (
     <div className="relative flex w-full flex-col px-6 pb-8 pt-[max(5.5rem,calc(env(safe-area-inset-top)+4.5rem))] sm:px-10 lg:px-16 lg:pt-24">
@@ -106,9 +96,6 @@ export function FocusStage() {
           report={careerPathReports[planRole.id] ?? null}
           loading={!!careerPathLoading[planRole.id]}
           error={careerPathErrors[planRole.id] ?? null}
-          gapReport={roleGapReports[planRole.id] ?? null}
-          gapLoading={!!roleGapLoading[planRole.id]}
-          gapError={roleGapErrors[planRole.id] ?? null}
           open={!!planRole}
           onClose={() => setPlanRole(null)}
         />

@@ -57,7 +57,6 @@ export function RecapStage() {
   const setStage = useStageStore((s) => s.setStage);
   const identity = useStageStore((s) => s.identity);
   const setIdentityLead = useStageStore((s) => s.setIdentityLead);
-  const identityLoading = useStageStore((s) => s.identityLoading);
   const skills = useStageStore((s) => s.skills);
   const interests = useStageStore((s) => s.interests);
   const addSkill = useStageStore((s) => s.addSkill);
@@ -82,12 +81,8 @@ export function RecapStage() {
   const [newInterest, setNewInterest] = useState("");
   const leadTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const archetype = identity?.archetype ?? (identityLoading ? "…" : "professional");
-  const lead =
-    identity?.lead ??
-    (identityLoading
-      ? "Generating your career identity…"
-      : "We mapped your profile to realistic next roles.");
+  const archetype = identity?.archetype ?? "professional";
+  const lead = identity?.lead ?? "We mapped your profile to realistic next roles.";
 
   const missingBigSections = buildMissingBigSections({
     educations,
@@ -156,7 +151,6 @@ export function RecapStage() {
                 ref={leadTextareaRef}
                 aria-label="Career context"
                 value={lead}
-                disabled={identityLoading && !identity}
                 onChange={(e) => setIdentityLead(e.target.value)}
                 className="block min-h-[4.5rem] w-full cursor-text resize-none overflow-hidden rounded-xl border border-foreground/10 bg-white/65 px-3 py-2 pr-9 text-[13.5px] leading-snug text-foreground/70 outline-none transition placeholder:text-foreground/35 hover:border-[color:var(--brand)]/25 focus:border-[color:var(--brand)]/35 focus:bg-white/80"
               />
@@ -467,7 +461,12 @@ function RowItem({
       {visibleText(meta) && (
         <span className="shrink-0 text-[12px] tabular-nums text-foreground/60">{meta}</span>
       )}
-      <button onClick={onRemove} className="opacity-0 transition group-hover:opacity-100">
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${title}`}
+        className="opacity-0 transition group-hover:opacity-100 focus-visible:opacity-100"
+      >
         <X size={12} className="text-foreground/50 hover:text-foreground" />
       </button>
     </motion.div>

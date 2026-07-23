@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import tempfile
 import unittest
 from pathlib import Path
 
@@ -21,7 +19,6 @@ from backend.app.features.cv_parsing.schemas import (
     Thesis,
 )
 from backend.app.features.role_matching.gap_analysis import _user_certs, _user_seniority
-from backend.app.features.role_matching.service import extract_user_skills
 from backend.app.features.role_matching.skill_ontology import SkillOntology
 
 
@@ -29,55 +26,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class SkillOntologyTests(unittest.TestCase):
-    def test_missing_ontology_file_falls_back_to_exact_skill_matching(self) -> None:
-        ontology = SkillOntology(path=Path("missing-ontology-file.json"))
+    def test_missing_ontology_file_fails_clearly(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "Required MIND ontology file is missing"):
+            SkillOntology(path=Path("missing-ontology-file.json"))
 
-        coverage, matched, gaps = ontology.compute_coverage(
-            "Python, SQL, FastAPI",
-            ["python", "sql"],
-        )
 
-        self.assertEqual(coverage, 2 / 3)
-        self.assertEqual(matched, ["Python", "SQL"])
-        self.assertEqual(
-            gaps,
-            [
-                {
-                    "required_skill": "FastAPI",
-                    "user_closest_skill": None,
-                    "transferability": 0.0,
-                    "severity": "high",
-                }
-            ],
-        )
+    def test_vendored_ontology_checksum_and_known_relation(self) -> None:
+        ontology = SkillOntology()
 
-    def test_ontology_file_still_supports_synonyms_and_implied_skills(self) -> None:
-        payload = {
-            "react": {
-                "name": "React",
-                "synonyms": ["React.js"],
-                "impliesKnowingSkills": ["JavaScript"],
-            },
-            "javascript": {
-                "name": "JavaScript",
-                "synonyms": ["JS"],
-                "impliesKnowingSkills": [],
-            },
-        }
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "ontology.json"
-            path.write_text(json.dumps(payload), encoding="utf-8")
-
-            ontology = SkillOntology(path=path)
-
-        coverage, matched, gaps = ontology.compute_coverage(
-            "React.js, JavaScript",
-            ["react"],
-        )
-
-        self.assertEqual(coverage, 1.0)
-        self.assertEqual(matched, ["React", "JavaScript"])
-        self.assertEqual(gaps, [])
+        self.assertEqual(ontology.canonical("NextJS"), "Next.js")
+        implied = ontology.implied_closure("Next.js")
+        self.assertIn("React", implied)
+        self.assertIn("JavaScript", implied)
 
 
 class SupabaseSchemaDriftTests(unittest.TestCase):
@@ -168,16 +128,6 @@ class RoleMatchingInputShapeTests(unittest.TestCase):
         return ConfirmedCVData(
             confirmed_cv_data=cv_data,
             confirmation_metadata=ConfirmationMetadata(),
-        )
-
-    def test_legacy_cv_wrapper_skill_extraction_stays_available_for_gap_analysis(self) -> None:
-        confirmed = self._confirmed_profile()
-
-        skills = extract_user_skills(confirmed)
-
-        self.assertEqual(
-            skills,
-            ["Python", "PostgreSQL", "Docker", "REST", "Kafka", "FastAPI"],
         )
 
     def test_gap_analysis_reads_certifications_and_seniority_from_wrapper(self) -> None:

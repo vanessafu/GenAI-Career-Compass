@@ -17,13 +17,12 @@ from backend.app.features.cv_parsing.schemas import (
 from backend.app.features.profile_pipeline import service
 
 
-def test_profile_pipeline_falls_back_when_identity_generation_fails(monkeypatch):
+def test_profile_pipeline_falls_back_when_identity_generation_fails(monkeypatch, tmp_path):
     async def fail_identity_generation(_cv_data):
         raise RuntimeError("identity service unavailable")
 
     monkeypatch.setattr(service, "generate_career_identity", fail_identity_generation)
-    monkeypatch.setattr(service, "save_cv_debug_artifact", lambda *args, **kwargs: None)
-    monkeypatch.setattr(service, "save_pipeline_artifact", lambda *args, **kwargs: None)
+    monkeypatch.chdir(tmp_path)
 
     cv_data = CVData(
         personal_info=PersonalInfo(current_role="Backend Developer"),
@@ -38,10 +37,11 @@ def test_profile_pipeline_falls_back_when_identity_generation_fails(monkeypatch)
         interests=["Cloud platforms"],
     )
 
-    response = asyncio.run(service.run_profile_pipeline(cv_data, artifact_name="test_profile"))
+    response = asyncio.run(service.run_profile_pipeline(cv_data))
 
     assert response.embedding_profile.career_identity_summary.label == "Backend Developer"
     assert "Builds APIs and data services." in response.embedding_profile.career_identity_summary.summary
+    assert not (tmp_path / "outputs").exists()
 
 
 def test_profile_pipeline_uses_privacy_stripped_data_for_identity(monkeypatch):
@@ -55,8 +55,6 @@ def test_profile_pipeline_uses_privacy_stripped_data_for_identity(monkeypatch):
         )
 
     monkeypatch.setattr(service, "generate_career_identity", capture_identity_generation)
-    monkeypatch.setattr(service, "save_cv_debug_artifact", lambda *args, **kwargs: None)
-    monkeypatch.setattr(service, "save_pipeline_artifact", lambda *args, **kwargs: None)
 
     cv_data = CVData(
         source=SourceDocument(filename="jane.pdf", extracted_text="Jane Doe jane@example.com"),
@@ -121,7 +119,7 @@ def test_profile_pipeline_uses_privacy_stripped_data_for_identity(monkeypatch):
         ],
     )
 
-    response = asyncio.run(service.run_profile_pipeline(cv_data, artifact_name="test_profile"))
+    response = asyncio.run(service.run_profile_pipeline(cv_data))
 
     stripped = captured["cv_data"]
     assert stripped == response.privacy_stripped_cv_data

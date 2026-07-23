@@ -1,7 +1,9 @@
 import asyncio
 
+import pytest
+
 from backend.app.features.cv_parsing import service
-from backend.app.features.cv_parsing.schemas import CVData, InferredSkill, SkillsExtracted, SoftSkill
+from backend.app.features.cv_parsing.schemas import CVData, InferredSkill, SkillsExtracted, SoftSkill, SourceDocument
 
 
 def test_cv_parse_uses_combined_parsing_and_extraction_prompt(monkeypatch):
@@ -106,10 +108,12 @@ def test_prompt_instructs_inferred_skills_and_potential_direction_rules():
     assert "inferred_from" in prompt
 
 
-def test_prompt_excludes_personal_links_from_technical_skills():
+def test_prompt_globally_excludes_personal_contact_data():
     prompt = service._CV_PARSING_AND_EXTRACTING_PROMPT.casefold()
-    assert "github" in prompt
-    assert "personal links" in prompt or "account handles" in prompt
+    assert "never extract email" in prompt
+    assert "github/gitlab" in prompt
+    for field in ("personal_info.email", "personal_info.phone", "personal_info.links"):
+        assert field in prompt
 
 
 def test_prompt_instructs_soft_skill_confidence_and_broadened_inference():
@@ -145,3 +149,29 @@ def test_model_override_is_used_for_single_cv_parse(monkeypatch):
 
     assert result.interests == ["AI"]
     assert calls == [(CVData, "cv_parsing", "model-x")]
+
+
+def test_pdf_extraction_enforces_page_and_text_limits(monkeypatch):
+    class Page:
+        def __init__(self, text=""):
+            self.text = text
+
+        def extract_text(self):
+            return self.text
+
+    class Reader:
+        def __init__(self, pages):
+            self.pages = pages
+
+    monkeypatch.setattr(service, "PdfReader", lambda *args, **kwargs: Reader([Page()] * 51))
+    with pytest.raises(ValueError, match="at most 50 pages"):
+        service.extract_text_from_pdf_bytes(b"%PDF-fixture")
+
+    monkeypatch.setattr(service, "PdfReader", lambda *args, **kwargs: Reader([Page("x" * 100_001)]))
+    with pytest.raises(ValueError, match="at most 100,000 characters"):
+        service.extract_text_from_pdf_bytes(b"%PDF-fixture")
+
+
+def test_source_document_never_serializes_raw_cv_text():
+    source = SourceDocument(filename="resume.pdf", extracted_text="private CV text")
+    assert source.model_dump() == {"filename": "resume.pdf"}

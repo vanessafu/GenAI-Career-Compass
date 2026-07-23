@@ -3,7 +3,6 @@ from typing import Union
 
 from .normalization import SENIORITY_ALIASES, SENIORITY_ORDER, normalize_skill_key
 from .schemas import (
-    BUCKET_WEIGHTS,
     BucketedRoles,
     DEFAULT_WEIGHTS,
     RecommendationBucket,
@@ -66,7 +65,6 @@ class Candidate:
     matched_certifications: list[str] = field(default_factory=list)
     final_score: float = 0.0
     bucket: RecommendationBucket = RecommendationBucket.ASPIRATIONAL
-    bucket_score: float = 0.0
 
     def __post_init__(self) -> None:
         self.description = self.description or ""
@@ -94,7 +92,7 @@ def _effective_domain_overlap(candidate: Candidate) -> float:
 
 
 def score_candidate(candidate: Candidate, weights: ScoringWeights) -> float:
-    return (
+    weighted_score = (
         weights.capability_vector_similarity * _clamp01(candidate.capability_vector_similarity)
         + weights.intent_vector_similarity * _clamp01(candidate.intent_vector_similarity)
         + weights.identity_vector_similarity * _clamp01(candidate.identity_vector_similarity)
@@ -102,22 +100,66 @@ def score_candidate(candidate: Candidate, weights: ScoringWeights) -> float:
         + weights.interest_domain_overlap * _effective_domain_overlap(candidate)
         + weights.seniority_fit * _clamp01(candidate.seniority_fit)
     )
+    weight_total = sum(
+        (
+            weights.capability_vector_similarity,
+            weights.intent_vector_similarity,
+            weights.identity_vector_similarity,
+            weights.normalized_skill_overlap,
+            weights.interest_domain_overlap,
+            weights.seniority_fit,
+        )
+    )
+    return weighted_score / weight_total if weight_total > 0 else 0.0
 
 
-def _ranked_buckets(candidate: Candidate) -> list[tuple[RecommendationBucket, float]]:
-    """Score the candidate under all three bucket weight profiles in parallel,
-    ranked best first. The first entry is the candidate's natural (argmax)
-    bucket; the rest are fallbacks for when a preferred bucket is already full."""
-    bucket_scores = {
-        bucket: score_candidate(candidate, weights) for bucket, weights in BUCKET_WEIGHTS.items()
-    }
-    return sorted(bucket_scores.items(), key=lambda item: item[1], reverse=True)
+def assign_bucket(candidate: Candidate) -> RecommendationBucket:
+    """Assign an honest readiness bucket from current capability evidence."""
+    final_score = candidate.final_score
+    skill_overlap = _clamp01(candidate.normalized_skill_overlap)
+    capability = _clamp01(candidate.capability_vector_similarity)
+    identity = _clamp01(candidate.identity_vector_similarity)
+    direction_signal = max(
+        _clamp01(candidate.intent_vector_similarity),
+        identity,
+        _effective_domain_overlap(candidate),
+    )
 
+    if candidate.seniority_gap == "stretch":
+        bucket = (
+            RecommendationBucket.NEXT_STEP
+            if candidate.seniority_fit >= 0.55
+            and final_score >= 0.50
+            and skill_overlap >= 0.20
+            else RecommendationBucket.ASPIRATIONAL
+        )
+        return bucket
 
-def assign_bucket(candidate: Candidate) -> tuple[RecommendationBucket, float]:
-    """The candidate's single best-scoring bucket (mutually exclusive argmax)."""
-    return _ranked_buckets(candidate)[0]
+    high_semantic_ready = (
+        capability >= 0.70
+        and identity >= 0.57
+        and _clamp01(candidate.interest_domain_overlap) >= 0.50
+    )
+    if (
+        (final_score >= 0.58 and skill_overlap >= 0.45)
+        or (
+            candidate.seniority_gap == "match"
+            and skill_overlap >= 0.25
+            and final_score >= 0.50
+        )
+        or (high_semantic_ready and final_score >= 0.48)
+    ):
+        return RecommendationBucket.READY_NOW
 
+    if (
+        final_score >= 0.48
+        and capability >= 0.50
+        and skill_overlap >= 0.20
+        and direction_signal >= 0.52
+    ):
+        return RecommendationBucket.NEXT_STEP
+
+    return RecommendationBucket.ASPIRATIONAL
 
 def _title_tokens(candidate: Candidate) -> set[str]:
     tokens = normalize_skill_key(candidate.job_title).split()
@@ -169,49 +211,6 @@ def _mmr_select(
     return selected
 
 
-def _backfill_underfilled_buckets(
-    grouped: dict[RecommendationBucket, list[Candidate]],
-    quota: int,
-) -> dict[RecommendationBucket, list[Candidate]]:
-    """Each bucket first keeps up to `quota` of its own natural (argmax)
-    candidates, chosen via MMR (relevance + diversity) so a bucket doesn't
-    fill up with near-duplicate roles. Any bucket left short is topped up
-    from the genuine overflow of the other buckets - candidates who lost
-    the cut in their own best bucket - ranked by how well they'd fit the
-    short bucket specifically. This never displaces a candidate who already
-    earned a spot in their own best-fit bucket; it only reuses real
-    leftovers to avoid an empty section."""
-    if quota <= 0:
-        return {bucket: [] for bucket in _BUCKET_ORDER}
-
-    kept: dict[RecommendationBucket, list[Candidate]] = {}
-    overflow: list[Candidate] = []
-    for bucket in _BUCKET_ORDER:
-        bucket_candidates = grouped[bucket]
-        kept[bucket] = _mmr_select(bucket_candidates, quota)
-        kept_ids = {id(c) for c in kept[bucket]}
-        overflow.extend(c for c in bucket_candidates if id(c) not in kept_ids)
-
-    for bucket in _BUCKET_ORDER:
-        shortfall = quota - len(kept[bucket])
-        if shortfall <= 0 or not overflow:
-            continue
-        weights = BUCKET_WEIGHTS[bucket]
-        overflow.sort(key=lambda candidate: score_candidate(candidate, weights), reverse=True)
-        fill, overflow = overflow[:shortfall], overflow[shortfall:]
-        for candidate in fill:
-            candidate.bucket = bucket
-            candidate.bucket_score = score_candidate(candidate, weights)
-        # Preserve the MMR order already decided for `kept`; only the
-        # appended fill (rare: the bucket's natural pool undershot quota)
-        # gets sorted by final_score, so a resort never undoes MMR's
-        # relevance/diversity trade-off for the roles it actually picked.
-        fill.sort(key=lambda item: item.final_score, reverse=True)
-        kept[bucket] = kept[bucket] + fill
-
-    return kept
-
-
 def _to_match(candidate: Candidate) -> RoleMatch:
     return RoleMatch(
         role_id=candidate.role_id,
@@ -252,65 +251,52 @@ def _balanced_bucket_selection(
         return selected
 
     indexes = {bucket: 0 for bucket in _BUCKET_ORDER}
+    seen_role_ids: set[str] = set()
+    seen_titles: set[str] = set()
     remaining = total
 
     while remaining > 0:
-        active_buckets = [
-            bucket
-            for bucket in _BUCKET_ORDER
-            if indexes[bucket] < len(grouped[bucket])
-        ]
-        if not active_buckets:
-            break
+        progressed = False
+        for bucket in _BUCKET_ORDER:
+            while indexes[bucket] < len(grouped[bucket]):
+                candidate = grouped[bucket][indexes[bucket]]
+                indexes[bucket] += 1
+                role_id = str(candidate.role_id)
+                title = normalize_skill_key(candidate.job_title)
+                if role_id in seen_role_ids or (title and title in seen_titles):
+                    continue
 
-        for bucket in active_buckets:
+                selected[bucket].append(candidate)
+                seen_role_ids.add(role_id)
+                if title:
+                    seen_titles.add(title)
+                remaining -= 1
+                progressed = True
+                break
+
             if remaining <= 0:
                 break
-            selected[bucket].append(grouped[bucket][indexes[bucket]])
-            indexes[bucket] += 1
-            remaining -= 1
+        if not progressed:
+            break
 
     return selected
 
-
-def recommend(
-    candidates: list[Candidate],
-    top_k: int | None = None,
-    per_bucket: int | None = None,
-) -> BucketedRoles:
-    if top_k is None and per_bucket is None:
-        top_k = 9
-
+def recommend(candidates: list[Candidate], top_k: int = 9) -> BucketedRoles:
+    top_k = max(0, top_k)
     for candidate in candidates:
-        candidate.bucket, candidate.bucket_score = assign_bucket(candidate)
         candidate.final_score = score_candidate(candidate, DEFAULT_WEIGHTS)
+        candidate.bucket = assign_bucket(candidate)
 
-    grouped: dict[RecommendationBucket, list[Candidate]] = {bucket: [] for bucket in _BUCKET_ORDER}
+    grouped: dict[RecommendationBucket, list[Candidate]] = {
+        bucket: [] for bucket in _BUCKET_ORDER
+    }
     for candidate in candidates:
         grouped[candidate.bucket].append(candidate)
-    for bucket_candidates in grouped.values():
+    for bucket, bucket_candidates in grouped.items():
         bucket_candidates.sort(key=lambda item: item.final_score, reverse=True)
+        grouped[bucket] = _mmr_select(bucket_candidates, min(top_k, len(bucket_candidates)))
 
-    quota = per_bucket if per_bucket is not None else top_k
-    grouped = _backfill_underfilled_buckets(grouped, quota or 0)
-
-    if per_bucket is not None:
-        return BucketedRoles(
-            ready_now=[
-                _to_match(item)
-                for item in grouped[RecommendationBucket.READY_NOW][:per_bucket]
-            ],
-            next_step=[
-                _to_match(item)
-                for item in grouped[RecommendationBucket.NEXT_STEP][:per_bucket]
-            ],
-            aspirational=[
-                _to_match(item)
-                for item in grouped[RecommendationBucket.ASPIRATIONAL][:per_bucket]
-            ],
-        )
-
-    selected = _balanced_bucket_selection(grouped, total=top_k or 0)
+    selected = _balanced_bucket_selection(grouped, total=top_k)
 
     return BucketedRoles(
         ready_now=[_to_match(item) for item in selected[RecommendationBucket.READY_NOW]],

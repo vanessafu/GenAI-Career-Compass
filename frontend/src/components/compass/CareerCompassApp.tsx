@@ -1,5 +1,4 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect } from "react";
 import { useStageStore } from "@/state/useStageStore";
 import { AmbientBackdrop } from "./AmbientBackdrop";
 import { TopBar } from "./TopBar";
@@ -12,18 +11,6 @@ import { FocusStage } from "./stages/FocusStage";
 
 export function CareerCompassApp() {
   const stage = useStageStore((s) => s.stage);
-  const loadDemo = useStageStore((s) => s.loadDemo);
-
-  useEffect(() => {
-    const demo = new URLSearchParams(window.location.search).get("demo");
-    if (demo === "1") {
-      loadDemo("roles");
-      return;
-    }
-    if (demo === "recap" || demo === "roles" || demo === "focus") {
-      loadDemo(demo);
-    }
-  }, [loadDemo]);
 
   return (
     <div

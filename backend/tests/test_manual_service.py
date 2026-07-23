@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from backend.app.features.cv_confirmation.manual_schemas import (
     ManualCVInput,
@@ -23,8 +24,6 @@ def test_minimum_signal_required():
     [
         (
             {
-                "seniority_level": "Senior",
-                "years_of_experience": 6,
                 "technical_skills": ["Python"],
                 "interests": ["Cloud"],
             },
@@ -33,26 +32,6 @@ def test_minimum_signal_required():
         (
             {
                 "current_role": "Engineer",
-                "years_of_experience": 6,
-                "technical_skills": ["Python"],
-                "interests": ["Cloud"],
-            },
-            "seniority",
-        ),
-        (
-            {
-                "current_role": "Engineer",
-                "seniority_level": "Senior",
-                "technical_skills": ["Python"],
-                "interests": ["Cloud"],
-            },
-            "years of experience",
-        ),
-        (
-            {
-                "current_role": "Engineer",
-                "seniority_level": "Senior",
-                "years_of_experience": 6,
                 "interests": ["Cloud"],
             },
             "technical skill",
@@ -60,11 +39,9 @@ def test_minimum_signal_required():
         (
             {
                 "current_role": "Engineer",
-                "seniority_level": "Senior",
-                "years_of_experience": 6,
                 "technical_skills": ["Python"],
             },
-            "interest or target constraint",
+            "interest",
         ),
     ],
 )
@@ -102,7 +79,6 @@ def test_full_mapping_and_profile_summary():
                     "issue_date": "2023",
                 }
             ],
-            target_constraints=["Remote only", "Berlin"],
         )
     )
     assert cv.profile_summary.current_seniority_level == "Senior"
@@ -111,29 +87,38 @@ def test_full_mapping_and_profile_summary():
     assert cv.education[0].degree_type == "MSc"
     assert cv.experience[0].organization == "Acme"
     assert cv.projects[0].technologies == ["Kafka"]
-    assert cv.projects[0].start_date == "2023"
     assert cv.certifications[0].name == "AWS Certified Developer"
-    assert cv.certifications[0].issuing_organization == "AWS"
     assert cv.skills_extracted.languages[0].language == "English"
-    assert cv.unmapped_information[0].label == "target_constraint"
-    assert cv.unmapped_information[0].value == "Remote only"
+    assert cv.unmapped_information == []
 
 
 def test_trimming_dedup_and_blank_filtering():
     cv = build_cv_data_from_manual_input(
         ManualCVInput(
             current_role="Engineer",
-            seniority_level="Senior",
-            years_of_experience=6,
             technical_skills=["Python", " python ", "", "Go"],
             interests=["AI", "ai", "  "],
-            target_constraints=["Remote", " remote ", "  "],
             education=[ManualEducationInput(degree_type="   ")],
             experience=[ManualExperienceInput(role="  ")],
         )
     )
     assert [s.name for s in cv.skills_extracted.technical_skills] == ["Python", "Go"]
     assert cv.interests == ["AI"]
-    assert [item.value for item in cv.unmapped_information] == ["Remote"]
     assert cv.education == []
     assert cv.experience == []
+
+
+def test_manual_payload_bounds_and_unknown_fields():
+    with pytest.raises(ValidationError):
+        ManualCVInput(
+            current_role="Engineer",
+            technical_skills=["Python"] * 51,
+            interests=["Cloud"],
+        )
+    with pytest.raises(ValidationError):
+        ManualCVInput(
+            current_role="Engineer",
+            technical_skills=["Python"],
+            interests=["Cloud"],
+            target_constraints=["Remote"],
+        )

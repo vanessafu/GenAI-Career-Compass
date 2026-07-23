@@ -124,15 +124,12 @@ DEFAULT_SKILL_ALIASES: dict[str, str] = {
     "restful api": "restful apis",
     "spring": "spring framework",
     "spring boot": "spring framework",
-    "figma": "ui ux design",
     "ux": "ui ux design",
     "ui": "ui ux design",
     "accessibility": "web accessibility guidelines",
     "a11y": "web accessibility guidelines",
-    "data": "data analysis",
     "analytics": "data analysis",
     "data analytics": "data analysis",
-    "pandas": "python",
     "ci": "ci cd",
     "ci/cd": "ci cd",
     "continuous integration": "ci cd",
@@ -144,10 +141,10 @@ DEFAULT_SKILL_ALIASES: dict[str, str] = {
 }
 
 
-def as_cv_data(profile: ConfirmedCVData | CVData) -> CVData:
-    """Return the raw CV parser payload for older gap-analysis helpers."""
-    return profile.confirmed_cv_data if isinstance(profile, ConfirmedCVData) else profile
 
+def as_cv_data(profile: ConfirmedCVData | CVData) -> CVData:
+    """Return the raw CV payload used by gap analysis."""
+    return profile.confirmed_cv_data if isinstance(profile, ConfirmedCVData) else profile
 
 def _clean_text(value: Any) -> str | None:
     if value is None:
@@ -270,25 +267,6 @@ def _profile_skill_terms(profile: UserCareerProfile) -> list[str]:
     return _dedupe(skills)
 
 
-def extract_user_skills(profile: ConfirmedCVData | CVData | UserCareerProfile) -> list[str]:
-    """Union of user skills for both the new profile schema and legacy gap helpers."""
-    if isinstance(profile, UserCareerProfile):
-        return _profile_skill_terms(profile)
-
-    cv_data = as_cv_data(profile)
-    skills: list[str] = []
-
-    extracted = getattr(cv_data, "skills_extracted", None)
-    for technical_skill in (getattr(extracted, "technical_skills", None) or []) if extracted else []:
-        skills.append(getattr(technical_skill, "name", "") or "")
-    for project in getattr(cv_data, "projects", None) or []:
-        skills.extend(getattr(project, "technologies", None) or [])
-    for thesis in getattr(cv_data, "thesis", None) or []:
-        skills.extend(getattr(thesis, "technologies", None) or [])
-    for exp in getattr(cv_data, "experience", None) or []:
-        skills.extend(getattr(exp, "contextual_skills", None) or [])
-    return _dedupe(skills)
-
 
 def build_capability_text(profile: UserCareerProfile) -> str:
     parts: list[str] = []
@@ -299,8 +277,6 @@ def build_capability_text(profile: UserCareerProfile) -> str:
     for index, exp in enumerate(profile.experience, start=1):
         line_parts = [
             exp.role,
-            # f"Organization: {exp.organization}" if _clean_text(exp.organization) else None,
-            # f"Dates: {exp.start_date}-{exp.end_date}" if exp.start_date or exp.end_date else None,
             f"Summary: {_truncate(exp.summary)}" if _clean_text(exp.summary) else None,
             f"Skills: {_join_unique(exp.skills)}" if _join_unique(exp.skills) else None,
         ]
@@ -313,7 +289,6 @@ def build_capability_text(profile: UserCareerProfile) -> str:
             project.title,
             f"Summary: {_truncate(project.summary)}" if _clean_text(project.summary) else None,
             f"Technologies: {_join_unique(project.technologies)}" if _join_unique(project.technologies) else None,
-            # f"Year: {project.year}" if _clean_text(project.year) else None,
         ]
         joined = _join_unique(line_parts)
         if joined:
@@ -321,8 +296,6 @@ def build_capability_text(profile: UserCareerProfile) -> str:
     for index, cert in enumerate(profile.certifications, start=1):
         line_parts = [
             cert.name,
-            # f"Issuer: {cert.issuer}" if _clean_text(cert.issuer) else None,
-            # f"Year: {cert.year}" if _clean_text(cert.year) else None,
         ]
         joined = _join_unique(line_parts)
         if joined:
@@ -330,8 +303,6 @@ def build_capability_text(profile: UserCareerProfile) -> str:
     for index, edu in enumerate(profile.education, start=1):
         line_parts = [
             edu.degree,
-                # f"Institution: {edu.institution}" if _clean_text(edu.institution) else None,
-                # f"Years: {edu.start_year}-{edu.end_year}" if edu.start_year or edu.end_year else None,
         ]
         joined = _join_unique(line_parts)
         if joined:
@@ -670,11 +641,8 @@ def _match_roles_sync(
         for row in roles
     ]
 
-    buckets = recommend(
-        candidates,
-        top_k=None if top_k == 9 else top_k,
-        per_bucket=3 if top_k == 9 else None,
-    )
+    buckets = recommend(candidates, top_k=top_k)
+
     logger.info(
         "Matched %d roles -> ready=%d next=%d aspirational=%d",
         len(candidates),

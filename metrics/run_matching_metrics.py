@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.app.features.role_matching.embedder import MODEL_NAME
-from backend.app.features.role_matching.schemas import RecommendationMode, UserCareerProfile
+from backend.app.features.role_matching.schemas import UserCareerProfile
 from backend.app.features.role_matching.service import _match_roles_sync
 from metrics.common import (
     evaluate_matching_roles,
@@ -77,7 +77,6 @@ def evaluate_matching(fixtures: list[dict[str, Any]], fixture_path: Path = DEFAU
             response = _match_roles_sync(
                 UserCareerProfile.model_validate(fixture["profile"]),
                 top_k=9,
-                mode=RecommendationMode.BALANCED,
                 include_debug=False,
             )
             roles, bucket_counts = _role_records_and_buckets(response)

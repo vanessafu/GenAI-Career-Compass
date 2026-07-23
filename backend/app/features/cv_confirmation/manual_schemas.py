@@ -1,54 +1,56 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
+from backend.app.core.validation import LongText, MAX_ITEMS, ShortText
 from backend.app.features.cv_parsing.schemas import Language
 
 
 class ManualEducationInput(BaseModel):
-    degree_type: str
-    institution: str | None = None
-    field_of_study: str | None = None
-    start_date: str | None = None
-    end_date: str | None = None
+    degree_type: ShortText
+    institution: ShortText | None = None
+    field_of_study: ShortText | None = None
+    start_date: ShortText | None = None
+    end_date: ShortText | None = None
 
 
 class ManualExperienceInput(BaseModel):
-    role: str
-    organization: str | None = None
-    description: str | None = None
-    start_date: str | None = None
-    end_date: str | None = None
+    role: ShortText
+    organization: ShortText | None = None
+    description: LongText | None = None
+    start_date: ShortText | None = None
+    end_date: ShortText | None = None
 
 
 class ManualCertificationInput(BaseModel):
-    name: str
-    issuing_organization: str | None = None
-    issue_date: str | None = None
+    name: ShortText
+    issuing_organization: ShortText | None = None
+    issue_date: ShortText | None = None
 
 
 class ManualProjectInput(BaseModel):
-    title: str
-    description: str | None = None
-    technologies: list[str] = Field(default_factory=list)
-    start_date: str | None = None
-    end_date: str | None = None
+    title: ShortText
+    description: LongText | None = None
+    technologies: list[ShortText] = Field(default_factory=list, max_length=MAX_ITEMS)
+    start_date: ShortText | None = None
+    end_date: ShortText | None = None
 
 
 class ManualCVInput(BaseModel):
-    """Frontend-friendly payload for manually entered profiles.
+    """Frontend-friendly payload mapped to the full CVData schema server-side."""
 
-    A thin DTO that is mapped to the full CVData schema server-side, so the
-    frontend does not need to assemble CVData itself.
-    """
+    model_config = ConfigDict(extra="forbid")
 
-    current_role: str | None = None
-    seniority_level: str | None = None
+    current_role: ShortText | None = None
+    seniority_level: ShortText | None = None
     years_of_experience: int | None = Field(default=None, ge=0, le=80)
-    summary: str | None = None
-    education: list[ManualEducationInput] = Field(default_factory=list)
-    experience: list[ManualExperienceInput] = Field(default_factory=list)
-    technical_skills: list[str] = Field(default_factory=list)
-    soft_skills: list[str] = Field(default_factory=list)
-    languages: list[Language] = Field(default_factory=list)
-    interests: list[str] = Field(default_factory=list)
-    projects: list[ManualProjectInput] = Field(default_factory=list)
-    certifications: list[ManualCertificationInput] = Field(default_factory=list)
+    summary: LongText | None = None
+    education: list[ManualEducationInput] = Field(default_factory=list, max_length=MAX_ITEMS)
+    experience: list[ManualExperienceInput] = Field(default_factory=list, max_length=MAX_ITEMS)
+    technical_skills: list[ShortText] = Field(default_factory=list, max_length=MAX_ITEMS)
+    soft_skills: list[ShortText] = Field(default_factory=list, max_length=MAX_ITEMS)
+    languages: list[Language] = Field(default_factory=list, max_length=MAX_ITEMS)
+    interests: list[ShortText] = Field(default_factory=list, max_length=MAX_ITEMS)
+    projects: list[ManualProjectInput] = Field(default_factory=list, max_length=MAX_ITEMS)
+    certifications: list[ManualCertificationInput] = Field(
+        default_factory=list,
+        max_length=MAX_ITEMS,
+    )

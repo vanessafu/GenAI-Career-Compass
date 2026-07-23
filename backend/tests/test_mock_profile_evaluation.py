@@ -108,7 +108,7 @@ class MockProfileEvaluationFixturesTests(unittest.TestCase):
 
         self.assertIn("rest apis", backend_skills)
         self.assertIn("spring framework", backend_skills)
-        self.assertIn("ui ux design", design_skills)
+        self.assertIn("figma", design_skills)
         self.assertIn("web accessibility guidelines", design_skills)
         self.assertIn("google data analytics professional certificate", data_certs)
         self.assertIn("oracle certified associate oca java", backend_certs)

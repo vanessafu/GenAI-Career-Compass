@@ -200,6 +200,7 @@ SENIORITY_ALIASES = {
     "architect": "lead",
     "team lead": "lead",
     "tech lead": "lead",
+    "manager": "lead",
     "head": "director",
     "vp": "director",
     "chief": "director",
@@ -230,7 +231,15 @@ def canon_seniority_label(label: Optional[str]) -> Optional[str]:
 
 def seniority_gap(user_level: Optional[str], role_level: Optional[str]) -> tuple[str, float]:
     """Compare two canonical seniority levels. Returns (gap_label, fit_score)."""
-    if not user_level or not role_level:
+    if not role_level:
+        return "unknown", 0.70
+    if not user_level:
+        if role_level == "director":
+            return "stretch", 0.25
+        if role_level in {"lead", "staff", "principal"}:
+            return "stretch", 0.55
+        if role_level == "senior":
+            return "stretch", 0.65
         return "unknown", 0.70
 
     distance = SENIORITY_ORDER.index(role_level) - SENIORITY_ORDER.index(user_level)

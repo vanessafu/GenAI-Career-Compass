@@ -1,11 +1,14 @@
 import logging
+from io import BytesIO
 
-import fitz
+from pypdf import PdfReader
 
 from backend.app.core import openai_client
 from backend.app.features.cv_parsing.schemas import CVData
 
 logger = logging.getLogger("CareerCompass.CVParsing.Service")
+MAX_PDF_PAGES = 50
+MAX_PDF_TEXT_CHARS = 100_000
 
 # One LLM step for CV parsing plus career signal extraction: structured CV
 # data, inferred interests, inferred soft skills (each with a confidence
@@ -50,11 +53,15 @@ Global Rules
 5. Keep every entry in its own schema section. Projects, certifications and thesis must remain in their own sections unless the CV explicitly presents them as employment.
 6. Do not infer industry, seniority, impact, or career goals.
 7. Use schema enums exactly.
+8. Privacy: never extract email addresses, phone numbers, personal URLs, social
+profiles, or account handles (including GitHub/GitLab). Leave personal_info.email,
+personal_info.phone and personal_info.links null/empty.
 
-Education (only include entries above the high school level)
+Education
 - entry_type:
-  degree | semester_abroad 
+  degree | semester_abroad | high_school | certification | other
 - Exchange/study abroad -> semester_abroad
+- Secondary-school entries -> high_school
 - Work & Travel -> other
 - Degree entries:
   degree_type = degree level only
@@ -73,8 +80,9 @@ Do not include:
 - course names
 - responsibilities
 - achievements
-- company names (e.g. Github,Gitlab,etc.)
-- URLs and other contact info
+- company names
+- personal URLs, email addresses, phone numbers, social/profile links or
+  account handles (including personal GitHub and GitLab profiles)
 
 Each skill should be concise (1-4 words).
 
@@ -131,12 +139,28 @@ Do not describe the current role, repeat interests or invent ambitions.
 def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
     """Extract text from a PDF byte stream in memory."""
     try:
-        with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
-            pages_text = [page.get_text() for page in doc]
-            return "\n".join(pages_text).strip()
+        reader = PdfReader(BytesIO(pdf_bytes), strict=False)
+        pages = list(reader.pages)
     except Exception as exc:
         logger.error("PDF extraction error: %s", exc)
         raise ValueError("The PDF document could not be read.") from exc
+
+    if len(pages) > MAX_PDF_PAGES:
+        raise ValueError(f"PDFs may contain at most {MAX_PDF_PAGES} pages.")
+
+    pages_text: list[str] = []
+    text_chars = 0
+    for page in pages:
+        try:
+            text = page.extract_text() or ""
+        except Exception as exc:
+            logger.error("PDF extraction error: %s", exc)
+            raise ValueError("The PDF document could not be read.") from exc
+        text_chars += len(text)
+        if text_chars > MAX_PDF_TEXT_CHARS:
+            raise ValueError(f"PDF text may contain at most {MAX_PDF_TEXT_CHARS:,} characters.")
+        pages_text.append(text)
+    return "\n".join(pages_text).strip()
 
 
 async def parse_cv_to_pydantic(raw_text: str, *, model: str | None = None) -> CVData:

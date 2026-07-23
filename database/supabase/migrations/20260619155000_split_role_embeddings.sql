@@ -2,8 +2,8 @@
 -- User/profile embeddings remain request-local and are not stored.
 
 alter table public.career_roles
-  add column if not exists capability_embedding vector(768),
-  add column if not exists intent_embedding vector(768),
+  add column if not exists capability_embedding extensions.vector(768),
+  add column if not exists intent_embedding extensions.vector(768),
   add column if not exists capability_embedding_text text,
   add column if not exists intent_embedding_text text;
 

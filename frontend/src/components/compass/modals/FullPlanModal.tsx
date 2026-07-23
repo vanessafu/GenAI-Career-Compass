@@ -4,7 +4,7 @@ import { AnimatedPercent } from "./AnimatedPercent";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, ChevronDown } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useState } from "react";
-import type { CareerPathMilestone, CareerPathReport, GapReport } from "@/lib/api";
+import type { CareerPathMilestone, CareerPathReport } from "@/lib/api";
 import type { RoadmapNodeKind } from "@/lib/roadmapPreview";
 import type { RoleView } from "@/types";
 import { RoadmapNodeIcon } from "../RoadmapNodeIcon";
@@ -39,9 +39,6 @@ export function FullPlanModal({
   report,
   loading,
   error,
-  gapReport,
-  gapLoading,
-  gapError,
   open,
   onClose,
 }: {
@@ -50,14 +47,11 @@ export function FullPlanModal({
   report: CareerPathReport | null;
   loading: boolean;
   error: string | null;
-  gapReport: GapReport | null;
-  gapLoading: boolean;
-  gapError: string | null;
   open: boolean;
   onClose: () => void;
 }) {
   const [showStepDetails, setShowStepDetails] = useState(false);
-  const fallbackGapReport = report?.requirement_breakdown ?? gapReport ?? null;
+  const gapReport = report?.requirement_breakdown ?? null;
   const targetRole = report?.target_role ?? role.title;
   const readiness = report
     ? percent(report.readiness_score ?? report.requirement_breakdown.overall_readiness)
@@ -106,23 +100,7 @@ export function FullPlanModal({
         />
       )}
 
-      {gapError && !fallbackGapReport ? (
-        <ModalBlock className="mb-6 border-l-2 border-red-300 pl-3">
-          <p className="text-[13px] leading-relaxed text-red-700">{gapError}</p>
-        </ModalBlock>
-      ) : gapLoading && !fallbackGapReport ? (
-        <ModalBlock className="mb-6">
-          <p className="text-[13px] leading-relaxed text-foreground/60">Preparing skills gap...</p>
-        </ModalBlock>
-      ) : fallbackGapReport ? (
-        <SkillGapSection report={fallbackGapReport} milestones={visibleMilestones} />
-      ) : (
-        <ModalBlock className="mb-6">
-          <p className="text-[13px] leading-relaxed text-foreground/60">
-            No skills gap report is available yet.
-          </p>
-        </ModalBlock>
-      )}
+      {gapReport && <SkillGapSection report={gapReport} milestones={visibleMilestones} />}
 
       <ModalBlock className="mt-2 border-t border-foreground/10 pt-4">
         <p className="text-[11.5px] leading-relaxed text-foreground/45">
@@ -727,16 +705,7 @@ function displayMilestones(milestones: CareerPathMilestone[]): CareerPathMilesto
 }
 
 function displayTimeline(report: CareerPathReport): string {
-  return (
-    totalTimeline(displayMilestones(report.milestones)) || formatTimeline(report.estimated_timeline)
-  );
-}
-
-function totalTimeline(milestones: CareerPathMilestone[]): string {
-  const durations = milestones.map((milestone) => durationWeeks(milestone.timeline));
-  if (durations.some((duration) => duration === null)) return "";
-
-  return formatDurationWeeks((durations as number[]).reduce((total, weeks) => total + weeks, 0));
+  return formatTimeline(report.estimated_timeline);
 }
 
 function formatTimeline(timeline: string): string {

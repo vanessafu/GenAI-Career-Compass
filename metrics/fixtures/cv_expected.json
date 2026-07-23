@@ -5,9 +5,6 @@
       "pdf": "test_data/cvs/semjon_eschweiler_04_26.pdf",
       "fields": {
         "full_name": "Semjon Marcelowitsch Eschweiler",
-        "email": "semjon.eschweiler@gmail.com",
-        "phone": "+49 15116914895",
-        "location": "Jochbergweg 7/24, 85748, Garching b. München, Germany",
         "experience_roles": [
           "Internship in Computer Vision Development",
           "Orientation Internship as Software Developer",
@@ -153,10 +150,6 @@
           "allowed 45x faster training times than SOTA, but with a considerable quality trade-off",
           "successful implementation of TacticAI (a GNN based corner kick predictor in football) in the domain of competitive esports"
         ],
-        "project_links": [
-          "https://www.linkedin.com/in/semjon-eschweiler/overlay/Project/1428598619/treasury/",
-          "https://www.linkedin.com/in/semjon-eschweiler/overlay/Project/1428320010/treasury/"
-        ],
         "thesis_titles": [
           "Evaluation of a synthetically generated dataset with Unreal Engine for people detection"
         ],
@@ -171,13 +164,6 @@
       "pdf": "test_data/cvs/alison_thorpe.pdf",
       "fields": {
         "full_name": "Alison Thorpe",
-        "email": "alisonthorpe@inter.net",
-        "phone": "07759 123456",
-        "location": "17a Christmas Way, Abingdon, Oxon OX99 2PQ",
-        "links": [
-          "linkedin.com/alison-thorpe-xxxx",
-          "github.com/alithorpe"
-        ],
         "experience_roles": [
           "Industrial Placement Developer",
           "IT Support Intern",
@@ -317,10 +303,6 @@
           "This demo was later fleshed out and released on the Play Store in October 2019",
           "Downloaded 1,467 times since release"
         ],
-        "project_links": [
-          "github.com/alithorpe/game",
-          "github.com/alithorpe/glasses"
-        ],
         "certifications": [
           "AWS Educate",
           "Accenture Digital Skills: User Experience"
@@ -332,14 +314,6 @@
       "pdf": "test_data/cvs/ben_theurich_12_25.pdf",
       "fields": {
         "full_name": "Ben Theurich",
-        "email": "bentheurich@gmail.com",
-        "phone": "+49 1512 9467132",
-        "location": "Munich, Germany 85748",
-        "links": [
-          "linkedin.com/in/ben-theurich",
-          "github.com/BenTheurich",
-          "bentheurich.com"
-        ],
         "experience_roles": [
           "Software Engineer II",
           "Software Engineer I",
@@ -460,11 +434,6 @@
         "project_outcomes": [
           "Winner - LPL Financial 24-Hour Hackathon 2023",
           "Winner - Black Forest Labs Challenge, START Munich Hackathon 2025"
-        ],
-        "project_links": [
-          "github.com/BenTheurich/SecuriKeyGUI",
-          "github.com/BenTheurich/Stocker",
-          "github.com/BenTheurich/EduComic"
         ]
       }
     },
@@ -473,14 +442,7 @@
       "pdf": "test_data/cvs/maya_rodriguez_product_data_cv.pdf",
       "fields": {
         "full_name": "Maya Rodriguez",
-        "email": "maya.rodriguez@example.com",
-        "phone": "+49 170 555 0142",
-        "location": "Berlin, Germany",
         "current_role": "Product Data Analyst",
-        "links": [
-          "linkedin.com/in/maya-rodriguez-data",
-          "github.com/mayarodriguez"
-        ],
         "years_of_experience": 6,
         "experience_roles": [
           "Senior Product Data Analyst",
@@ -636,14 +598,7 @@
       "pdf": "test_data/cvs/nathan_lee_cloud_security_cv.pdf",
       "fields": {
         "full_name": "Nathan Lee",
-        "email": "nathan.lee@example.com",
-        "phone": "+31 6 1234 7788",
-        "location": "Amsterdam, Netherlands",
         "current_role": "Cloud Security Engineer",
-        "links": [
-          "linkedin.com/in/nathanlee-cloudsec",
-          "github.com/nathanlee-secops"
-        ],
         "years_of_experience": 8,
         "experience_roles": [
           "Cloud Security Engineer",

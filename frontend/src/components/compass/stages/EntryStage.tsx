@@ -135,7 +135,6 @@ export function EntryStage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [manualError, setManualError] = useState<string | null>(null);
   const [invalidField, setInvalidField] = useState<"role" | "skills" | "interests" | null>(null);
-  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -178,13 +177,12 @@ export function EntryStage() {
     setManualDraft,
   ]);
 
-  useEffect(() => {
-    const timers = timersRef.current;
-    return () => {
-      timers.forEach(clearTimeout);
+  useEffect(
+    () => () => {
       if (progressTimerRef.current) clearInterval(progressTimerRef.current);
-    };
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!manualOpen) return;
@@ -195,8 +193,6 @@ export function EntryStage() {
   }, [manualOpen]);
 
   const clearLoadingTimers = () => {
-    timersRef.current.forEach(clearTimeout);
-    timersRef.current = [];
     if (progressTimerRef.current) {
       clearInterval(progressTimerRef.current);
       progressTimerRef.current = null;
@@ -363,7 +359,7 @@ export function EntryStage() {
     const ok = await uploadCv(file);
     if (ok) {
       finishProgress();
-      timersRef.current.push(setTimeout(() => setStage("recap"), 600));
+      setStage("recap");
     } else {
       clearLoadingTimers();
       setParsing(false);
@@ -379,19 +375,39 @@ export function EntryStage() {
       showManualError("Add your current role.");
       return;
     }
-    if (skills.length === 0) {
+
+    // Flush any typed-but-not-added tags so the visible form is what gets submitted.
+    const pendingSkill = skillDraft.trim();
+    const pendingInterest = interestDraft.trim();
+    const pendingSoftSkill = softSkillDraft.trim();
+    const skillsOut =
+      pendingSkill && !skills.some((item) => item.toLowerCase() === pendingSkill.toLowerCase())
+        ? [...skills, pendingSkill]
+        : skills;
+    const interestsOut =
+      pendingInterest &&
+      !interests.some((item) => item.toLowerCase() === pendingInterest.toLowerCase())
+        ? [...interests, pendingInterest]
+        : interests;
+    const softSkillsOut =
+      pendingSoftSkill &&
+      !softSkills.some((item) => item.toLowerCase() === pendingSoftSkill.toLowerCase())
+        ? [...softSkills, pendingSoftSkill]
+        : softSkills;
+
+    if (skillsOut.length === 0) {
       setInvalidField("skills");
       showManualError("Add at least one technical skill.");
       return;
     }
-    if (interests.length === 0) {
+    if (interestsOut.length === 0) {
       setInvalidField("interests");
       showManualError("Add at least one interest.");
       return;
     }
     setInvalidField(null);
 
-    // Flush any typed-but-not-added drafts so nothing is lost on submit.
+    // Flush any typed-but-not-added rows so nothing is lost on submit.
     const educationOut = educationDraft.degree.trim()
       ? [
           ...education,
@@ -462,9 +478,9 @@ export function EntryStage() {
       currentRole: role,
       education: educationOut,
       experience: experienceOut,
-      skills,
-      interests,
-      softSkills,
+      skills: skillsOut,
+      interests: interestsOut,
+      softSkills: softSkillsOut,
       languages: languagesOut,
       projects: projectsOut,
       certifications: certificationsOut,
@@ -473,6 +489,12 @@ export function EntryStage() {
 
     setEducation(educationOut);
     setExperience(experienceOut);
+    setSkills(skillsOut);
+    setSkillDraft("");
+    setInterests(interestsOut);
+    setInterestDraft("");
+    setSoftSkills(softSkillsOut);
+    setSoftSkillDraft("");
     setLanguages(languagesOut);
     setProjects(projectsOut);
     setCertifications(certificationsOut);
@@ -514,7 +536,7 @@ export function EntryStage() {
     const ok = await submitManualProfile(manualProfile);
     if (ok) {
       finishProgress();
-      timersRef.current.push(setTimeout(() => setStage("recap"), 600));
+      setStage("recap");
     } else {
       clearLoadingTimers();
       setParsing(false);
@@ -651,7 +673,7 @@ export function EntryStage() {
                   animate={drag ? { scale: 1.01 } : { scale: 1 }}
                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
                   className={cn(
-                    "mt-4 flex flex-1 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-6 text-center transition-colors",
+                    "mt-4 flex flex-1 cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-6 text-center transition-colors focus-within:ring-2 focus-within:ring-[color:var(--brand)]/50",
                     drag
                       ? "border-[color:var(--brand)]/60 bg-[color:var(--brand)]/[0.06]"
                       : "border-foreground/15 bg-white/55",
@@ -660,7 +682,7 @@ export function EntryStage() {
                   <input
                     type="file"
                     accept="application/pdf,.pdf"
-                    className="hidden"
+                    className="sr-only"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) {
@@ -1230,9 +1252,9 @@ function InlineAutocomplete({
           >
             {matches.map((m) => (
               <button
+                type="button"
                 key={m}
-                onMouseDown={(e) => {
-                  e.preventDefault();
+                onClick={() => {
                   onChange(m);
                   setOpen(false);
                 }}
@@ -1295,9 +1317,9 @@ function AutocompleteInput({
           >
             {matches.map((m) => (
               <button
+                type="button"
                 key={m}
-                onMouseDown={(e) => {
-                  e.preventDefault();
+                onClick={() => {
                   onChange(m);
                   setOpen(false);
                 }}
@@ -1363,8 +1385,9 @@ function SkillTypeahead({
               .slice(0, 8)
               .map((p) => (
                 <button
+                  type="button"
                   key={p}
-                  onMouseDown={() => onAdd(p)}
+                  onClick={() => onAdd(p)}
                   className="block w-full rounded-md px-2 py-1.5 text-left text-[12.5px] text-foreground/80 hover:bg-foreground/5"
                 >
                   {p}

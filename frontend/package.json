@@ -9,11 +9,10 @@
     "lint": "eslint .",
     "test:loading-progress": "node scripts/check-loading-progress.mjs",
     "test:feedback-quick-wins": "node scripts/check-feedback-quick-wins.mjs",
-    "test:demo-fixture": "node scripts/check-demo-fixture.mjs",
-    "test:profile-reset": "node scripts/check-profile-reset-regression.mjs",
     "test:scroll": "node scripts/check-scroll-regression.mjs",
     "preview": "vite preview",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test": "vitest run"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -26,11 +25,11 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
-    "@tailwindcss/vite": "^4.2.1",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "^5.0.4",
+    "@vitejs/plugin-react": "^6.0.3",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
@@ -39,9 +38,9 @@
     "globals": "^15.15.0",
     "prettier": "^3.7.3",
     "tailwindcss": "^4.2.1",
-    "tw-animate-css": "^1.3.4",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^7.3.1"
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
   }
 }

@@ -67,24 +67,49 @@
           "role_id": "101",
           "title": "Game Developer",
           "relevance": 0
+        },
+        {
+          "role_id": "346",
+          "title": "Web Designer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "190",
+          "title": "UI Developer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "444",
+          "title": "Application Designer",
+          "relevance": 1,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "196",
+          "title": "WordPress Developer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "189",
+          "title": "UI Designer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "395",
+          "title": "Cloud System Engineer",
+          "relevance": 0
         }
       ],
       "profile": {
         "career_identity": {
           "title": "Frontend student"
         },
-        "skills": [
-          "React",
-          "JavaScript",
-          "HTML",
-          "CSS",
-          "Git"
-        ],
-        "interests": [
-          "cloud",
-          "ux",
-          "web development"
-        ]
+        "skills": ["React", "JavaScript", "HTML", "CSS", "Git"],
+        "interests": ["cloud", "ux", "web development"]
       }
     },
     {
@@ -148,6 +173,48 @@
           "role_id": "85",
           "title": "Entry Level Developer",
           "relevance": 0
+        },
+        {
+          "role_id": "478",
+          "title": "Data Scientist",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "390",
+          "title": "Intelligence Specialist",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "157",
+          "title": "Python Developer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "440",
+          "title": "Computer and Information Research Scientist",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "386",
+          "title": "Database Developer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "67",
+          "title": "Computer Research Scientist",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "325",
+          "title": "Geographic Information Systems (GIS) Analyst",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
         }
       ],
       "profile": {
@@ -166,11 +233,7 @@
             "name": "Google Data Analytics Certificate"
           }
         ],
-        "interests": [
-          "AI",
-          "analytics",
-          "data"
-        ]
+        "interests": ["AI", "analytics", "data"]
       }
     },
     {
@@ -232,6 +295,54 @@
           "role_id": "77",
           "title": "Datadog Engineer",
           "relevance": 0
+        },
+        {
+          "role_id": "86",
+          "title": "Entry Level Network Engineer",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "31",
+          "title": "Production Support Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "26",
+          "title": "Operations Engineer",
+          "relevance": 1,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "327",
+          "title": "Identity and Access Management Specialist",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "435",
+          "title": "IT Apprentice",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "375",
+          "title": "Security Administrator",
+          "relevance": 1,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "379",
+          "title": "Network Analyst",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "318",
+          "title": "Cloud Migration Specialist",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
         }
       ],
       "profile": {
@@ -250,10 +361,7 @@
             "name": "CompTIA A+"
           }
         ],
-        "interests": [
-          "cybersecurity",
-          "cloud"
-        ]
+        "interests": ["cybersecurity", "cloud"]
       }
     },
     {
@@ -318,6 +426,48 @@
           "title": "Entry Level Developer",
           "relevance": 1,
           "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "345",
+          "title": "Back End Developer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "53",
+          "title": "C# Developer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "134",
+          "title": "Mulesoft Developer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "480",
+          "title": "Frameworks Specialist",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "147",
+          "title": "Oracle SQL Developer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "339",
+          "title": "Python Architect",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "13",
+          "title": "Build Engineer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
         }
       ],
       "profile": {
@@ -329,24 +479,13 @@
             "role": "Backend Developer"
           }
         ],
-        "skills": [
-          "Java",
-          "SQL",
-          "APIs",
-          "Git",
-          "Docker",
-          "Spring"
-        ],
+        "skills": ["Java", "SQL", "APIs", "Git", "Docker", "Spring"],
         "certifications": [
           {
             "name": "Oracle Certified Associate Java Programmer"
           }
         ],
-        "interests": [
-          "DevOps",
-          "architecture",
-          "cloud"
-        ]
+        "interests": ["DevOps", "architecture", "cloud"]
       }
     },
     {
@@ -409,6 +548,36 @@
           "role_id": "120",
           "title": "Jr Developer",
           "relevance": 0
+        },
+        {
+          "role_id": "190",
+          "title": "UI Developer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "97",
+          "title": "Frontend Web Developer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "444",
+          "title": "Application Designer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "351",
+          "title": "Multimedia Designer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "449",
+          "title": "UX/UI Researcher",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
         }
       ],
       "profile": {
@@ -423,11 +592,7 @@
           "accessibility",
           "responsive design"
         ],
-        "interests": [
-          "UX",
-          "frontend",
-          "design"
-        ]
+        "interests": ["UX", "frontend", "design"]
       }
     },
     {
@@ -546,6 +711,36 @@
           "title": "Platform Engineer",
           "relevance": 1,
           "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "318",
+          "title": "Cloud Migration Specialist",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "474",
+          "title": "Cloud Architect",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "327",
+          "title": "Identity and Access Management Specialist",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "171",
+          "title": "Senior SRE Engineer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "337",
+          "title": "Network Architect",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
         }
       ],
       "profile": {
@@ -581,11 +776,7 @@
             "name": "CompTIA Security+"
           }
         ],
-        "interests": [
-          "cloud",
-          "cybersecurity",
-          "security automation"
-        ]
+        "interests": ["cloud", "cybersecurity", "security automation"]
       }
     },
     {
@@ -697,6 +888,35 @@
           "title": "DevOps Engineer",
           "relevance": 1,
           "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "174",
+          "title": "Software Engineer",
+          "relevance": 1,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "57",
+          "title": "Cloud Automation Engineer",
+          "relevance": 2,
+          "expected_bucket": "next_step"
+        },
+        {
+          "role_id": "33",
+          "title": "Senior Build and Release Engineer",
+          "relevance": 2,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "120",
+          "title": "Junior Developer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "459",
+          "title": "Technical Animator",
+          "relevance": 0
         }
       ],
       "profile": {
@@ -733,11 +953,7 @@
             "name": "ISTQB Foundation Level"
           }
         ],
-        "interests": [
-          "qa",
-          "automation",
-          "software quality"
-        ]
+        "interests": ["qa", "automation", "software quality"]
       }
     },
     {
@@ -855,6 +1071,45 @@
           "role_id": "428",
           "title": "Portfolio Manager",
           "relevance": 0
+        },
+        {
+          "role_id": "359",
+          "title": "Power BI Developer",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "360",
+          "title": "Power BI Analyst",
+          "relevance": 3,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "15",
+          "title": "Data Analyst",
+          "relevance": 2,
+          "expected_bucket": "ready_now"
+        },
+        {
+          "role_id": "354",
+          "title": "SEO Manager",
+          "relevance": 0
+        },
+        {
+          "role_id": "147",
+          "title": "Oracle SQL Developer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "460",
+          "title": "Art Director",
+          "relevance": 0
+        },
+        {
+          "role_id": "397",
+          "title": "Software Quality Assurance Analyst",
+          "relevance": 0
         }
       ],
       "profile": {
@@ -891,11 +1146,7 @@
             "name": "Certified Scrum Product Owner (CSPO)"
           }
         ],
-        "interests": [
-          "product management",
-          "analytics",
-          "experimentation"
-        ]
+        "interests": ["product management", "analytics", "experimentation"]
       }
     },
     {
@@ -1019,6 +1270,23 @@
           "role_id": "280",
           "title": "Junit Engineer",
           "relevance": 0
+        },
+        {
+          "role_id": "356",
+          "title": "Front-End Designer",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "440",
+          "title": "Computer and Information Research Scientist",
+          "relevance": 1,
+          "expected_bucket": "aspirational"
+        },
+        {
+          "role_id": "159",
+          "title": "React Developer",
+          "relevance": 0
         }
       ],
       "profile": {
@@ -1053,11 +1321,7 @@
             "name": "Google UX Design Professional Certificate"
           }
         ],
-        "interests": [
-          "ux",
-          "design",
-          "research"
-        ]
+        "interests": ["ux", "design", "research"]
       }
     }
   ]

@@ -25,12 +25,14 @@ import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import psycopg2
 from dotenv import load_dotenv
-from google import genai
 from psycopg2.extras import execute_values
+
+if TYPE_CHECKING:
+    from google import genai
 
 from backend.app.core.config import GEMINI_API_KEY, GEMINI_MODEL
 from backend.app.core.database import db_pool, get_db_connection
@@ -152,6 +154,8 @@ def _get_gemini_client() -> "genai.Client":
     if _gemini_client is None:
         if not GEMINI_API_KEY:
             raise RuntimeError("GEMINI_API_KEY is not set in the environment variables.")
+        from google import genai
+
         _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
     return _gemini_client
 
