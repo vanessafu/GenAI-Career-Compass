@@ -41,11 +41,22 @@ function loadCommonJs(sourceText) {
 }
 
 const { buildRoadmapPreviewNodes } = loadCommonJs(source);
-const { roleMatchToView } = loadCommonJs(roleViewSource);
+const { bucketScoreLabel, roleMatchToView } = loadCommonJs(roleViewSource);
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
+
+assert(bucketScoreLabel("ready_now") === "current fit", "Ready now should show current fit.");
+assert(bucketScoreLabel("next_step") === "growth fit", "Next step should show growth fit.");
+assert(
+  bucketScoreLabel("aspirational") === "direction fit",
+  "Aspirational should show direction fit.",
+);
+assert(
+  focusStageSource.includes("bucketScoreLabel(role.bucket)"),
+  "Selected-role cards should retain their assigned lens label.",
+);
 
 assert(
   !iconSource.includes("title.toLowerCase") && !iconSource.includes("RegExp"),

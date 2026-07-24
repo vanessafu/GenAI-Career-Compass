@@ -19,7 +19,7 @@ The run requires the populated read-only PostgreSQL database but makes no OpenAI
 - Bucket accuracy: agreement with reviewed Ready now, Next step, or Aspirational labels.
 - Duplicate titles and unjudged roles: quality guardrails.
 
-`top_k=9` is a total limit. Bucket counts can differ because roles retain their evidence-based natural bucket; the matcher does not relabel candidates to fill a section.
+`top_k=9` is a total limit allocated as three unique roles per normalized lens when eligibility permits: current fit (Ready now), growth fit (Next step), and direction fit (Aspirational). Severe seniority constraints can shift the counts without reducing the total. Scores are comparable within a lens.
 
 ## CV parsing
 

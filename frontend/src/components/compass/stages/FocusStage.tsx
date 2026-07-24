@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ArrowLeft, ChevronRight, Clock, Wallet } from "lucide-react";
 import { buildRoadmapPreviewNodes, type RoadmapPreviewNode } from "@/lib/roadmapPreview";
-import { bucketTone, roleMatchesToViews } from "@/lib/roleView";
+import { bucketScoreLabel, bucketTone, roleMatchesToViews } from "@/lib/roleView";
 import { useStageStore } from "@/state/useStageStore";
 import type { CareerPathReport } from "@/lib/api";
 import type { RoleView } from "@/types";
@@ -163,7 +163,7 @@ function PathCard({
               color: "transparent",
             }}
           >
-            {Math.round(role.fit * 100)}% fit
+            {Math.round(role.fit * 100)}% {bucketScoreLabel(role.bucket)}
           </span>
         </div>
       </div>

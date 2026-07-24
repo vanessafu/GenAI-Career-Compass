@@ -11,6 +11,11 @@ function assert(condition, message) {
 
 assert(source.includes("aria-pressed={selected}"), "Role cards should expose pressed state.");
 assert(
+  source.includes("bucketScoreLabel(role.bucket)") &&
+    /Compare scores\s+within the same section/.test(source),
+  "Role cards should label the assigned scoring lens and explain cross-section scores.",
+);
+assert(
   source.includes("{selected && (") &&
     /\{selected && \([\s\S]*?\bSelected\b[\s\S]*?\)\}/.test(source),
   "The Selected badge text should only render for selected cards.",

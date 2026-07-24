@@ -230,6 +230,7 @@ export type RoleMatch = {
   role_id: string | number;
   bucket: string;
   title: string;
+  /** Percentage score under the role's assigned recommendation lens. */
   matching_score: number;
   salary: string;
   description: string;

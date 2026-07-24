@@ -66,8 +66,8 @@ Use a synthetic fixture or manual entry if you do not want to submit a personal 
 1. FastAPI validates and extracts an uploaded PDF, or accepts the bounded manual-profile form.
 2. OpenAI converts the input into a structured profile. Contact and link fields are removed before the profile continues through matching.
 3. The bundled [MIND tech-skills ontology](https://github.com/MIND-TechAI/MIND-tech-ontology) canonicalizes technical skills and supplies synonym and prerequisite relationships.
-4. PostgreSQL/pgvector retrieves roles from the hosted catalog using capability, intent, and identity embeddings. Skill overlap, interests, identity, and seniority refine the normalized score; certification matches enrich the explanation.
-5. Results are divided into **Ready now**, **Next step**, and **Aspirational** buckets. `top_k` is the total result limit, and duplicate roles are removed.
+4. PostgreSQL/pgvector retrieves roles using capability, intent, and identity embeddings, plus explicit skill overlap, interests, and seniority. Each role is scored under three normalized lenses: **current fit** emphasizes present capability and skills, **growth fit** balances present evidence with intent, and **direction fit** emphasizes interests and intended direction.
+5. With the default `top_k=9`, an exact allocator returns three unique **Ready now**, three **Next step**, and three **Aspirational** roles when enough roles qualify for each lens. If seniority constraints make that split unsafe, it still returns the requested total using only eligible sections. Percentages are honest scores for their assigned lens and should be compared within the same section.
 6. Career-path generation uses the selected catalog role, ESCO grounding, and computed requirement gaps rather than inventing role requirements.
 
 MIND is pinned to commit [`2367527d1a2f5665f595d6e0518294cc69dfb0fe`](https://github.com/MIND-TechAI/MIND-tech-ontology/tree/2367527d1a2f5665f595d6e0518294cc69dfb0fe). See [third-party notices](THIRD_PARTY_NOTICES.md) for licenses and data provenance.

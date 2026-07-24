@@ -24,8 +24,35 @@ class ScoringWeights(BaseModel):
     seniority_fit: float = 0.07
 
 
-# The normalized score shown to users and used to rank candidates.
-DEFAULT_WEIGHTS = ScoringWeights()
+# Each bucket is a distinct ranking lens. Every profile sums to 1.0 so its
+# score is an honest weighted average in the 0..1 range.
+BUCKET_WEIGHTS: dict[RecommendationBucket, ScoringWeights] = {
+    RecommendationBucket.READY_NOW: ScoringWeights(
+        capability_vector_similarity=0.25,
+        intent_vector_similarity=0.08,
+        identity_vector_similarity=0.33,
+        normalized_skill_overlap=0.20,
+        interest_domain_overlap=0.07,
+        seniority_fit=0.07,
+    ),
+    RecommendationBucket.NEXT_STEP: ScoringWeights(
+        capability_vector_similarity=0.13,
+        intent_vector_similarity=0.25,
+        identity_vector_similarity=0.28,
+        normalized_skill_overlap=0.13,
+        interest_domain_overlap=0.14,
+        seniority_fit=0.07,
+    ),
+    RecommendationBucket.ASPIRATIONAL: ScoringWeights(
+        capability_vector_similarity=0.10,
+        intent_vector_similarity=0.40,
+        identity_vector_similarity=0.20,
+        normalized_skill_overlap=0.10,
+        interest_domain_overlap=0.15,
+        seniority_fit=0.05,
+    ),
+}
+
 
 def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
@@ -180,7 +207,11 @@ class CareerResultV1(BaseModel):
     role_id: str | int
     bucket: str
     title: str
-    matching_score: int = Field(ge=0, le=100)
+    matching_score: int = Field(
+        ge=0,
+        le=100,
+        description="Percentage score under the role's assigned recommendation lens.",
+    )
     salary: str = ""
     description: str = ""
     esco_title: str = ""

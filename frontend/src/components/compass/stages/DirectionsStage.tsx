@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useMemo } from "react";
 import { useStageStore, MAX_PICKS } from "@/state/useStageStore";
-import { bucketTone, roleMatchesToViews } from "@/lib/roleView";
+import { bucketScoreLabel, bucketTone, roleMatchesToViews } from "@/lib/roleView";
 import type { RoleView } from "@/types";
 import { ArrowLeft, ArrowRight, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -53,6 +53,11 @@ export function DirectionsStage() {
             </motion.button>
           </div>
         </motion.div>
+
+        <p className="text-[12px] text-foreground/55">
+          Each section weights your current skills and future direction differently. Compare scores
+          within the same section.
+        </p>
 
         {ranked.length === 0 ? (
           <div className="flex flex-1 items-center justify-center">
@@ -175,17 +180,22 @@ function RoleCard({
         >
           {role.title}
         </h3>
-        <span
-          className="shrink-0 font-display leading-none tracking-tight"
-          style={{
-            fontSize: "clamp(1.55rem, 2.1vw, 2rem)",
-            background: "var(--gradient-warm)",
-            WebkitBackgroundClip: "text",
-            backgroundClip: "text",
-            color: "transparent",
-          }}
-        >
-          {Math.round(role.fit * 100)}%
+        <span className="shrink-0 text-right">
+          <span
+            className="block font-display leading-none tracking-tight"
+            style={{
+              fontSize: "clamp(1.55rem, 2.1vw, 2rem)",
+              background: "var(--gradient-warm)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+            }}
+          >
+            {Math.round(role.fit * 100)}%
+          </span>
+          <span className="mt-1 block text-[9px] uppercase tracking-[0.14em] text-foreground/45">
+            {bucketScoreLabel(role.bucket)}
+          </span>
         </span>
       </div>
 

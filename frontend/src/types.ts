@@ -114,7 +114,7 @@ export type RoleView = {
   bucketLabel: string;
   trackLabel: string;
   summary: string;
-  /** Similarity fit in 0..1. */
+  /** Score in 0..1 under the role's assigned recommendation lens. */
   fit: number;
   salary: string;
   escoTitle: string;

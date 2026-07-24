@@ -325,11 +325,9 @@ def build_intent_text(profile: UserCareerProfile) -> str:
 
 
 def build_identity_text(profile: UserCareerProfile) -> str:
-    """Who this person currently, stably identifies as professionally -
-    title + summary. Compared against each role's capability_embedding (no
-    dedicated identity_embedding column exists) as a drift guardrail
-    (recommend.py's _identity_guardrail_multiplier), not a scored dimension
-    in its own right."""
+    """Who this person currently identifies as professionally. The text is
+    compared with each role's capability embedding and scored as the identity
+    signal in all three recommendation lenses."""
     parts: list[str] = []
     if _clean_text(profile.career_identity.title):
         parts.append(f"Career identity: {profile.career_identity.title.strip()}")

@@ -4,31 +4,31 @@ This is the only checked-in metric output. Timestamped detailed reports and fres
 
 ## Role matching
 
-Final local run: 2026-07-20. Fixture: `metrics/fixtures/matching_profiles.json`. Embedding model: `BAAI/bge-base-en-v1.5`. Evaluated catalog: 268 roles with capability and intent embeddings.
+Final local run: 2026-07-24. Fixture: `metrics/fixtures/matching_profiles.json`. Embedding model: `BAAI/bge-base-en-v1.5`. Evaluated catalog: 268 roles with capability and intent embeddings.
 
 | Metric | Result |
 | --- | ---: |
-| nDCG@9 | 69.0% |
-| Precision@3 | 100.0% |
+| nDCG@9 | 69.3% |
+| Precision@3 | 81.5% |
 | MRR@9 | 100.0% |
-| Bucket accuracy | 63.0% |
+| Bucket accuracy | 42.1% |
 | Duplicate normalized titles@9 | 0.00 |
-| Unjudged roles@9 | 0.00 |
+| Unjudged roles@9 | 2.67 |
 | Successful profiles | 9/9 |
 
 | Profile | nDCG@9 | P@3 | MRR@9 | Bucket accuracy |
 | --- | ---: | ---: | ---: | ---: |
-| frontend_student | 55.4% | 100.0% | 100.0% | 50.0% |
-| python_data_student | 77.3% | 100.0% | 100.0% | 44.4% |
-| it_support_beginner | 56.2% | 100.0% | 100.0% | 55.6% |
-| backend_developer | 92.8% | 100.0% | 100.0% | 66.7% |
-| design_frontend | 80.1% | 100.0% | 100.0% | 75.0% |
-| cloud_security_analyst | 84.1% | 100.0% | 100.0% | 66.7% |
-| qa_automation_engineer | 58.1% | 100.0% | 100.0% | 87.5% |
-| product_analytics_pm | 68.8% | 100.0% | 100.0% | 83.3% |
-| ux_researcher | 48.5% | 100.0% | 100.0% | 42.9% |
+| frontend_student | 67.3% | 66.7% | 100.0% | 16.7% |
+| python_data_student | 71.9% | 66.7% | 100.0% | 16.7% |
+| it_support_beginner | 47.5% | 100.0% | 100.0% | 80.0% |
+| backend_developer | 83.1% | 100.0% | 100.0% | 66.7% |
+| design_frontend | 72.5% | 66.7% | 100.0% | 40.0% |
+| cloud_security_analyst | 77.5% | 100.0% | 100.0% | 50.0% |
+| qa_automation_engineer | 50.7% | 66.7% | 100.0% | 57.1% |
+| product_analytics_pm | 87.0% | 100.0% | 100.0% | 25.0% |
+| ux_researcher | 66.4% | 66.7% | 100.0% | 37.5% |
 
-The judgment fixture was reviewed against the current 268-role catalog because the former fixture referenced an older 486-role snapshot. It now covers every role returned by the nine fixed profiles, including explicit relevance-0 judgments for wrong roles. This prevents unjudged results from being treated as hidden successes. Bucket accuracy remains the weakest aggregate and is reported rather than disguised.
+The fixed judgment set predates the final three-lens allocator, so newly returned roles remain explicitly unjudged rather than being counted as hidden successes. Bucket accuracy is also reported without artificial score bands or post-hoc relabeling. Extending the labels requires a fresh human review of those roles.
 
 Reproduce the deterministic run with a populated read-only database:
 

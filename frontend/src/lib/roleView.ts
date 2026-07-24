@@ -16,6 +16,19 @@ function bucketLabel(bucket: string): string {
   return label || "Role";
 }
 
+export function bucketScoreLabel(bucket: string): string {
+  switch (bucket) {
+    case "ready_now":
+      return "current fit";
+    case "next_step":
+      return "growth fit";
+    case "aspirational":
+      return "direction fit";
+    default:
+      return "fit";
+  }
+}
+
 function webUrl(value: string | null | undefined): string {
   const trimmed = value?.trim() || "";
   return /^https?:\/\//i.test(trimmed) ? trimmed : "";
