@@ -19,7 +19,7 @@ The run requires the populated read-only PostgreSQL database but makes no OpenAI
 - Bucket accuracy: agreement with reviewed Ready now, Next step, or Aspirational labels.
 - Duplicate titles and unjudged roles: quality guardrails.
 
-`top_k=9` is a total limit allocated as three unique roles per normalized lens when eligibility permits: current fit (Ready now), growth fit (Next step), and direction fit (Aspirational). Severe seniority constraints can shift the counts without reducing the total. Scores are comparable within a lens.
+`top_k=9` is a total limit allocated as three unique roles per normalized lens when eligibility permits: current fit (Ready now), growth fit (Next step), and direction fit (Aspirational). Quota-aware MMR selects from a 3x globally unique shortlist using 75% lens score and 25% title/skill/domain redundancy, then each section is sorted by its raw lens score. Severe seniority constraints can shift the counts without reducing the total.
 
 ## CV parsing
 

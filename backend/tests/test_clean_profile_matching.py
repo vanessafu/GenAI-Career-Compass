@@ -630,6 +630,112 @@ class RankingBehaviorTests(unittest.TestCase):
                 )
                 self.assertEqual(round(expected, 4), role.final_score)
 
+    def test_mmr_changes_membership_without_changing_bucket_or_display_contract(self) -> None:
+        shared_skills = ["python", "django", "postgresql", "docker"]
+        candidates = [
+            Candidate(
+                role_id="ready-best",
+                job_title="Backend Application Developer",
+                required_skills=shared_skills,
+            ),
+            Candidate(
+                role_id="ready-near-a",
+                job_title="Python Web Engineer",
+                required_skills=shared_skills,
+            ),
+            Candidate(
+                role_id="ready-near-b",
+                job_title="Django API Programmer",
+                required_skills=shared_skills,
+            ),
+            Candidate(
+                role_id="ready-distinct",
+                job_title="Embedded Systems Engineer",
+                required_skills=["rust", "firmware", "embedded systems"],
+            ),
+            *[
+                Candidate(
+                    role_id=f"next-{index}",
+                    job_title=f"Next Role {index}",
+                    required_skills=[f"next skill {index}"],
+                )
+                for index in range(3)
+            ],
+            *[
+                Candidate(
+                    role_id=f"asp-{index}",
+                    job_title=f"Aspirational Role {index}",
+                    required_skills=[f"aspirational skill {index}"],
+                )
+                for index in range(3)
+            ],
+        ]
+        scores: dict[str, dict[RecommendationBucket, float]] = {
+            "ready-best": {
+                RecommendationBucket.READY_NOW: 0.90,
+                RecommendationBucket.NEXT_STEP: 0.10,
+                RecommendationBucket.ASPIRATIONAL: 0.10,
+            },
+            "ready-near-a": {
+                RecommendationBucket.READY_NOW: 0.88,
+                RecommendationBucket.NEXT_STEP: 0.10,
+                RecommendationBucket.ASPIRATIONAL: 0.10,
+            },
+            "ready-near-b": {
+                RecommendationBucket.READY_NOW: 0.86,
+                RecommendationBucket.NEXT_STEP: 0.10,
+                RecommendationBucket.ASPIRATIONAL: 0.10,
+            },
+            "ready-distinct": {
+                RecommendationBucket.READY_NOW: 0.83,
+                RecommendationBucket.NEXT_STEP: 0.10,
+                RecommendationBucket.ASPIRATIONAL: 0.10,
+            },
+        }
+        for index in range(3):
+            scores[f"next-{index}"] = {
+                RecommendationBucket.READY_NOW: 0.10,
+                RecommendationBucket.NEXT_STEP: 0.95 - index * 0.01,
+                RecommendationBucket.ASPIRATIONAL: 0.10,
+            }
+            scores[f"asp-{index}"] = {
+                RecommendationBucket.READY_NOW: 0.10,
+                RecommendationBucket.NEXT_STEP: 0.10,
+                RecommendationBucket.ASPIRATIONAL: 0.95 - index * 0.01,
+            }
+
+        def fake_score(candidate: Candidate, weights: role_schemas.ScoringWeights) -> float:
+            bucket = next(
+                bucket
+                for bucket, configured in role_schemas.BUCKET_WEIGHTS.items()
+                if configured is weights
+            )
+            return scores[str(candidate.role_id)][bucket]
+
+        with patch(
+            "backend.app.features.role_matching.recommendation.score_candidate",
+            side_effect=fake_score,
+        ):
+            buckets = recommend(candidates, top_k=9)
+
+        all_roles = [*buckets.ready_now, *buckets.next_step, *buckets.aspirational]
+        bucket_lists = (buckets.ready_now, buckets.next_step, buckets.aspirational)
+        self.assertEqual(
+            (3, 3, 3),
+            tuple(len(roles) for roles in bucket_lists),
+        )
+        self.assertEqual(9, len({str(role.role_id) for role in all_roles}))
+        self.assertEqual(
+            ["ready-best", "ready-near-a", "ready-distinct"],
+            [role.role_id for role in buckets.ready_now],
+        )
+        self.assertNotIn("ready-near-b", {role.role_id for role in all_roles})
+        for roles in (buckets.ready_now, buckets.next_step, buckets.aspirational):
+            self.assertEqual(
+                [role.final_score for role in roles],
+                sorted((role.final_score for role in roles), reverse=True),
+            )
+
     def test_lens_assignment_uses_distinct_weight_profiles(self) -> None:
         candidates = [
             Candidate(

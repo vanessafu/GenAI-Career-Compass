@@ -23,6 +23,10 @@ _TITLE_LEVEL_MODIFIERS = frozenset(
 NEXT_STEP_SKILL_OVERLAP = 0.35
 STRETCH_MIN_SKILL_OVERLAP = 0.20
 
+# MMR influences membership only; displayed percentages remain raw lens scores.
+MMR_LAMBDA = 0.75
+MMR_POOL_MULTIPLIER = 3
+
 
 _BUCKET_ORDER = (
     RecommendationBucket.READY_NOW,
@@ -106,12 +110,36 @@ def score_candidate(candidate: Candidate, weights: ScoringWeights) -> float:
     return weighted_score / weight_total if weight_total > 0 else 0.0
 
 
-def _title_key(candidate: Candidate) -> str:
+def _title_tokens(candidate: Candidate) -> set[str]:
     tokens = normalize_skill_key(candidate.job_title).split()
     if tokens[:2] == ["entry", "level"]:
         tokens = tokens[2:]
-    core = sorted(token for token in tokens if token not in _TITLE_LEVEL_MODIFIERS)
+    return {token for token in tokens if token not in _TITLE_LEVEL_MODIFIERS}
+
+
+def _title_key(candidate: Candidate) -> str:
+    core = sorted(_title_tokens(candidate))
     return " ".join(core) or f"role:{candidate.role_id}"
+
+
+def _jaccard(left: set[str], right: set[str]) -> float:
+    if not left or not right:
+        return 0.0
+    return len(left & right) / len(left | right)
+
+
+def _role_similarity(left: Candidate, right: Candidate) -> float:
+    def skill_domain_tokens(candidate: Candidate) -> set[str]:
+        return {
+            key
+            for value in (*candidate.required_skills, *candidate.domain_tags)
+            if (key := normalize_skill_key(value))
+        }
+
+    return max(
+        _jaccard(skill_domain_tokens(left), skill_domain_tokens(right)),
+        _jaccard(_title_tokens(left), _title_tokens(right)),
+    )
 
 
 def _lens_eligible(
@@ -241,8 +269,67 @@ def _balanced_lens_selection(
     return selected
 
 
+def _mmr_select(
+    pool: dict[RecommendationBucket, list[Candidate]],
+    target_counts: dict[RecommendationBucket, int],
+) -> dict[RecommendationBucket, list[Candidate]] | None:
+    if any(len(pool[bucket]) < target_counts[bucket] for bucket in _BUCKET_ORDER):
+        return None
+
+    remaining = [candidate for bucket in _BUCKET_ORDER for candidate in pool[bucket]]
+    selected: dict[RecommendationBucket, list[Candidate]] = {
+        bucket: [] for bucket in _BUCKET_ORDER
+    }
+    target_total = sum(target_counts.values())
+
+    while sum(len(roles) for roles in selected.values()) < target_total:
+        chosen = [candidate for roles in selected.values() for candidate in roles]
+        available = [
+            candidate
+            for candidate in remaining
+            if len(selected[candidate.bucket]) < target_counts[candidate.bucket]
+        ]
+        if not available:
+            return None
+
+        def mmr_key(candidate: Candidate) -> tuple[float, float, str]:
+            redundancy = (
+                max(_role_similarity(candidate, other) for other in chosen)
+                if chosen
+                else 0.0
+            )
+            return (
+                MMR_LAMBDA * candidate.final_score
+                - (1 - MMR_LAMBDA) * redundancy,
+                candidate.final_score,
+                str(candidate.role_id),
+            )
+
+        candidate = max(available, key=mmr_key)
+        selected[candidate.bucket].append(candidate)
+        remaining.remove(candidate)
+
+    for roles in selected.values():
+        roles.sort(
+            key=lambda candidate: (candidate.final_score, str(candidate.role_id)),
+            reverse=True,
+        )
+    return selected
+
+
 def recommend(candidates: list[Candidate], top_k: int = 9) -> BucketedRoles:
-    selected = _balanced_lens_selection(candidates, total=max(0, top_k))
+    total = max(0, top_k)
+    selected = _balanced_lens_selection(candidates, total=total)
+    target_counts = {bucket: len(selected[bucket]) for bucket in _BUCKET_ORDER}
+
+    if total > 1:
+        # ponytail: a bounded 3x pool gives MMR useful alternatives without a
+        # full diversity-aware assignment solver; baseline is the safe fallback.
+        pool = _balanced_lens_selection(
+            candidates,
+            total=total * MMR_POOL_MULTIPLIER,
+        )
+        selected = _mmr_select(pool, target_counts) or selected
 
     return BucketedRoles(
         ready_now=[_to_match(item) for item in selected[RecommendationBucket.READY_NOW]],
