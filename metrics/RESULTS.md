@@ -8,27 +8,27 @@ Final local run: 2026-07-24. Fixture: `metrics/fixtures/matching_profiles.json`.
 
 | Metric | Result |
 | --- | ---: |
-| nDCG@9 | 69.8% |
-| Precision@3 | 92.6% |
+| nDCG@9 | 66.3% |
+| Precision@3 | 85.2% |
 | MRR@9 | 100.0% |
 | Bucket accuracy | 51.7% |
 | Duplicate normalized titles@9 | 0.00 |
-| Unjudged roles@9 | 2.33 |
+| Unjudged roles@9 | 2.44 |
 | Successful profiles | 9/9 |
 
 | Profile | nDCG@9 | P@3 | MRR@9 | Bucket accuracy |
 | --- | ---: | ---: | ---: | ---: |
-| frontend_student | 60.8% | 100.0% | 100.0% | 33.3% |
+| frontend_student | 46.6% | 66.7% | 100.0% | 20.0% |
 | python_data_student | 77.4% | 66.7% | 100.0% | 42.9% |
 | it_support_beginner | 52.4% | 100.0% | 100.0% | 50.0% |
 | backend_developer | 85.0% | 100.0% | 100.0% | 57.1% |
-| design_frontend | 81.4% | 100.0% | 100.0% | 50.0% |
+| design_frontend | 82.1% | 100.0% | 100.0% | 66.7% |
 | cloud_security_analyst | 82.0% | 100.0% | 100.0% | 66.7% |
 | qa_automation_engineer | 49.6% | 66.7% | 100.0% | 42.9% |
 | product_analytics_pm | 64.9% | 100.0% | 100.0% | 85.7% |
-| ux_researcher | 74.6% | 100.0% | 100.0% | 37.5% |
+| ux_researcher | 56.6% | 66.7% | 100.0% | 28.6% |
 
-The fixed judgment set predates the final three-lens/MMR selector, so newly returned roles remain explicitly unjudged rather than being counted as hidden successes. Bucket accuracy is also reported without artificial score bands or post-hoc relabeling. Extending the labels requires a fresh human review of those roles.
+The fixed judgment set predates the final three-lens/MMR selector, so newly returned roles remain explicitly unjudged rather than being counted as hidden successes. Compound spellings such as `frontend` and `front end` are treated as one title family and cannot occupy separate slots. Bucket accuracy is also reported without artificial score bands or post-hoc relabeling. Extending the labels requires a fresh human review of those roles.
 
 Reproduce the deterministic run with a populated read-only database:
 

@@ -12,6 +12,7 @@ import backend.app.features.role_matching.schemas as role_schemas
 from backend.app.features.role_matching.recommendation import (
     Candidate,
     _effective_domain_overlap,
+    _title_key,
     recommend,
     score_candidate,
 )
@@ -1209,6 +1210,12 @@ class RankingBehaviorTests(unittest.TestCase):
         self.assertIn("data manager", normalized_titles)
         self.assertFalse(
             {"ui designer", "senior ui designer"}.issubset(normalized_titles)
+        )
+
+    def test_title_deduplication_handles_compound_spelling_variants(self) -> None:
+        self.assertEqual(
+            _title_key(Candidate(role_id="a", job_title="Frontend Developer")),
+            _title_key(Candidate(role_id="b", job_title="Junior Front-End Developer")),
         )
 
 

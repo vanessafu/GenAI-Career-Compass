@@ -111,7 +111,9 @@ def score_candidate(candidate: Candidate, weights: ScoringWeights) -> float:
 
 
 def _title_tokens(candidate: Candidate) -> set[str]:
-    tokens = normalize_skill_key(candidate.job_title).split()
+    normalized_title = f" {normalize_skill_key(candidate.job_title)} "
+    normalized_title = normalized_title.replace(" front end ", " frontend ").strip()
+    tokens = normalized_title.split()
     if tokens[:2] == ["entry", "level"]:
         tokens = tokens[2:]
     return {token for token in tokens if token not in _TITLE_LEVEL_MODIFIERS}
